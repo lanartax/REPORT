@@ -1,4 +1,9 @@
 {
+  "name": "workspacegadgetmart",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node local-server.js"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0"
   }
