@@ -20,16 +20,18 @@ module.exports = async function handler(req, res) {
     if (sql) {
       try {
         const rows = await sql`SELECT key, month, year, team_target, sales_targets FROM monthly_targets`;
-        const result = {};
-        rows.forEach(r => {
-          result[r.key] = {
-            month: r.month,
-            year: r.year,
-            teamTarget: Number(r.team_target),
-            salesTargets: r.sales_targets
-          };
-        });
-        return res.status(200).json(result);
+        if (rows && rows.length > 0) {
+          const result = {};
+          rows.forEach(r => {
+            result[r.key] = {
+              month: r.month,
+              year: r.year,
+              teamTarget: Number(r.team_target),
+              salesTargets: r.sales_targets
+            };
+          });
+          return res.status(200).json(result);
+        }
       } catch (err) {
         console.error("Neon targets fetch error:", err);
       }

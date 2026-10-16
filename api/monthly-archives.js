@@ -19,9 +19,11 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     if (sql) {
       try {
-        const rows = await sql`SELECT data FROM monthly_archives ORDER BY created_at DESC`;
-        const list = rows.map(r => r.data);
-        return res.status(200).json(list);
+        const rows = await sql`SELECT data FROM monthly_archives ORDER BY year ASC, month ASC`;
+        if (rows && rows.length > 0) {
+          const list = rows.map(r => r.data);
+          return res.status(200).json(list);
+        }
       } catch (err) {
         console.error("Neon archives fetch error:", err);
       }
@@ -44,8 +46,12 @@ module.exports = async function handler(req, res) {
 
     if (sql && Array.isArray(payload)) {
       try {
+        const currentIds = [];
         for (const item of payload) {
-          const archiveId = String(item.id || `${item.year}-${item.month}`);
+          const archiveId = (item.year && item.month) 
+            ? `${item.year}-${String(item.month).padStart(2, '0')}` 
+            : String(item.id || item.title);
+          currentIds.push(archiveId);
           await sql`
             INSERT INTO monthly_archives (id, month, year, title, data, created_at)
             VALUES (${archiveId}, ${item.month || null}, ${item.year || null}, ${item.title || ''}, ${JSON.stringify(item)}, NOW())
@@ -55,6 +61,9 @@ module.exports = async function handler(req, res) {
                 title = EXCLUDED.title,
                 data = EXCLUDED.data
           `;
+        }
+        if (currentIds.length > 0) {
+          await sql`DELETE FROM monthly_archives WHERE id != ALL(${currentIds})`;
         }
         return res.status(200).json({ success: true, storage: 'neon' });
       } catch (err) {

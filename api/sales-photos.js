@@ -20,11 +20,13 @@ module.exports = async function handler(req, res) {
     if (sql) {
       try {
         const rows = await sql`SELECT pic_name, photo_url FROM sales_photos`;
-        const result = {};
-        rows.forEach(r => {
-          result[r.pic_name] = r.photo_url;
-        });
-        return res.status(200).json(result);
+        if (rows && rows.length > 0) {
+          const result = {};
+          rows.forEach(r => {
+            result[r.pic_name] = r.photo_url;
+          });
+          return res.status(200).json(result);
+        }
       } catch (err) {
         console.error("Neon photos fetch error:", err);
       }
