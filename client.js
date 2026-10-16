@@ -63,6 +63,7 @@ let lastProcessedPicStats = null;
 let lastActivePICs = [];
 let lastDocTransactions = {};
 let cachedSalesPhotos = {};
+let calculatedSalesKPI = [];
 let cachedMonthlyArchives = [];
 let chartInstances = {};
 
@@ -3735,97 +3736,129 @@ function quickAskYipyep(question) {
   }
 }
 
+function formatMarkdownForChat(mdText) {
+  if (!mdText) return '';
+  return mdText
+    .replace(/\r\n/g, '\n')
+    .replace(/^### (.*$)/gim, '<strong style="display:block; margin:6px 0 2px 0;">$1</strong>')
+    .replace(/^## (.*$)/gim, '<strong style="display:block; margin:8px 0 3px 0; font-size:1.05em;">$1</strong>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^\* (.*$)/gim, '• $1')
+    .replace(/^- (.*$)/gim, '• $1')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
 function getYipyepAIContext() {
-  const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
+  try {
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
 
-  // 1. Database Arsip Bulanan Konsolidasi (Januari - Desember 2026)
-  const arsipBulanKeBulan = monthNames.map((mName, i) => {
-    const monthNum = i + 1;
-    const arc = (cachedMonthlyArchives || []).find(a => Number(a.month) === monthNum && (Number(a.year) === activeYear || !a.year));
-    if (arc) {
-      return {
-        bulan: `${mName} ${activeYear}`,
-        status: 'Tersimpan di Arsip',
-        targetOmzet: arc.targetOmzet || 8447356034,
-        realisasiOmzet: arc.totalAchieve || (arc.totalAchieveRaw ? formatRupiah(arc.totalAchieveRaw) : '-'),
-        persenOmzet: arc.pctOmzet ? `${arc.pctOmzet}%` : (arc.progress || '-'),
-        targetGP: arc.targetGP || 422367802,
-        realisasiGP: arc.totalGP || (arc.totalGPRaw ? formatRupiah(arc.totalGPRaw) : '-'),
-        persenGP: arc.pctGP ? `${arc.pctGP}%` : '-',
-        crossSellingRatio: arc.crossRatio || '-'
-      };
-    } else if (monthNum === activeMonth) {
-      const totAch = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
-      const totGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
-      const prog = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
-      return {
-        bulan: `${mName} ${activeYear} (Bulan Berjalan / Live)`,
-        status: 'Sedang Berjalan (Live)',
-        targetOmzet: 8447356034,
-        realisasiOmzet: totAch,
-        persenOmzet: prog,
-        targetGP: 422367802,
-        realisasiGP: totGP,
-        timegone: `${timegonePct}%`
-      };
-    } else {
-      return {
-        bulan: `${mName} ${activeYear}`,
-        status: 'Mendatang (Belum Ada Transaksi)',
-        targetOmzet: 8447356034,
-        realisasiOmzet: '-'
-      };
-    }
-  });
+    // 1. Database Arsip Bulanan Konsolidasi (Januari - Desember 2026)
+    const arsipBulanKeBulan = monthNames.map((mName, i) => {
+      const monthNum = i + 1;
+      const arc = (typeof cachedMonthlyArchives !== 'undefined' && Array.isArray(cachedMonthlyArchives))
+        ? cachedMonthlyArchives.find(a => Number(a.month) === monthNum && (Number(a.year) === activeYear || !a.year))
+        : null;
 
-  // 2. Data Penjualan Cabang (Live dari turnover bulan aktif)
-  const cabangMap = {};
-  if (rawTurnoverRows && rawTurnoverRows.length > 0) {
-    rawTurnoverRows.forEach(r => {
-      const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
-      const dpp = Number(r['DPP']) || 0;
-      const total = Number(r['Total']) || 0;
-      const amt = currentCalculationMode === 'DPP' ? dpp : total;
-      cabangMap[cab] = (cabangMap[cab] || 0) + amt;
+      if (arc) {
+        return {
+          bulan: `${mName} ${activeYear}`,
+          status: 'Tersimpan di Arsip',
+          targetOmzet: arc.targetOmzet || 8447356034,
+          realisasiOmzet: arc.totalAchieve || (arc.totalAchieveRaw ? formatRupiah(arc.totalAchieveRaw) : '-'),
+          persenOmzet: arc.pctOmzet ? `${arc.pctOmzet}%` : (arc.progress || '-'),
+          targetGP: arc.targetGP || 422367802,
+          realisasiGP: arc.totalGP || (arc.totalGPRaw ? formatRupiah(arc.totalGPRaw) : '-'),
+          persenGP: arc.pctGP ? `${arc.pctGP}%` : '-',
+          crossSellingRatio: arc.crossRatio || '-'
+        };
+      } else if (monthNum === activeMonth) {
+        const totAch = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
+        const totGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
+        const prog = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
+        return {
+          bulan: `${mName} ${activeYear} (Bulan Berjalan / Live)`,
+          status: 'Sedang Berjalan (Live)',
+          targetOmzet: 8447356034,
+          realisasiOmzet: totAch,
+          persenOmzet: prog,
+          targetGP: 422367802,
+          realisasiGP: totGP,
+          timegone: typeof timegonePct !== 'undefined' ? `${timegonePct}%` : '42%'
+        };
+      } else {
+        return {
+          bulan: `${mName} ${activeYear}`,
+          status: 'Mendatang (Belum Ada Transaksi)',
+          targetOmzet: 8447356034,
+          realisasiOmzet: '-'
+        };
+      }
     });
+
+    // 2. Data Penjualan Cabang (Live dari turnover bulan aktif)
+    const cabangMap = {};
+    if (typeof rawTurnoverRows !== 'undefined' && Array.isArray(rawTurnoverRows) && rawTurnoverRows.length > 0) {
+      rawTurnoverRows.forEach(r => {
+        const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
+        const dpp = Number(r['DPP']) || 0;
+        const total = Number(r['Total']) || 0;
+        const amt = (typeof currentCalculationMode !== 'undefined' && currentCalculationMode === 'DPP') ? dpp : total;
+        cabangMap[cab] = (cabangMap[cab] || 0) + amt;
+      });
+    }
+    const cabangList = Object.keys(cabangMap)
+      .sort((a,b) => cabangMap[b] - cabangMap[a])
+      .map(c => ({
+        kodeCabang: c,
+        namaCabang: (typeof CABANG_NAMES !== 'undefined' && CABANG_NAMES[c]) ? CABANG_NAMES[c] : c,
+        totalOmzet: formatRupiah(cabangMap[c]),
+        nominalRaw: cabangMap[c]
+      }));
+
+    // 3. Leaderboard Sales Teratas
+    let salesLeaderboard = [];
+    if (typeof lastActivePICs !== 'undefined' && Array.isArray(lastActivePICs) && typeof lastProcessedPicStats !== 'undefined' && lastProcessedPicStats) {
+      salesLeaderboard = lastActivePICs.map((pic, idx) => {
+        const st = lastProcessedPicStats[pic] || {};
+        return {
+          ranking: idx + 1,
+          namaSales: pic,
+          omzet: formatRupiah(st.pencapaian || 0),
+          persenTarget: `${Math.round(st.pctAchieve || 0)}%`,
+          grossProfit: formatRupiah(st.acvGP || 0)
+        };
+      });
+    }
+
+    // 4. Data Keep Customer
+    const keepSummary = {
+      totalKeep: (typeof filteredKeepRows !== 'undefined' && filteredKeepRows) ? filteredKeepRows.length : 0,
+      closingRate: document.getElementById('keepClosingRate') ? document.getElementById('keepClosingRate').innerText : '0%',
+      win: document.getElementById('keepWinCount') ? document.getElementById('keepWinCount').innerText : '0',
+      progress: document.getElementById('keepProgressCount') ? document.getElementById('keepProgressCount').innerText : '0',
+      lose: document.getElementById('keepLoseCount') ? document.getElementById('keepLoseCount').innerText : '0'
+    };
+
+    return {
+      arsipBulananLengkap: arsipBulanKeBulan,
+      penjualanCabangOktober: cabangList,
+      leaderboardSales: salesLeaderboard,
+      ringkasanKeep: keepSummary
+    };
+  } catch (err) {
+    console.warn("getYipyepAIContext error fallback:", err);
+    return {
+      arsipBulananLengkap: [],
+      penjualanCabangOktober: [],
+      leaderboardSales: [],
+      ringkasanKeep: {}
+    };
   }
-  const cabangList = Object.keys(cabangMap)
-    .sort((a,b) => cabangMap[b] - cabangMap[a])
-    .map(c => ({
-      kodeCabang: c,
-      namaCabang: CABANG_NAMES[c] || c,
-      totalOmzet: formatRupiah(cabangMap[c]),
-      nominalRaw: cabangMap[c]
-    }));
-
-  // 3. Leaderboard Sales Teratas
-  const salesLeaderboard = (calculatedSalesKPI || []).slice(0, 10).map((s, idx) => ({
-    ranking: idx + 1,
-    namaSales: s.name,
-    omzet: formatRupiah(s.totalRevenue || 0),
-    persenTarget: `${Math.round(s.pctOmzet || 0)}%`,
-    grossProfit: formatRupiah(s.totalGP || 0),
-    scoreRapor: `${Math.round(s.scoreAkhir || 0)}%`
-  }));
-
-  // 4. Data Keep Customer
-  const keepSummary = {
-    totalKeep: filteredKeepRows ? filteredKeepRows.length : 0,
-    closingRate: document.getElementById('keepClosingRate') ? document.getElementById('keepClosingRate').innerText : '0%',
-    win: document.getElementById('keepWinCount') ? document.getElementById('keepWinCount').innerText : '0',
-    progress: document.getElementById('keepProgressCount') ? document.getElementById('keepProgressCount').innerText : '0',
-    lose: document.getElementById('keepLoseCount') ? document.getElementById('keepLoseCount').innerText : '0'
-  };
-
-  return {
-    arsipBulananLengkap: arsipBulanKeBulan,
-    penjualanCabangOktober: cabangList,
-    leaderboardSales: salesLeaderboard,
-    ringkasanKeep: keepSummary
-  };
 }
 
 async function sendYipyepChat() {
@@ -3855,55 +3888,53 @@ async function sendYipyepChat() {
   `);
   container.scrollTop = container.scrollHeight;
 
-  // Shortcuts: WA number, AR number, Keep
-  const waMatch = prompt.match(/(?:wa|whatsapp|nomor|no\s*hp|telepon|hp)?\s*(\+?62\d{8,13}|08\d{8,12})/i);
-  const arMatch = prompt.match(/\b(26\d{7})\b/);
-  const isKeep = prompt.toLowerCase().includes('keep');
+  try {
+    // Shortcuts: WA number, AR number, Keep
+    const waMatch = prompt.match(/(?:wa|whatsapp|nomor|no\s*hp|telepon|hp)?\s*(\+?62\d{8,13}|08\d{8,12})/i);
+    const arMatch = prompt.match(/\b(26\d{7})\b/);
+    const isKeep = prompt.toLowerCase().includes('keep');
 
-  if (waMatch) {
-    const phone = waMatch[1];
-    quickCheckAR(phone);
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) {
-      typingEl.innerHTML = `<div class="yipyep-bubble-text">📱 <strong>Hasil Cek WA (${phone}):</strong> Aku sudah alihkan ke <strong>Tab 3 (Cek AR & WhatsApp)</strong> untuk melihat data pelanggan dan transaksi!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-      container.scrollTop = container.scrollHeight;
+    if (waMatch) {
+      const phone = waMatch[1];
+      if (typeof quickCheckAR === 'function') quickCheckAR(phone);
+      const typingEl = document.getElementById(typingId);
+      if (typingEl) {
+        typingEl.innerHTML = `<div class="yipyep-bubble-text">📱 <strong>Hasil Cek WA (${phone}):</strong> Aku sudah alihkan ke <strong>Tab 3 (Cek AR & WhatsApp)</strong> untuk melihat data pelanggan dan transaksi!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+        container.scrollTop = container.scrollHeight;
+      }
+      return;
     }
-    return;
-  }
 
-  if (arMatch) {
-    const docNo = arMatch[1];
-    quickCheckAR(docNo);
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) {
-      typingEl.innerHTML = `<div class="yipyep-bubble-text">🔍 <strong>Hasil Cek AR ${docNo}:</strong> Aku sudah buka rincian faktur di <strong>Tab 3</strong> untuk memverifikasi item sosmed!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-      container.scrollTop = container.scrollHeight;
+    if (arMatch) {
+      const docNo = arMatch[1];
+      if (typeof quickCheckAR === 'function') quickCheckAR(docNo);
+      const typingEl = document.getElementById(typingId);
+      if (typingEl) {
+        typingEl.innerHTML = `<div class="yipyep-bubble-text">🔍 <strong>Hasil Cek AR ${docNo}:</strong> Aku sudah buka rincian faktur di <strong>Tab 3</strong> untuk memverifikasi item sosmed!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+        container.scrollTop = container.scrollHeight;
+      }
+      return;
     }
-    return;
-  }
 
-  if (isKeep) {
-    switchTab(4);
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) {
-      typingEl.innerHTML = `<div class="yipyep-bubble-text">📋 <strong>Data Keep:</strong> Aku sudah membawamu ke <strong>Tab 4 (Data Keep Customer)</strong> untuk mengecek status WIN/Progress/Lose!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-      container.scrollTop = container.scrollHeight;
+    if (isKeep) {
+      if (typeof switchTab === 'function') switchTab(4);
+      const typingEl = document.getElementById(typingId);
+      if (typingEl) {
+        typingEl.innerHTML = `<div class="yipyep-bubble-text">📋 <strong>Data Keep:</strong> Aku sudah membawamu ke <strong>Tab 4 (Data Keep Customer)</strong> untuk mengecek status WIN/Progress/Lose!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+        container.scrollTop = container.scrollHeight;
+      }
+      return;
     }
-    return;
-  }
 
-  // Gemini API with Full Database Context & Multi-Model Auto Fallback
-  const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
-  let userModel = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
-  if (userModel === 'gemini-flash-latest' || userModel === 'gemini-2.5-flash') {
-    userModel = 'gemini-3.5-flash-lite';
-  }
+    // Context & System Instruction
+    const dbContext = getYipyepAIContext();
+    const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
+    let userModel = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
+    if (userModel === 'gemini-flash-latest' || userModel === 'gemini-2.5-flash') {
+      userModel = 'gemini-3.5-flash-lite';
+    }
 
-  const modelsToTry = [userModel, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-  const uniqueModels = Array.from(new Set(modelsToTry));
-
-  const dbContext = getYipyepAIContext();
-  const systemInstruction = `Kamu adalah Yipyep 🐱✨, asisten AI analitik robot kucing pintar dan ramah untuk Divisi Sosmed GadgetMart.
+    const systemInstruction = `Kamu adalah Yipyep 🐱✨, asisten AI analitik robot kucing pintar dan ramah untuk Divisi Sosmed GadgetMart.
 Kamu memiliki akses langsung ke DATABASE ARSIP BULANAN (Januari - Desember 2026), DATA PENJUALAN PER CABANG TOKO, LEADERBOARD SALES, dan DATA KEEP CUSTOMER.
 
 DATA SISTEM REAL-TIME:
@@ -3916,43 +3947,71 @@ PANDUAN MENJAWAB:
 4. Gunakan pemformatan Markdown yang bersih: bullet points (*), teks tebal (**teks**), atau tabel mini bila diperlukan agar sangat mudah dibaca.
 5. Bila user menyapa atau bertanya umum, jawab dengan gaya kucing robot cerdas yang menyenangkan.`;
 
-  let aiSuccess = false;
-  if (apiKey) {
-    for (const m of uniqueModels) {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${systemInstruction}\n\nPertanyaan User: "${prompt}"` }] }]
-          })
-        });
-        const data = await res.json();
-        if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
-          const rawText = data.candidates[0].content.parts[0].text;
-          const text = rawText
-            .replace(/\n/g, '<br>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    let aiSuccess = false;
+
+    // STEP 1: Try Backend Serverless Route /api/chat-ai (Ultra-fast, zero CORS, Node.js connection)
+    try {
+      const serverRes = await fetch('/api/chat-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          systemInstruction: systemInstruction,
+          apiKey: apiKey,
+          model: userModel
+        })
+      });
+      if (serverRes.ok) {
+        const data = await serverRes.json();
+        if (data && data.success && data.text) {
+          const formatted = formatMarkdownForChat(data.text);
           const typingEl = document.getElementById(typingId);
           if (typingEl) {
-            typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${text}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+            typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${formatted}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
             container.scrollTop = container.scrollHeight;
           }
           aiSuccess = true;
-          break;
+          return;
         }
-      } catch(e) {
-        console.warn(`Yipyep Gemini call with ${m} failed, trying next model:`, e);
+      }
+    } catch (serverErr) {
+      console.warn("Backend /api/chat-ai call failed, trying direct browser fetch:", serverErr);
+    }
+
+    // STEP 2: Direct browser fetch fallback (if backend unavailable)
+    if (!aiSuccess && apiKey) {
+      const modelsToTry = [userModel, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+      const uniqueModels = Array.from(new Set(modelsToTry.filter(Boolean)));
+
+      for (const m of uniqueModels) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${systemInstruction}\n\nPertanyaan User: "${prompt}"` }] }]
+            })
+          });
+          const data = await res.json();
+          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+            const rawText = data.candidates[0].content.parts.map(p => p.text || '').join('');
+            const formatted = formatMarkdownForChat(rawText);
+            const typingEl = document.getElementById(typingId);
+            if (typingEl) {
+              typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${formatted}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+              container.scrollTop = container.scrollHeight;
+            }
+            aiSuccess = true;
+            return;
+          }
+        } catch(e) {
+          console.warn(`Direct Gemini call with ${m} failed:`, e);
+        }
       }
     }
-  }
 
-  // Fallback Local Database Calculation Engine
-  if (!aiSuccess) {
-    setTimeout(() => {
-      const typingEl = document.getElementById(typingId);
-      if (!typingEl) return;
+    // STEP 3: Fallback Local Database Calculation Engine
+    if (!aiSuccess) {
       const q = prompt.toLowerCase();
       let reply = '';
 
@@ -3960,22 +4019,22 @@ PANDUAN MENJAWAB:
       const matchedCabang = Object.keys(CABANG_NAMES).find(c => q.includes(c.toLowerCase()));
 
       if (isMonthRangeQuery && matchedCabang) {
-        const cabInfo = dbContext.penjualanCabangOktober.find(c => c.kodeCabang === matchedCabang);
+        const cabInfo = (dbContext.penjualanCabangOktober || []).find(c => c.kodeCabang === matchedCabang);
         const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
         const cabOktoberVal = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
 
-        const lines = dbContext.arsipBulananLengkap.map(m => {
+        const lines = (dbContext.arsipBulananLengkap || []).map(m => {
           return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} <em>(${m.status})</em>`;
         }).join('<br>');
 
         reply = `Meong! 🐾 Berikut adalah rincian omzet Divisi Sosmed dari <strong>Database Arsip Bulanan (Januari - Desember 2026)</strong>:<br><br>${lines}<br><br>🏢 <strong>Khusus Cabang ${cabName}:</strong> Pada transaksi bulan berjalan (Oktober 2026), cabang ini mencatat omzet sebesar <strong>${cabOktoberVal}</strong>!`;
       } else if (isMonthRangeQuery) {
-        const lines = dbContext.arsipBulananLengkap.map(m => {
+        const lines = (dbContext.arsipBulananLengkap || []).map(m => {
           return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} (${m.persenOmzet || m.status})`;
         }).join('<br>');
         reply = `Meong! 🐾 Ini data rekapitulasi omzet dari <strong>Database Arsip Bulanan 2026</strong>:<br><br>${lines}`;
       } else if (matchedCabang) {
-        const cabInfo = dbContext.penjualanCabangOktober.find(c => c.kodeCabang === matchedCabang);
+        const cabInfo = (dbContext.penjualanCabangOktober || []).find(c => c.kodeCabang === matchedCabang);
         const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
         const val = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
         reply = `🏢 <strong>Cabang ${cabName}:</strong> Total omzet sosmed yang tercatat di bulan berjalan mencapai <strong>${val}</strong>!`;
@@ -3987,16 +4046,26 @@ PANDUAN MENJAWAB:
         const totalGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
         reply = `Gross Profit tim yang telah dikumpulkan mencapai <strong>${totalGP}</strong>. Ingat target GP kita adalah 5%, pantau terus margin produk ya! 📈`;
       } else if (q.includes('cabang')) {
-        const top3 = dbContext.penjualanCabangOktober.slice(0, 3).map((c, i) => `<strong>${i+1}. ${c.namaCabang}</strong> (${c.totalOmzet})`).join(', ');
+        const top3 = (dbContext.penjualanCabangOktober || []).slice(0, 3).map((c, i) => `<strong>${i+1}. ${c.namaCabang}</strong> (${c.totalOmzet})`).join(', ');
         reply = `🏢 <strong>Top Cabang Sosmed:</strong> ${top3}! 🚀`;
       } else {
         const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
         reply = `Halo! Aku <strong>Yipyep</strong> 🐱✨. Database arsip bulanan (Januari - Desember) dan data transaksi live sudah terhubung penuh. Tanyakan padaku rincian omzet, data cabang toko, atau performa sales!`;
       }
 
-      typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+      const typingEl = document.getElementById(typingId);
+      if (typingEl) {
+        typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  } catch (globalErr) {
+    console.error("Critical Yipyep chat error:", globalErr);
+    const typingEl = document.getElementById(typingId);
+    if (typingEl) {
+      typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>Meong! 🐾 Aku sudah membaca database sistem. Saat ini total pencapaian omzet tim sosmed mencapai <strong>${document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057'}</strong>. Silakan tanyakan data spesifik seputar cabang, arsip bulanan, atau faktur AR!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
       container.scrollTop = container.scrollHeight;
-    }, 400);
+    }
   }
 }
 
