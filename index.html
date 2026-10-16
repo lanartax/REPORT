@@ -129,6 +129,10 @@
         <button class="btn-upload-pill" onclick="document.getElementById('fileInput').click()">
           Pilih File Excel
         </button>
+        <div class="turnover-status-badge" id="turnoverStatusBadge" title="Indikator Pembaruan File Turnover">
+          <span class="turnover-status-dot"></span>
+          <span id="turnoverUpdateText">File turnover terupdate per: Memuat status...</span>
+        </div>
         <div class="db-sync-badge" id="dbSyncBadge" title="Status Sinkronisasi Database Server">
           <span class="db-pulse-dot"></span>
           <span id="dbSyncStatusText">Database Server: Tersimpan & Tersinkron LAN</span>
@@ -500,6 +504,18 @@
             <button class="report-filter-pill" id="filterBtnR2" onclick="setReportViewMode('r2')">
               🎯 Report 2: Omzet & GP vs Timegone
             </button>
+          </div>
+        </div>
+
+        <!-- Turnover Timestamp Indicator Banner in Tab 2 -->
+        <div class="turnover-report-banner" id="turnoverReportBanner">
+          <div class="banner-left">
+            <span class="banner-icon">📁</span>
+            <span id="turnoverBannerText">File turnover terupdate per: Memuat status...</span>
+          </div>
+          <div class="banner-right">
+            <button class="btn btn-xs btn-outline-crimson" onclick="document.getElementById('fileInput').click()" title="Unggah file turnover.xlsx baru untuk memperbarui laporan">🔄 Update File Turnover Baru</button>
+            <button class="btn btn-xs btn-outline-dark" id="btnResetTurnover" onclick="resetTurnoverToDefault()" title="Hapus cache file upload dan kembali ke data bawaan">Kembali ke Default</button>
           </div>
         </div>
 

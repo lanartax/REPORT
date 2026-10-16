@@ -62,6 +62,10 @@ let cachedMonthlyTargets = {};
 let lastProcessedPicStats = null;
 let lastActivePICs = [];
 let lastDocTransactions = {};
+let lastTotalSosmedAchieve = 0;
+let lastTotalSosmedGP = 0;
+let lastTotalSosmedGadget = 0;
+let lastTotalSosmedCross = 0;
 let cachedSalesPhotos = {};
 let calculatedSalesKPI = [];
 let cachedMonthlyArchives = [];
@@ -144,6 +148,122 @@ function formatCrosellingDate(pd) {
   return '-';
 }
 
+// ==========================================================================
+// INDEXEDDB ENGINE: BROWSER PERSISTENT STORAGE FOR EXCEL FILES
+// ==========================================================================
+const GM_DB_NAME = 'GadgetMartReportDB';
+const GM_DB_VERSION = 1;
+const GM_STORE_NAME = 'uploaded_files';
+
+function openReportDB() {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      resolve(null);
+      return;
+    }
+    const req = window.indexedDB.open(GM_DB_NAME, GM_DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(GM_STORE_NAME)) {
+        db.createObjectStore(GM_STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => {
+      console.warn('IndexedDB gagal dibuka:', req.error);
+      resolve(null);
+    };
+  });
+}
+
+async function saveFileToIndexedDB(key, arrayBuffer) {
+  try {
+    const db = await openReportDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(GM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(GM_STORE_NAME);
+      store.put(arrayBuffer, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (e) {
+    console.warn('saveFileToIndexedDB error:', e);
+    return false;
+  }
+}
+
+async function getFileFromIndexedDB(key) {
+  try {
+    const db = await openReportDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      const tx = db.transaction(GM_STORE_NAME, 'readonly');
+      const store = tx.objectStore(GM_STORE_NAME);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    console.warn('getFileFromIndexedDB error:', e);
+    return null;
+  }
+}
+
+async function clearFileFromIndexedDB(key) {
+  try {
+    const db = await openReportDB();
+    if (!db) return;
+    const tx = db.transaction(GM_STORE_NAME, 'readwrite');
+    tx.objectStore(GM_STORE_NAME).delete(key);
+  } catch (e) {}
+}
+
+function getFormattedTimestamp(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = pad(date.getDate());
+  const m = pad(date.getMonth() + 1);
+  const y = date.getFullYear();
+  const hr = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `${d}/${m}/${y} ${hr}:${min} WITA`;
+}
+
+function updateTurnoverIndicator(text) {
+  const el1 = document.getElementById('turnoverUpdateText');
+  if (el1) el1.innerText = text;
+  const el2 = document.getElementById('turnoverBannerText');
+  if (el2) el2.innerText = text;
+}
+
+async function resetTurnoverToDefault() {
+  if (confirm("Apakah Anda yakin ingin menghapus file turnover yang diunggah dan kembali ke data default sistem?")) {
+    await clearFileFromIndexedDB('turnover_file');
+    localStorage.removeItem('gadgetmart_turnover_timestamp');
+    localStorage.removeItem('gadgetmart_turnover_is_custom');
+    alert("Cache file turnover telah dihapus. Halaman akan dimuat ulang dengan data default sistem.");
+    window.location.reload();
+  }
+}
+
+// MATCH ALL SOSMED SALES EMPLOYEE CODES (BOTH "BJM.SOS.0" AND "BJM.SOS.K.0")
+function isSosmedSalesCode(empStr, remStr = '', cabStr = '') {
+  const emp = String(empStr || '').trim().toLowerCase();
+  const rem = String(remStr || '').trim().toLowerCase();
+  const cab = String(cabStr || '').trim().toLowerCase();
+
+  // All sales employee codes starting with "bjm.sos" (both bjm.sos.0 and bjm.sos.k.0)
+  if (emp.startsWith('bjm.sos')) return true;
+  if (/bjm\.sos(?:\.k)?\./i.test(emp)) return true;
+  if (emp.includes('bjm.sos')) return true;
+
+  // Check remarks and sales cabang if emp is empty
+  if (/bjm\.sos(?:\.k)?\./i.test(rem) || rem.includes('bjm.sos')) return true;
+  if (/bjm\.sos(?:\.k)?\./i.test(cab) || cab.includes('bjm.sos')) return true;
+
+  return false;
+}
+
 // 2. PARSER ENGINE FOR turnover.xlsx (Achievement DPP)
 function parseTurnoverBuffer(arrayBuffer) {
   try {
@@ -206,8 +326,8 @@ function updateDatabaseStatus() {
   }
 }
 
-// SMART FILE UPLOAD HANDLER
-function parseExcelFile(arrayBuffer, fileName = '') {
+// SMART FILE UPLOAD HANDLER (WITH INDEXEDDB PERSISTENCE & LIVE INDICATOR)
+async function parseExcelFile(arrayBuffer, fileName = '') {
   try {
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
@@ -222,29 +342,42 @@ function parseExcelFile(arrayBuffer, fileName = '') {
     const firstRow = jsonData[0] || {};
     const hasWA = 'No HP Customer' in firstRow || 'SC/HL Code' in firstRow || fileName.toLowerCase().includes('croselling') || fileName.toLowerCase().includes('sheet');
     const hasDPP = 'DPP' in firstRow || fileName.toLowerCase().includes('turnover');
+    const updateTs = getFormattedTimestamp();
 
     if (hasWA && !hasDPP) {
       rawCrosellingRows = jsonData;
+      await saveFileToIndexedDB('croselling_file', arrayBuffer);
+      localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
       saveExcelToServer(arrayBuffer, 'croselling');
-      alert(`Berhasil mengimpor Data Google Sheets (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase AR & WhatsApp telah diperbarui dan tersimpan permanen ke Server.`);
-      switchTab(2);
+      alert(`Berhasil mengimpor Data Google Sheets (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase AR & WhatsApp telah diperbarui dan tetap tersimpan saat refresh.`);
+      switchTab(3);
     } else if (hasDPP) {
       rawTurnoverRows = jsonData;
+      await saveFileToIndexedDB('turnover_file', arrayBuffer);
+      localStorage.setItem('gadgetmart_turnover_timestamp', updateTs);
+      localStorage.setItem('gadgetmart_turnover_is_custom', 'true');
+      updateTurnoverIndicator(`File turnover terupdate per ${updateTs}`);
       saveExcelToServer(arrayBuffer, 'turnover');
       processAllReports();
-      alert(`Berhasil mengimpor turnover.xlsx (${jsonData.length.toLocaleString('id-ID')} baris data)!\nLaporan Pencapaian & KPI telah diperbarui dan tersimpan permanen ke Server.`);
-      switchTab(1);
+      alert(`Berhasil mengimpor turnover.xlsx (${jsonData.length.toLocaleString('id-ID')} baris data)!\nFile turnover terupdate per ${updateTs} dan akan tetap tersimpan saat refresh.`);
+      switchTab(2);
     } else {
       // Default: check if it has No HP
       if ('No HP Customer' in firstRow) {
         rawCrosellingRows = jsonData;
+        await saveFileToIndexedDB('croselling_file', arrayBuffer);
+        localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
         saveExcelToServer(arrayBuffer, 'croselling');
-        switchTab(2);
+        switchTab(3);
       } else {
         rawTurnoverRows = jsonData;
+        await saveFileToIndexedDB('turnover_file', arrayBuffer);
+        localStorage.setItem('gadgetmart_turnover_timestamp', updateTs);
+        localStorage.setItem('gadgetmart_turnover_is_custom', 'true');
+        updateTurnoverIndicator(`File turnover terupdate per ${updateTs}`);
         saveExcelToServer(arrayBuffer, 'turnover');
         processAllReports();
-        switchTab(1);
+        switchTab(2);
       }
     }
     updateDatabaseStatus();
@@ -306,22 +439,17 @@ function processAllReports() {
 
   const docTransactions = {};
   let maxActiveDay = 1;
+  let totalSosmedAchieve = 0;
+  let totalSosmedGP = 0;
 
   for (const row of rawTurnoverRows) {
     const emp = String(row['Sales Employee Name'] || '');
     const rem = String(row['Remarks'] || '');
     const cab = String(row['SalesCabang'] || '');
 
-    // Identify sales PIC
-    let matchedPIC = null;
-    for (const m of masterList) {
-      if (emp.includes(m.code) || rem.includes(m.code) || cab.includes(m.code)) {
-        matchedPIC = m.name;
-        break;
-      }
-    }
-
-    if (!matchedPIC || !activePICs.includes(matchedPIC)) continue;
+    // Check if transaction belongs to Sosmed (matches all codes starting with bjm.sos, including bjm.sos.0 and bjm.sos.k.0)
+    const isSos = isSosmedSalesCode(emp, rem, cab);
+    if (!isSos) continue;
 
     // Resolve date with inverted US-locale fix
     const day = resolvePostingDay(row['Posting Date']);
@@ -335,22 +463,39 @@ function processAllReports() {
     const gp = Number(row['GrossProfit']) || 0;
     const amount = currentCalculationMode === 'DPP' ? dpp : total;
 
-    // Report 1: Daily Matrix accumulation
+    // Accumulate total division sosmed achievement
+    totalSosmedAchieve += amount;
+    totalSosmedGP += gp;
+
+    // Report 1: Daily Matrix accumulation for total day
     if (parsedDailyMatrix[day]) {
-      parsedDailyMatrix[day].sales[matchedPIC] += amount;
       parsedDailyMatrix[day].totalDay += amount;
     }
 
-    // Report 2: Omzet & GP accumulation
-    picStats[matchedPIC].pencapaian += amount;
-    picStats[matchedPIC].acvGP += gp;
+    // Identify sales PIC
+    let matchedPIC = null;
+    for (const m of masterList) {
+      if (emp.includes(m.code) || rem.includes(m.code) || cab.includes(m.code)) {
+        matchedPIC = m.name;
+        break;
+      }
+    }
+
+    // Accumulate individual PIC stats if matched and active
+    if (matchedPIC && activePICs.includes(matchedPIC)) {
+      if (parsedDailyMatrix[day]) {
+        parsedDailyMatrix[day].sales[matchedPIC] += amount;
+      }
+      picStats[matchedPIC].pencapaian += amount;
+      picStats[matchedPIC].acvGP += gp;
+    }
 
     // Grouping for Cross-selling calculation (by Document Number)
     const docNo = row['Document Number'];
     if (docNo) {
       if (!docTransactions[docNo]) {
         docTransactions[docNo] = {
-          pic: matchedPIC,
+          pic: matchedPIC || 'SOSMED',
           hasGadget: false,
           hasCross: false
         };
@@ -366,12 +511,20 @@ function processAllReports() {
   }
 
   // Calculate Cross-Selling Counts from Document groups
+  let totalSosmedGadget = 0;
+  let totalSosmedCross = 0;
   for (const doc in docTransactions) {
     const item = docTransactions[doc];
-    if (item.hasGadget && picStats[item.pic]) {
-      picStats[item.pic].gadgetCount++;
+    if (item.hasGadget) {
+      totalSosmedGadget++;
       if (item.hasCross) {
-        picStats[item.pic].crossCount++;
+        totalSosmedCross++;
+      }
+      if (item.pic && picStats[item.pic]) {
+        picStats[item.pic].gadgetCount++;
+        if (item.hasCross) {
+          picStats[item.pic].crossCount++;
+        }
       }
     }
   }
@@ -389,6 +542,10 @@ function processAllReports() {
   lastProcessedPicStats = picStats;
   lastActivePICs = activePICs;
   lastDocTransactions = docTransactions;
+  lastTotalSosmedAchieve = totalSosmedAchieve;
+  lastTotalSosmedGP = totalSosmedGP;
+  lastTotalSosmedGadget = totalSosmedGadget;
+  lastTotalSosmedCross = totalSosmedCross;
 
   // Render all views
   renderReport1Table(activePICs);
@@ -556,8 +713,14 @@ function renderReport2Tables(picStats, activePICs) {
   });
 
   // Table 1 MANAJER Total Row
-  const totalPctOmzet = sumTarget > 0 ? (sumAch / sumTarget) * 100 : 0;
-  const totalPctGP = sumTargetGP > 0 ? (sumAcvGP / sumTargetGP) * 100 : 0;
+  // Use lastTotalSosmedAchieve and lastTotalSosmedGP which includes ALL sales employee codes starting with bjm.sos (both bjm.sos.0 and bjm.sos.k.0)
+  const managerAchieve = (typeof lastTotalSosmedAchieve === 'number' && lastTotalSosmedAchieve > 0) ? lastTotalSosmedAchieve : sumAch;
+  const managerGP = (typeof lastTotalSosmedGP === 'number' && lastTotalSosmedGP !== 0) ? lastTotalSosmedGP : sumAcvGP;
+  const managerGadget = (typeof lastTotalSosmedGadget === 'number' && lastTotalSosmedGadget > 0) ? lastTotalSosmedGadget : sumGadget;
+  const managerCross = (typeof lastTotalSosmedCross === 'number' && lastTotalSosmedCross > 0) ? lastTotalSosmedCross : sumCross;
+
+  const totalPctOmzet = sumTarget > 0 ? (managerAchieve / sumTarget) * 100 : 0;
+  const totalPctGP = sumTargetGP > 0 ? (managerGP / sumTargetGP) * 100 : 0;
   let statusMgrOmzet = totalPctOmzet >= (timegonePct - 4) ? '🖤' : '💔';
   let statusMgrGP = totalPctGP >= (timegonePct - 4) ? '🖤' : '☠️';
 
@@ -565,26 +728,26 @@ function renderReport2Tables(picStats, activePICs) {
     <tr class="row-manajer">
       <td class="text-left font-bold">MANAJER</td>
       <td>${formatRupiah(sumTarget)}</td>
-      <td>${formatRupiah(sumAch)}</td>
+      <td>${formatRupiah(managerAchieve)}</td>
       <td class="font-bold">${formatPercent(totalPctOmzet)}</td>
       <td class="text-center status-icon-lg">${statusMgrOmzet}</td>
       <td>${formatRupiah(sumTargetGP)}</td>
-      <td>${formatRupiah(sumAcvGP)}</td>
+      <td>${formatRupiah(managerGP)}</td>
       <td class="font-bold">${formatPercent(totalPctGP)}</td>
       <td class="text-center status-icon-lg">${statusMgrGP}</td>
     </tr>
   `;
 
   // Table 2 MANAJER Total Row
-  const totalRatio = sumGadget > 0 ? (sumCross / sumGadget) : 0;
+  const totalRatio = managerGadget > 0 ? (managerCross / managerGadget) : 0;
   const totalPctCross = Math.min(100, Math.round(totalRatio * 3 * 100));
   const totalPctAkhir = Math.round((Math.min(100, totalPctOmzet) * 0.35) + (Math.min(100, Math.max(0, totalPctGP)) * 0.35) + (totalPctCross * 0.30));
 
   crossFoot.innerHTML = `
     <tr>
       <td class="text-left font-bold">MANAJER</td>
-      <td>${sumGadget}</td>
-      <td>${sumCross}</td>
+      <td>${managerGadget}</td>
+      <td>${managerCross}</td>
       <td class="font-bold">${formatPercent(totalPctCross)}</td>
       <td class="font-bold">${formatPercent(totalPctAkhir)}</td>
       <td class="text-center status-icon-lg">🖤</td>
@@ -595,18 +758,23 @@ function renderReport2Tables(picStats, activePICs) {
 
 // 6. UPDATE EXECUTIVE KPI SUMMARY CARDS
 function updateExecutiveKPICards(picStats, activePICs) {
-  let grandTotal = 0, grandGP = 0, grandTarget = 0, grandGPTarget = 0;
-  let grandGadget = 0, grandCross = 0;
+  let grandTarget = 0, grandGPTarget = 0;
+  let sumAch = 0, sumGP = 0, sumGadget = 0, sumCross = 0;
 
   activePICs.forEach(pic => {
     const s = picStats[pic];
-    grandTotal += s.pencapaian;
-    grandGP += s.acvGP;
     grandTarget += s.target;
     grandGPTarget += s.targetGP;
-    grandGadget += s.gadgetCount;
-    grandCross += s.crossCount;
+    sumAch += s.pencapaian;
+    sumGP += s.acvGP;
+    sumGadget += s.gadgetCount;
+    sumCross += s.crossCount;
   });
+
+  const grandTotal = (typeof lastTotalSosmedAchieve === 'number' && lastTotalSosmedAchieve > 0) ? lastTotalSosmedAchieve : sumAch;
+  const grandGP = (typeof lastTotalSosmedGP === 'number' && lastTotalSosmedGP !== 0) ? lastTotalSosmedGP : sumGP;
+  const grandGadget = (typeof lastTotalSosmedGadget === 'number' && lastTotalSosmedGadget > 0) ? lastTotalSosmedGadget : sumGadget;
+  const grandCross = (typeof lastTotalSosmedCross === 'number' && lastTotalSosmedCross > 0) ? lastTotalSosmedCross : sumCross;
 
   const pct = grandTarget > 0 ? (grandTotal / grandTarget) * 100 : 0;
   const sisa = grandTotal - grandTarget;
@@ -2204,20 +2372,25 @@ function drawSpeedometer(canvasId, valuePct, color) {
 
 function renderSpeedometerGauges(picStats, activePICs) {
   if (!picStats || !activePICs || activePICs.length === 0) return;
-  let grandTotal = 0, grandGP = 0, grandTarget = 0, grandGPTarget = 0;
-  let grandGadget = 0, grandCross = 0;
+  let grandTarget = 0, grandGPTarget = 0;
+  let sumAch = 0, sumGP = 0, sumGadget = 0, sumCross = 0;
 
   activePICs.forEach(pic => {
     const s = picStats[pic];
     if (s) {
-      grandTotal += s.pencapaian;
-      grandGP += s.acvGP;
       grandTarget += s.target;
       grandGPTarget += s.targetGP;
-      grandGadget += s.gadgetCount;
-      grandCross += s.crossCount;
+      sumAch += s.pencapaian;
+      sumGP += s.acvGP;
+      sumGadget += s.gadgetCount;
+      sumCross += s.crossCount;
     }
   });
+
+  const grandTotal = (typeof lastTotalSosmedAchieve === 'number' && lastTotalSosmedAchieve > 0) ? lastTotalSosmedAchieve : sumAch;
+  const grandGP = (typeof lastTotalSosmedGP === 'number' && lastTotalSosmedGP !== 0) ? lastTotalSosmedGP : sumGP;
+  const grandGadget = (typeof lastTotalSosmedGadget === 'number' && lastTotalSosmedGadget > 0) ? lastTotalSosmedGadget : sumGadget;
+  const grandCross = (typeof lastTotalSosmedCross === 'number' && lastTotalSosmedCross > 0) ? lastTotalSosmedCross : sumCross;
 
   const pctOmzet = grandTarget > 0 ? (grandTotal / grandTarget) * 100 : 0;
   const pctGP = grandGPTarget > 0 ? (grandGP / grandGPTarget) * 100 : 0;
@@ -3524,37 +3697,68 @@ dropZone.addEventListener('drop', (e) => {
   }
 });
 
-// LOAD BOTH DEFAULT EXCEL FILES (turnover.xlsx & CROSSELLING-12102026.xlsx)
+// LOAD BOTH DEFAULT EXCEL FILES (turnover.xlsx & CROSSELLING-12102026.xlsx) WITH INDEXEDDB CACHE PRIORITY
 async function loadAllDefaultFiles() {
   const statusTitle = document.getElementById('fileStatusTitle');
   if (statusTitle) statusTitle.innerText = 'Memuat Data turnover.xlsx & Google Sheets...';
   
-  // 1. Fetch and Parse turnover.xlsx (Achievement Report)
+  // 1. Fetch and Parse turnover.xlsx (Achievement Report) - Prioritize User's Uploaded File in IndexedDB
+  let turnoverLoaded = false;
   try {
-    const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
-    if (resTurnover.ok) {
-      const buf1 = await resTurnover.arrayBuffer();
-      parseTurnoverBuffer(buf1);
-      console.log('✅ turnover.xlsx berhasil dimuat dari database server!');
-    } else {
-      console.warn("turnover.xlsx status not ok:", resTurnover.status);
+    const cachedTurnover = await getFileFromIndexedDB('turnover_file');
+    if (cachedTurnover) {
+      parseTurnoverBuffer(cachedTurnover);
+      turnoverLoaded = true;
+      const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || getFormattedTimestamp();
+      updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
+      console.log('✅ turnover.xlsx berhasil dimuat dari IndexedDB lokal!');
     }
   } catch (e) {
-    console.warn("Gagal memuat turnover.xlsx:", e);
+    console.warn("Gagal memuat cached turnover dari IndexedDB:", e);
   }
 
-  // 2. Fetch and Parse CROSSELLING-12102026.xlsx (AR & WhatsApp Customer Search)
-  try {
-    const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
-    if (resCroselling.ok) {
-      const buf2 = await resCroselling.arrayBuffer();
-      parseCrosellingBuffer(buf2);
-      console.log('✅ CROSSELLING-12102026.xlsx berhasil dimuat dari database server!');
-    } else {
-      console.warn("CROSSELLING-12102026.xlsx status not ok:", resCroselling.status);
+  // If no user-uploaded file in IndexedDB, fallback to server default static turnover.xlsx
+  if (!turnoverLoaded) {
+    try {
+      const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
+      if (resTurnover.ok) {
+        const buf1 = await resTurnover.arrayBuffer();
+        parseTurnoverBuffer(buf1);
+        const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || 'Default Sistem (13/10/2026 18:00 WITA)';
+        updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
+        console.log('✅ turnover.xlsx berhasil dimuat dari database server!');
+      } else {
+        console.warn("turnover.xlsx status not ok:", resTurnover.status);
+      }
+    } catch (e) {
+      console.warn("Gagal memuat turnover.xlsx:", e);
     }
-  } catch (e) {
-    console.warn("Gagal memuat CROSSELLING-12102026.xlsx:", e);
+  }
+
+  // 2. Fetch and Parse CROSSELLING-12102026.xlsx (AR & WhatsApp Customer Search) - Prioritize User's Uploaded File
+  let crosellingLoaded = false;
+  try {
+    const cachedCroselling = await getFileFromIndexedDB('croselling_file');
+    if (cachedCroselling) {
+      parseCrosellingBuffer(cachedCroselling);
+      crosellingLoaded = true;
+      console.log('✅ CROSSELLING data dimuat dari IndexedDB lokal!');
+    }
+  } catch (e) {}
+
+  if (!crosellingLoaded) {
+    try {
+      const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
+      if (resCroselling.ok) {
+        const buf2 = await resCroselling.arrayBuffer();
+        parseCrosellingBuffer(buf2);
+        console.log('✅ CROSSELLING-12102026.xlsx berhasil dimuat dari database server!');
+      } else {
+        console.warn("CROSSELLING-12102026.xlsx status not ok:", resCroselling.status);
+      }
+    } catch (e) {
+      console.warn("Gagal memuat CROSSELLING-12102026.xlsx:", e);
+    }
   }
 
   updateDatabaseBadge(true);
@@ -3675,10 +3879,12 @@ function applyDashboardFilters() {
       }
 
       // 2. Sales filter
-      if (targetSales !== 'all') {
-        const emp = String(r['Sales Employee Name'] || '');
-        const rem = String(r['Remarks'] || '');
-        const cab = String(r['SalesCabang'] || '');
+      const emp = String(r['Sales Employee Name'] || '');
+      const rem = String(r['Remarks'] || '');
+      const cab = String(r['SalesCabang'] || '');
+      if (targetSales === 'all') {
+        if (!isSosmedSalesCode(emp, rem, cab)) return;
+      } else {
         if (!emp.includes(targetSales) && !rem.includes(targetSales) && !cab.includes(targetSales)) return;
       }
 

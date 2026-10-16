@@ -1793,16 +1793,78 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ==========================================================================
+   TURNOVER UPDATE INDICATOR BADGE & BANNER
+   ========================================================================== */
+.turnover-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition: all 0.2s ease;
+}
+
+.turnover-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+.turnover-report-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #fff1f2;
+  border: 1.5px solid #fecdd3;
+  border-left: 5px solid var(--crimson);
+  border-radius: 12px;
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #9f1239;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.06);
+}
+
+.turnover-report-banner .banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.turnover-report-banner .banner-icon {
+  font-size: 1.1rem;
+}
+
+.turnover-report-banner .banner-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
    EXECUTIVE DASHBOARD: SPEEDOMETER GAUGES (BAHUNDA STYLE)
    ========================================================================== */
 .dashboard-gauges-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
+  gap: 24px;
+  margin-bottom: 32px;
 }
 
 .gauge-card {
-  padding: 18px 20px;
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1886,46 +1948,57 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* ==========================================================================
-   MONTH-TO-MONTH COMBO CHARTS (BAHUNDA STYLE)
+   MONTH-TO-MONTH COMBO CHARTS (BAHUNDA STYLE) - SPACIOUS & UNCLUTTERED
    ========================================================================== */
 .charts-section {
   width: 100%;
+  margin-top: 36px;
+  margin-bottom: 40px;
 }
 
 .charts-grid-2col {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-  gap: 20px;
+  gap: 32px;
+  margin-bottom: 32px;
 }
 
 @media (max-width: 768px) {
   .charts-grid-2col {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
 }
 
 .chart-card {
-  padding: 20px 22px;
+  padding: 26px 28px;
   background: white;
-  border-radius: 14px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.chart-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 .chart-card-header {
-  margin-bottom: 16px;
+  margin-bottom: 22px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  padding-bottom: 10px;
+  padding-bottom: 14px;
 }
 
 .chart-header-title h3 {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: var(--ink);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .chart-header-title p {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   margin: 0;
 }
@@ -1933,7 +2006,8 @@ h1, h2, h3, h4, h5, h6,
 .chart-canvas-container {
   position: relative;
   width: 100%;
-  height: 290px;
+  height: 310px;
+  padding-top: 8px;
 }
 
 /* ==========================================================================
