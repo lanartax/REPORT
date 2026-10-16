@@ -17,55 +17,100 @@
 </head>
 <body>
   <div class="app-layout">
-    <!-- Top Red Banner: 100% Solid Red Block (No White Card) -->
-    <header class="top-red-banner">
-      <div class="header-inner-content">
-        <div class="brand-row">
-          <div class="brand-left-group">
-            <div class="brand-logo-container">
-              <img src="logo.png" alt="GadgetMart Logo" class="brand-logo-img">
-            </div>
-            <div class="brand-text">
-              <div class="brand-badge-light">GADGETMART INDONESIA</div>
-              <h1 class="brand-title">WORKSPACE DIVISI SOSMED</h1>
-            </div>
-          </div>
-          <div class="header-right-actions">
-            <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Dashboard%20Sosmed%20Gadgetmart.%20Tolong%20perbaiki%20segera." target="_blank" class="btn-contact-yahya" title="Hubungi Pemilik / Developer Website">
-              <span class="yahya-pulse-dot"></span> 🛠️ Hubungi Yahya
-            </a>
-          </div>
+    <!-- Left Vertical Sidebar (UI Header disamping - Persis Sesuai Mockup Gambar) -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-brand-section">
+        <div class="sidebar-logo-container">
+          <img src="logo.png" alt="GadgetMart Logo" class="sidebar-logo-img">
         </div>
-
-        <!-- Horizontal Pill Tabs Navigation directly on Red Block -->
-        <nav class="header-tabs-nav">
-          <button class="pill-tab-btn active" id="tabBtn1" onclick="switchTab(1)">
-            <span class="tab-icon">🏆</span> Dashboard & Leaderboard
-          </button>
-          <button class="pill-tab-btn" id="tabBtn2" onclick="switchTab(2)">
-            <span class="tab-icon">📊</span> Laporan Pencapaian & KPI
-          </button>
-          <button class="pill-tab-btn" id="tabBtn3" onclick="switchTab(3)">
-            <span class="tab-icon">🔍</span> Cek AR & WhatsApp
-          </button>
-          <button class="pill-tab-btn" id="tabBtn4" onclick="switchTab(4)">
-            <span class="tab-icon">📋</span> Data Keep Customer
-          </button>
-          <button class="pill-tab-btn" id="tabBtn5" onclick="switchTab(5)">
-            <span class="tab-icon">⚠️</span> Audit AR Belum Sosmed
-          </button>
-          <button class="pill-tab-btn" id="tabBtn6" onclick="switchTab(6)">
-            <span class="tab-icon">📁</span> Arsip Pencapaian Bulanan
-          </button>
-          <button class="pill-tab-btn" id="tabBtn7" onclick="switchTab(7)">
-            <span class="tab-icon">⚙️</span> Pengaturan Admin
-          </button>
-          <a href="https://kandidatgadgetmart.my.id" target="_blank" class="pill-tab-btn tab-link-external" title="Buka Portal Rekrutmen Kandidat GadgetMart">
-            <span class="tab-icon">🚀</span> Kandidat Gadgetmart ↗
-          </a>
-        </nav>
+        <div class="sidebar-brand-title">WORKSPACE DIVISI SOSMED</div>
       </div>
-    </header>
+
+      <nav class="sidebar-nav">
+        <!-- Group 1: MENU UTAMA -->
+        <div class="sidebar-group-header">MENU UTAMA</div>
+
+        <button class="sidebar-nav-item active" id="tabBtn1" onclick="switchTab(1)">
+          <span class="nav-item-icon">🏆</span>
+          <span class="nav-item-text">Dashboard & Leaderboard</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <button class="sidebar-nav-item" id="tabBtn2" onclick="switchTab(2)">
+          <span class="nav-item-icon">📊</span>
+          <span class="nav-item-text">Laporan Pencapaian & KPI</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <button class="sidebar-nav-item" id="tabBtn3" onclick="switchTab(3)">
+          <span class="nav-item-icon">🔍</span>
+          <span class="nav-item-text">Cek AR & WhatsApp</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <button class="sidebar-nav-item" id="tabBtn4" onclick="switchTab(4)">
+          <span class="nav-item-icon">📋</span>
+          <span class="nav-item-text">Data Keep Customer</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <button class="sidebar-nav-item" id="tabBtn5" onclick="switchTab(5)">
+          <span class="nav-item-icon">⚠️</span>
+          <span class="nav-item-text">Audit AR Belum Sosmed</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <button class="sidebar-nav-item" id="tabBtn6" onclick="switchTab(6)">
+          <span class="nav-item-icon">📁</span>
+          <span class="nav-item-text">Arsip Pencapaian Bulanan</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <!-- Group 2: ADMINISTRASI -->
+        <div class="sidebar-group-header">ADMINISTRASI</div>
+
+        <button class="sidebar-nav-item" id="tabBtn7" onclick="switchTab(7)">
+          <span class="nav-item-icon">⚙️</span>
+          <span class="nav-item-text">Pengaturan Admin</span>
+          <span class="nav-active-indicator">▪</span>
+        </button>
+
+        <a href="https://kandidatgadgetmart.my.id" target="_blank" class="sidebar-nav-item sidebar-ext-item" title="Buka Portal Rekrutmen Kandidat GadgetMart">
+          <span class="nav-item-icon">🚀</span>
+          <span class="nav-item-text">Kandidat Gadgetmart</span>
+          <span class="nav-ext-arrow">↗</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Bottom: Hubungi Yahya -->
+      <div class="sidebar-bottom-section">
+        <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Dashboard%20Sosmed%20Gadgetmart.%20Tolong%20perbaiki%20segera." target="_blank" class="sidebar-btn-yahya" title="Hubungi Pemilik / Developer Website">
+          <div class="yahya-content-left">
+            <span class="yahya-pulse-dot"></span>
+            <span class="yahya-icon-key">🔑</span>
+            <span class="yahya-title">Hubungi Yahya</span>
+          </div>
+          <span class="yahya-badge-online">Online</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Mobile Drawer Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebarMobile()"></div>
+
+    <!-- Main Content Area Wrapper -->
+    <div class="app-main-wrapper">
+      <!-- Mobile Top Bar Header -->
+      <div class="mobile-top-bar">
+        <button class="mobile-hamburger-btn" onclick="toggleSidebarMobile()" title="Buka Menu Navigasi">
+          ☰
+        </button>
+        <div class="mobile-brand-wrapper">
+          <img src="logo.png" alt="GadgetMart" class="mobile-brand-logo">
+          <span class="mobile-brand-tag">DIVISI SOSMED</span>
+        </div>
+        <a href="https://wa.me/6289603864476" target="_blank" class="mobile-btn-wa" title="WhatsApp Yahya">💬</a>
+      </div>
 
     <main class="main-content">
 
@@ -1129,9 +1174,9 @@
             </div>
           </div>
         </div>
-      </section>
     </main>
-  </div>
+    </div> <!-- /app-main-wrapper -->
+  </div> <!-- /app-layout -->
 
   <!-- Modal: Gemini API Key Config -->
   <div id="geminiModal" class="modal-overlay" style="display:none">

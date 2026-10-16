@@ -57,17 +57,332 @@ h1, h2, h3, h4, h5, h6,
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
-/* App Container */
+/* App Container: Left Sidebar + Main Content Layout */
 .app-layout {
+  display: flex;
+  min-height: 100vh;
   width: 100%;
   margin: 0;
-  padding: 0 0 60px 0;
+  padding: 0;
+  background-color: #ffffff;
+}
+
+/* ==========================================================================
+   APP SIDEBAR NAVIGATION (UI HEADER DISAMPING - PERSIS SESUAI MOCKUP GAMBAR)
+   ========================================================================== */
+.app-sidebar {
+  width: 275px;
+  min-width: 275px;
+  max-width: 275px;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, #4f030a 0%, #360207 40%, #1f0104 100%);
+  border-right: 1.5px solid #140103;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px 18px 16px;
+  overflow-y: auto;
+  z-index: 1000;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.sidebar-brand-section {
+  text-align: center;
+  padding: 0 4px 18px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 14px;
+}
+
+.sidebar-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.sidebar-logo-img {
+  max-width: 175px;
+  height: auto;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  transition: transform 0.25s ease;
+}
+
+.sidebar-logo-img:hover {
+  transform: scale(1.03);
+}
+
+.sidebar-brand-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.sidebar-group-header {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: #f59e0b;
+  text-transform: uppercase;
+  padding: 10px 8px 4px 8px;
+}
+
+.sidebar-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  transform: translateX(3px);
+}
+
+/* Active State: Vibrant Yellow / Gold background with dark charcoal text (Exact Match to Screenshot) */
+.sidebar-nav-item.active {
+  background: #ffc72c !important;
+  color: #111827 !important;
+  font-weight: 800 !important;
+  border-color: #ffc72c !important;
+  box-shadow: 0 4px 16px rgba(255, 199, 44, 0.4);
+  transform: translateX(2px);
+}
+
+.nav-item-icon {
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-active-indicator {
+  display: none;
+  font-size: 0.75rem;
+  color: #111827;
+  font-weight: 900;
+  margin-left: auto;
+}
+
+.sidebar-nav-item.active .nav-active-indicator {
+  display: inline-block;
+}
+
+.nav-ext-arrow {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+/* Sidebar Footer: Hubungi Yahya */
+.sidebar-bottom-section {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-btn-yahya {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #140103;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-decoration: none;
+  transition: all 0.22s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.sidebar-btn-yahya:hover {
+  background: #25d366;
+  border-color: #25d366;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37, 211, 102, 0.4);
+}
+
+.sidebar-btn-yahya:hover .yahya-title,
+.sidebar-btn-yahya:hover .yahya-badge-online {
+  color: #ffffff;
+}
+
+.yahya-content-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yahya-pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #22c55e;
+  animation: pulseGreen 1.8s infinite;
+}
+
+.yahya-icon-key {
+  font-size: 0.95rem;
+}
+
+.yahya-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.yahya-badge-online {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.04em;
+}
+
+/* Main Content Wrapper */
+.app-main-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #ffffff;
 }
 
 .main-content {
-  max-width: 1560px;
+  max-width: 1600px;
+  width: 100%;
   margin: 0 auto;
-  padding: 20px 24px;
+  padding: 24px 32px 60px 32px;
+}
+
+/* Mobile Top Bar Header */
+.mobile-top-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #4f030a;
+  border-bottom: 1.5px solid #1f0104;
+  position: sticky;
+  top: 0;
+  z-index: 990;
+}
+
+.mobile-hamburger-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobile-brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-brand-logo {
+  height: 28px;
+  object-fit: contain;
+}
+
+.mobile-brand-tag {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #ffc72c;
+  letter-spacing: 0.05em;
+}
+
+.mobile-btn-wa {
+  font-size: 1.25rem;
+  text-decoration: none;
+}
+
+/* Responsive Breakpoint for Mobile and Tablet */
+@media (max-width: 992px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    height: 100vh;
+    z-index: 10000;
+    transition: left 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .app-sidebar.sidebar-open {
+    left: 0;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+  }
+
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  .mobile-top-bar {
+    display: flex;
+  }
+
+  .main-content {
+    padding: 16px 14px 40px 14px;
+  }
 }
 
 /* ================= SPEC CARD TEGAS ================= */
@@ -89,108 +404,6 @@ h1, h2, h3, h4, h5, h6,
 /* Aksen Card Khusus / Card Pesanan */
 .card-accent-left {
   border-left: var(--card-accent-border) !important;
-}
-
-/* ================= TOP RED BANNER HEADER (100% SOLID RED BLOCK - TANPA KOTAK PUTIH) ================= */
-.top-red-banner {
-  background: #c8102e;
-  background: linear-gradient(135deg, #a50f27 0%, #c8102e 60%, #b80d27 100%);
-  width: 100%;
-  border-bottom: 2px solid #0f172a;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.15);
-}
-
-.header-inner-content {
-  max-width: 1560px;
-  margin: 0 auto;
-  padding: 16px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.brand-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.brand-logo-container {
-  height: 52px;
-  background: #0f172a;
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
-  border-radius: 12px;
-  padding: 4px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.brand-logo-img {
-  height: 40px;
-  object-fit: contain;
-}
-
-.brand-badge-light {
-  display: inline-block;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  color: #ffd1d9;
-  text-transform: uppercase;
-  margin-bottom: 2px;
-}
-
-.brand-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1.48rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: #ffffff;
-  line-height: 1.15;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Horizontal Pill Tabs Navigation directly on Red Banner */
-.header-tabs-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-
-.pill-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 18px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #ffffff;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  white-space: nowrap;
-  backdrop-filter: blur(4px);
-}
-
-.pill-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
-  border-color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.pill-tab-btn.active {
-  background: #ffffff !important;
-  color: #c8102e !important;
-  border-color: #ffffff !important;
-  font-weight: 800 !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-  transform: translateY(-1px);
 }
 
 /* ================= BUTTONS ================= */

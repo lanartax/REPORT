@@ -632,6 +632,14 @@ function updateExecutiveKPICards(picStats, activePICs) {
 // 7. TAB NAVIGATION & VIEW MODE FILTER (SUPPORT 7 UNIFIED TABS)
 let currentReportViewMode = 'all'; // 'all', 'r1', 'r2'
 
+function toggleSidebarMobile() {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+  sidebar.classList.toggle('sidebar-open');
+  if (backdrop) backdrop.classList.toggle('active');
+}
+
 function switchTab(tabIndex) {
   currentActiveTab = tabIndex;
   for (let i = 1; i <= 7; i++) {
@@ -639,6 +647,14 @@ function switchTab(tabIndex) {
     const content = document.getElementById(`tabContent${i}`);
     if (btn) btn.classList.toggle('active', i === tabIndex);
     if (content) content.classList.toggle('active', i === tabIndex);
+  }
+
+  // Auto-close sidebar on mobile screens
+  if (window.innerWidth <= 992) {
+    const sidebar = document.getElementById('appSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.remove('sidebar-open');
+    if (backdrop) backdrop.classList.remove('active');
   }
 
   // Toggle KPI Cards and Gemini Prompt visibility
