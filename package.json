@@ -1,8 +1,8 @@
 {
   "name": "REPORT",
-  "version": "1.0.4",
-  "main": "index.js",
+  "version": "1.0.5",
   "scripts": {
+    "build": "echo 'Static site ready'",
     "start": "node local-server.js"
   },
   "dependencies": {
