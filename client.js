@@ -238,10 +238,13 @@ function updateTurnoverIndicator(text) {
 
 async function resetTurnoverToDefault() {
   if (confirm("Apakah Anda yakin ingin menghapus file turnover yang diunggah dan kembali ke data default sistem?")) {
+    try {
+      await fetch('/api/get-excel?type=turnover', { method: 'DELETE' });
+    } catch(e) {}
     await clearFileFromIndexedDB('turnover_file');
     localStorage.removeItem('gadgetmart_turnover_timestamp');
     localStorage.removeItem('gadgetmart_turnover_is_custom');
-    alert("Cache file turnover telah dihapus. Halaman akan dimuat ulang dengan data default sistem.");
+    alert("File turnover kustom telah dihapus dari database & browser. Halaman akan dimuat ulang dengan data default sistem.");
     window.location.reload();
   }
 }
@@ -2744,7 +2747,8 @@ function renderRegionalSosmedChart() {
     'Pontianak': {
       label: 'Pontianak (PTKC)',
       codes: ['PTKC', 'PTKX'],
-      trxCount: 0,
+      docs: new Set(),
+      itemCount: 0,
       omzetDPP: 0,
       omzetGross: 0,
       color: '#0284c7'
@@ -2752,7 +2756,8 @@ function renderRegionalSosmedChart() {
     'Balikpapan': {
       label: 'Balikpapan (BPPC/BP2C)',
       codes: ['BPPC', 'BP2C', 'BP2X'],
-      trxCount: 0,
+      docs: new Set(),
+      itemCount: 0,
       omzetDPP: 0,
       omzetGross: 0,
       color: '#c8102e'
@@ -2760,7 +2765,8 @@ function renderRegionalSosmedChart() {
     'Sungai Danau': {
       label: 'Sungai Danau (SDNC)',
       codes: ['SDNC'],
-      trxCount: 0,
+      docs: new Set(),
+      itemCount: 0,
       omzetDPP: 0,
       omzetGross: 0,
       color: '#10b981'
@@ -2771,21 +2777,22 @@ function renderRegionalSosmedChart() {
     rawTurnoverRows.forEach(r => {
       const emp = String(r['Sales Employee Name'] || '');
       const rem = String(r['Remarks'] || '');
-      const cab = String(r['SalesCabang'] || '');
+      const cab = String(r['Cabang'] || r['SalesCabang'] || '').trim().toUpperCase();
 
       // Acuan data ditarik dari kode sales employee "bjm.sos.0" dan "bjm.sos.k"
       if (!isSosmedSalesCode(emp, rem, cab)) return;
 
-      const c = String(r['Cabang'] || r['SalesCabang'] || '').trim().toUpperCase();
+      const docNo = r['Document Number'];
       const dpp = Number(r['DPP']) || 0;
       const total = Number(r['Total']) || 0;
 
       for (const regKey in regionalData) {
         const reg = regionalData[regKey];
-        const isMatch = reg.codes.some(code => c.includes(code)) || 
-                        c.startsWith(regKey.slice(0, 3).toUpperCase());
+        const isMatch = reg.codes.some(code => cab.includes(code)) || 
+                        cab.startsWith(regKey.slice(0, 3).toUpperCase());
         if (isMatch) {
-          reg.trxCount++;
+          reg.itemCount++;
+          if (docNo) reg.docs.add(docNo);
           reg.omzetDPP += dpp;
           reg.omzetGross += total;
           break;
@@ -2794,16 +2801,22 @@ function renderRegionalSosmedChart() {
     });
   }
 
-  // Update stat chips
+  // Update stat chips dengan JUMLAH TRANSAKSI FAKTUR & NOMINAL PENJUALAN DPP
+  const ptkNominal = formatRupiah(isDPP ? regionalData['Pontianak'].omzetDPP : regionalData['Pontianak'].omzetGross);
   const elPtk = document.getElementById('chipValPtk');
-  const elBpp = document.getElementById('chipValBpp');
-  const elSdn = document.getElementById('chipValSdn');
-  if (elPtk) elPtk.innerText = `${regionalData['Pontianak'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Pontianak'].omzetDPP : regionalData['Pontianak'].omzetGross)})`;
-  if (elBpp) elBpp.innerText = `${regionalData['Balikpapan'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Balikpapan'].omzetDPP : regionalData['Balikpapan'].omzetGross)})`;
-  if (elSdn) elSdn.innerText = `${regionalData['Sungai Danau'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Sungai Danau'].omzetDPP : regionalData['Sungai Danau'].omzetGross)})`;
+  if (elPtk) elPtk.innerHTML = `<strong>${ptkNominal}</strong> (${regionalData['Pontianak'].docs.size} Trx Faktur &bull; ${regionalData['Pontianak'].itemCount} Item)`;
 
+  const bppNominal = formatRupiah(isDPP ? regionalData['Balikpapan'].omzetDPP : regionalData['Balikpapan'].omzetGross);
+  const elBpp = document.getElementById('chipValBpp');
+  if (elBpp) elBpp.innerHTML = `<strong>${bppNominal}</strong> (${regionalData['Balikpapan'].docs.size} Trx Faktur &bull; ${regionalData['Balikpapan'].itemCount} Item)`;
+
+  const sdnNominal = formatRupiah(isDPP ? regionalData['Sungai Danau'].omzetDPP : regionalData['Sungai Danau'].omzetGross);
+  const elSdn = document.getElementById('chipValSdn');
+  if (elSdn) elSdn.innerHTML = `<strong>${sdnNominal}</strong> (${regionalData['Sungai Danau'].docs.size} Trx Faktur &bull; ${regionalData['Sungai Danau'].itemCount} Item)`;
+
+  // Plot grafik berdasarkan NOMINAL PENJUALAN DPP (Juta Rupiah)
   const labels = Object.values(regionalData).map(r => r.label);
-  const trxCounts = Object.values(regionalData).map(r => r.trxCount);
+  const nominalJuta = Object.values(regionalData).map(r => Math.round(((isDPP ? r.omzetDPP : r.omzetGross) / 1000000) * 10) / 10);
   const colors = Object.values(regionalData).map(r => r.color);
 
   const defaultFont = { family: "'Plus Jakarta Sans', sans-serif" };
@@ -2815,8 +2828,8 @@ function renderRegionalSosmedChart() {
       labels,
       datasets: [
         {
-          label: 'Jumlah Penjualan / Transaksi (Trx)',
-          data: trxCounts,
+          label: isDPP ? 'Total Penjualan DPP (Juta Rp)' : 'Total Penjualan Gross (Juta Rp)',
+          data: nominalJuta,
           backgroundColor: colors,
           borderRadius: 8,
           barPercentage: 0.55
@@ -2833,23 +2846,29 @@ function renderRegionalSosmedChart() {
             label: (ctx) => {
               const regKey = Object.keys(regionalData)[ctx.dataIndex];
               const reg = regionalData[regKey];
-              const omzetVal = isDPP ? reg.omzetDPP : reg.omzetGross;
+              const valNominal = isDPP ? reg.omzetDPP : reg.omzetGross;
               return [
-                ` Jumlah Penjualan: ${ctx.parsed.y} Transaksi`,
-                ` Total Omzet (${isDPP ? 'DPP' : 'Gross'}): ${formatRupiah(omzetVal)}`
+                ` Penjualan ${isDPP ? 'DPP' : 'Gross'}: ${formatRupiah(valNominal)}`,
+                ` Transaksi Faktur Customer: ${reg.docs.size} Faktur Unik`,
+                ` Total Item Terjual: ${reg.itemCount} Barang`
               ];
             }
           }
         }
       },
       scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { ...defaultFont, weight: 600, size: 11 }, color: '#334155' }
+        },
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'Banyak Penjualan (Jumlah Transaksi)', font: defaultFont },
-          ticks: { font: defaultFont, precision: 0 }
-        },
-        x: {
-          ticks: { font: { ...defaultFont, weight: '700' } }
+          grid: { color: 'rgba(0,0,0,0.06)' },
+          ticks: {
+            font: { ...defaultFont, size: 10 },
+            color: '#64748b',
+            callback: (v) => `Rp ${v} Jt`
+          }
         }
       }
     }
@@ -3107,7 +3126,13 @@ function renderArchiveGrid() {
         <span class="kpi-badge badge-crimson">${a.dateSaved || 'Tersimpan'}</span>
       </div>
       <div class="archive-stats" style="font-size:0.83rem; line-height:1.6; color:#334155;">
-        <p style="display:flex; justify-content:space-between;"><span>Pencapaian:</span> <strong style="color:#0f172a;">${a.totalAchieve}</strong></p>
+        <p style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Pencapaian Omzet:</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <strong style="color:#0f172a;">${a.totalAchieve}</strong>
+            <button class="btn-archive-edit-gp" onclick="editArchiveOmzet(${a.month}, ${a.year})" title="Setting / Edit Pencapaian Omzet ${a.title}">✏️</button>
+          </span>
+        </p>
         <p style="display:flex; justify-content:space-between; align-items:center;">
           <span>Gross Profit:</span>
           <span style="display:inline-flex; align-items:center; gap:6px;">
@@ -3119,16 +3144,54 @@ function renderArchiveGrid() {
         <p style="display:flex; justify-content:space-between;"><span>Progress Target:</span> <strong style="color:#c8102e;">${a.progress}</strong></p>
         <p style="display:flex; justify-content:space-between;"><span>Cross-Selling:</span> <strong>${a.crossRatio}</strong></p>
       </div>
-      <div class="archive-card-actions" style="margin-top:14px; padding-top:10px; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-        <button class="btn btn-outline btn-xs" onclick="editArchiveGP(${a.month}, ${a.year})">
-          ✏️ Edit Gross Profit
-        </button>
+      <div class="archive-card-actions" style="margin-top:14px; padding-top:10px; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-outline btn-xs" onclick="editArchiveOmzet(${a.month}, ${a.year})">
+            ✏️ Setting Pencapaian
+          </button>
+          <button class="btn btn-outline btn-xs" onclick="editArchiveGP(${a.month}, ${a.year})">
+            ✏️ Edit GP
+          </button>
+        </div>
         <button class="btn btn-outline btn-xs" style="color:#ef4444; border-color:#fca5a5;" onclick="deleteArchiveMonth(${a.month}, ${a.year})">
           🗑️ Hapus
         </button>
       </div>
     </div>
   `).join('');
+}
+
+// FITUR SETTING / EDIT PENCAPAIAN OMZET DI ARSIP PENCAPAIAN (PERMINTAAN USER)
+async function editArchiveOmzet(month, year) {
+  const archive = cachedMonthlyArchives.find(a => Number(a.month) === Number(month) && Number(a.year) === Number(year));
+  if (!archive) {
+    alert("Arsip bulan tidak ditemukan!");
+    return;
+  }
+  const currentVal = archive.totalAchieveRaw || Number(String(archive.totalAchieve || '0').replace(/[^0-9.-]+/g, ''));
+  const promptVal = prompt(
+    `Setting / Edit Realisasi Pencapaian Omzet untuk "${archive.title}":\n\nMasukkan nominal angka baru (contoh: 8500000000 atau Rp 8.500.000.000):`,
+    currentVal
+  );
+  if (promptVal === null) return; // Dibatalkan pengguna
+
+  const cleanNum = Number(String(promptVal).replace(/[^0-9.-]+/g, ''));
+  if (isNaN(cleanNum) || cleanNum < 0) {
+    alert("Nominal pencapaian omzet tidak valid! Harap masukkan angka yang benar.");
+    return;
+  }
+
+  archive.totalAchieveRaw = cleanNum;
+  archive.totalAchieve = formatRupiah(cleanNum);
+  if (archive.targetOmzet && archive.targetOmzet > 0) {
+    archive.pctOmzet = Math.round((cleanNum / archive.targetOmzet) * 100);
+    archive.progress = `${archive.pctOmzet}%`;
+  }
+
+  await persistMonthlyArchivesToServer();
+  renderArchiveGrid();
+  renderMonthToMonthCharts();
+  alert(`✅ Pencapaian Omzet untuk "${archive.title}" berhasil diatur menjadi ${formatRupiah(cleanNum)}!\nGrafik tren omzet bulanan telah otomatis diperbarui.`);
 }
 
 // EDIT GROSS PROFIT PADA SNAPSHOT ARSIP BULANAN (PERMINTAAN USER)
@@ -3905,30 +3968,18 @@ let lastKnownSyncStatus = {
   keepMtime: 0
 };
 
-// LOAD BOTH DEFAULT EXCEL FILES - SERVER FIRST (AGAR PERUBAHAN DARI LAPTOP LAIN LANGSUNG MUNCUL)
+// LOAD BOTH DEFAULT EXCEL FILES - PRIORITASKAN CUSTOM UPLOAD (DATABASE / INDEXEDDB) AGAR DATA TIDAK HILANG SAAT REFRESH
 async function loadAllDefaultFiles() {
   const statusTitle = document.getElementById('fileStatusTitle');
   if (statusTitle) statusTitle.innerText = 'Menghubungkan ke Server Database...';
   
-  // 1. Fetch and Parse turnover.xlsx (Prioritaskan versi terbaru di Server)
+  // 1. Fetch turnover.xlsx:
+  // Cek apakah ada file turnover kustom yang tersimpan di IndexedDB atau PostgreSQL Database
   let turnoverLoaded = false;
-  try {
-    const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
-    if (resTurnover.ok) {
-      const buf1 = await resTurnover.arrayBuffer();
-      parseTurnoverBuffer(buf1);
-      turnoverLoaded = true;
-      await saveFileToIndexedDB('turnover_file', buf1);
-      const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || getFormattedTimestamp();
-      updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
-      console.log('✅ turnover.xlsx berhasil dimuat langsung dari server database!');
-    }
-  } catch (e) {
-    console.warn("Server turnover fetch warning, fallback to cache:", e);
-  }
+  const isCustomTurnover = localStorage.getItem('gadgetmart_turnover_is_custom') === 'true';
 
-  // Fallback to IndexedDB if offline or server failed
-  if (!turnoverLoaded) {
+  // A. Jika ada file custom di IndexedDB, muat langsung agar REFRESH TETAP STAY & INSTAN
+  if (isCustomTurnover) {
     try {
       const cachedTurnover = await getFileFromIndexedDB('turnover_file');
       if (cachedTurnover) {
@@ -3936,29 +3987,67 @@ async function loadAllDefaultFiles() {
         turnoverLoaded = true;
         const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || getFormattedTimestamp();
         updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
-        console.log('✅ turnover.xlsx dimuat dari IndexedDB lokal!');
+        console.log('✅ turnover.xlsx kustom dimuat dari IndexedDB lokal!');
       }
     } catch (e) {}
   }
 
-  // 2. Fetch and Parse CROSSELLING-12102026.xlsx (Prioritaskan versi terbaru di Server)
+  // B. Ambil dari Database Server (/api/get-excel?type=turnover)
+  if (!turnoverLoaded) {
+    try {
+      const resTurnover = await fetch(`/api/get-excel?type=turnover&t=${Date.now()}`);
+      if (resTurnover.ok) {
+        const isDbCustom = resTurnover.headers.get('X-Custom-File') === 'true';
+        const serverTs = resTurnover.headers.get('X-File-Timestamp');
+        const buf1 = await resTurnover.arrayBuffer();
+        parseTurnoverBuffer(buf1);
+        turnoverLoaded = true;
+        if (isDbCustom) {
+          await saveFileToIndexedDB('turnover_file', buf1);
+          localStorage.setItem('gadgetmart_turnover_is_custom', 'true');
+          const ts = serverTs ? new Date(serverTs).toLocaleString('id-ID') : getFormattedTimestamp();
+          localStorage.setItem('gadgetmart_turnover_timestamp', ts);
+          updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
+        } else {
+          const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || 'Default Sistem (13/10/2026 18:00 WITA)';
+          updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
+        }
+        console.log('✅ turnover.xlsx dimuat dari database server!');
+      }
+    } catch (e) {}
+  }
+
+  // C. Fallback ke file statis jika server belum punya custom upload
+  if (!turnoverLoaded) {
+    try {
+      const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
+      if (resTurnover.ok) {
+        const buf1 = await resTurnover.arrayBuffer();
+        parseTurnoverBuffer(buf1);
+        turnoverLoaded = true;
+        const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || 'Default Sistem (13/10/2026 18:00 WITA)';
+        updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
+      }
+    } catch (e) {}
+  }
+
+  // 2. Fetch CROSSELLING-12102026.xlsx
   let crosellingLoaded = false;
   try {
-    const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
+    const resCroselling = await fetch(`/api/get-excel?type=croselling&t=${Date.now()}`);
     if (resCroselling.ok) {
+      const isDbCustom = resCroselling.headers.get('X-Custom-File') === 'true';
       const buf2 = await resCroselling.arrayBuffer();
       parseCrosellingBuffer(buf2);
       crosellingLoaded = true;
-      await saveFileToIndexedDB('croselling_file', buf2);
+      if (isDbCustom) {
+        await saveFileToIndexedDB('croselling_file', buf2);
+      }
       const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Default Sistem (12/10/2026)';
       updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
-      console.log('✅ CROSSELLING-12102026.xlsx dimuat dari server database!');
     }
-  } catch (e) {
-    console.warn("Server croselling fetch warning, fallback to cache:", e);
-  }
+  } catch(e) {}
 
-  // Fallback to IndexedDB if offline
   if (!crosellingLoaded) {
     try {
       const cachedCroselling = await getFileFromIndexedDB('croselling_file');
@@ -3967,7 +4056,19 @@ async function loadAllDefaultFiles() {
         crosellingLoaded = true;
         const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Tersimpan di Peramban';
         updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
-        console.log('✅ CROSSELLING data dimuat dari IndexedDB lokal!');
+      }
+    } catch (e) {}
+  }
+
+  if (!crosellingLoaded) {
+    try {
+      const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
+      if (resCroselling.ok) {
+        const buf2 = await resCroselling.arrayBuffer();
+        parseCrosellingBuffer(buf2);
+        crosellingLoaded = true;
+        const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Default Sistem (12/10/2026)';
+        updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
       }
     } catch (e) {}
   }

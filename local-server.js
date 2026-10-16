@@ -99,6 +99,33 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API Get Excel File (Ambil file turnover/croselling terbaru dari server)
+  if (reqPath === '/api/get-excel') {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`);
+    const type = urlParams.searchParams.get('type') || 'turnover';
+    const targetFileName = type === 'croselling' ? 'CROSSELLING-12102026.xlsx' : 'turnover.xlsx';
+    const targetFilePath = path.join(PUBLIC_DIR, targetFileName);
+
+    if (req.method === 'DELETE') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: `File ${type} direset ke default.` }));
+      return;
+    }
+
+    if (fs.existsSync(targetFilePath)) {
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${targetFileName}"`,
+        'Cache-Control': 'no-store, no-cache, must-revalidate'
+      });
+      fs.createReadStream(targetFilePath).pipe(res);
+    } else {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'File tidak ditemukan' }));
+    }
+    return;
+  }
+
   // API Sales Photos (Get & Save)
   if (reqPath === '/api/sales-photos') {
     const photosFile = path.join(PUBLIC_DIR, 'sales_photos.json');

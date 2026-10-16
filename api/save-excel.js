@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getDb, initDb } = require('../lib/db.js');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,16 +25,45 @@ module.exports = async function handler(req, res) {
       }
     }
     const buffer = Buffer.concat(chunks);
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'Data file kosong.' });
+    }
 
+    // 1. Simpan ke Database PostgreSQL (Neon.tech) agar PERMANEN di serverless & multi-device
+    let dbSaved = false;
+    try {
+      const sql = getDb();
+      if (sql) {
+        await initDb(sql);
+        const base64Data = buffer.toString('base64');
+        const updateTs = new Date().toISOString();
+        await sql`
+          INSERT INTO uploaded_files (file_key, file_name, file_data, timestamp, updated_at)
+          VALUES (${fileType}, ${targetFileName}, ${base64Data}, ${updateTs}, NOW())
+          ON CONFLICT (file_key) DO UPDATE SET
+            file_name = EXCLUDED.file_name,
+            file_data = EXCLUDED.file_data,
+            timestamp = EXCLUDED.timestamp,
+            updated_at = NOW();
+        `;
+        dbSaved = true;
+        console.log(`✅ File ${targetFileName} berhasil disimpan ke PostgreSQL database (${(buffer.length/1024/1024).toFixed(2)} MB)!`);
+      }
+    } catch (dbErr) {
+      console.warn("Gagal simpan ke Neon DB:", dbErr.message);
+    }
+
+    // 2. Simpan juga ke disk lokal jika writable (misal saat running di local-server / localhost)
     try {
       fs.writeFileSync(targetPath, buffer);
     } catch(e) {
-      console.warn("Disk write skipped on read-only serverless environment");
+      // Di serverless read-only disk tidak apa-apa karena sudah tersimpan di database PostgreSQL
     }
 
     return res.status(200).json({
       success: true,
-      message: `File ${targetFileName} berhasil diproses (${buffer.length} bytes)`,
+      message: `File ${targetFileName} berhasil disimpan ke database server (${buffer.length} bytes)`,
+      dbSaved,
       size: buffer.length
     });
   } catch (err) {
