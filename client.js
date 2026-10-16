@@ -1135,6 +1135,78 @@ async function loadKeepData() {
   }
 }
 
+function parseCSVLine(text) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i+1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+window.parseCSVLine = parseCSVLine;
+
+function parseKeepCSV(csvText) {
+  try {
+    if (!csvText || typeof csvText !== 'string') return;
+    let jsonData = [];
+    if (typeof XLSX !== 'undefined' && XLSX.read) {
+      try {
+        const wb = XLSX.read(csvText, { type: 'string' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        jsonData = XLSX.utils.sheet_to_json(ws);
+      } catch (xlsxErr) {
+        console.warn("SheetJS parse warning, using fallback CSV parser:", xlsxErr);
+      }
+    }
+
+    if (!jsonData || jsonData.length === 0) {
+      const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length > 1) {
+        const headers = parseCSVLine(lines[0]);
+        for (let i = 1; i < lines.length; i++) {
+          const vals = parseCSVLine(lines[i]);
+          const row = {};
+          headers.forEach((h, idx) => {
+            row[h] = vals[idx] !== undefined ? vals[idx] : '';
+          });
+          jsonData.push(row);
+        }
+      }
+    }
+
+    if (!jsonData || jsonData.length === 0) return;
+    rawKeepRows = jsonData;
+    console.log(`Keep CSV parsed successfully: ${rawKeepRows.length} rows`);
+    const pill = document.getElementById('keepStatusPill');
+    if (pill) {
+      pill.innerHTML = `<span>📁 Sumber: Google Sheets Live (${rawKeepRows.length.toLocaleString('id-ID')} Baris Data)</span>`;
+    }
+    populateKeepSosmedDropdown();
+    applyKeepFilters();
+    if (typeof rawCrosellingRows !== 'undefined' && rawCrosellingRows.length > 0 && typeof runARMissingSosmedAudit === 'function') {
+      runARMissingSosmedAudit();
+    }
+  } catch(e) {
+    console.error("Error parsing Keep CSV:", e);
+  }
+}
+window.parseKeepCSV = parseKeepCSV;
+
 async function syncLiveKeepData() {
   const btn = document.getElementById('btnSyncKeepData');
   const originalText = btn ? btn.innerHTML : '';
@@ -1166,7 +1238,11 @@ async function syncLiveKeepData() {
 
     if (csvData) {
       parseKeepCSV(csvData);
-      localStorage.setItem('gadgetmart_sosmed_keep_cache', csvData);
+      try {
+        localStorage.setItem('gadgetmart_sosmed_keep_cache', csvData);
+      } catch (storageErr) {
+        console.warn("Storage quota exceeded for localStorage keep cache:", storageErr);
+      }
       alert("✅ Data Keep berhasil disinkronisasi langsung dari Google Sheets!");
       renderKeepTable();
     } else {
@@ -1181,6 +1257,7 @@ async function syncLiveKeepData() {
     if (btn) btn.innerHTML = originalText;
   }
 }
+window.syncLiveKeepData = syncLiveKeepData;
 
 function populateKeepSosmedDropdown() {
   const select = document.getElementById('keepFilterSosmed');
@@ -1361,12 +1438,12 @@ function renderKeepPage() {
       <td class="text-left font-bold">${r['Nama'] || '-'}</td>
       <td class="text-left">${waHtml}</td>
       <td class="text-left font-bold" style="color:var(--ink);">${r['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="color:var(--ink-secondary); font-size:0.8rem;">${r['Tanggal Ambil'] || '-'}</td>
-      <td class="text-left" style="font-size:0.78rem; max-width:240px; white-space:normal; line-height:1.4;">${r['Catatan'] || '-'}</td>
+      <td class="text-left" style="color:var(--ink-secondary); font-size:0.75rem;">${r['Tanggal Ambil'] || '-'}</td>
+      <td class="text-left" style="font-size:0.75rem; max-width:130px; white-space:normal; line-height:1.3;">${r['Catatan'] || '-'}</td>
       <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r['Kode Sosmed'] || '-'}</span></td>
       <td class="text-center">${arHtml}</td>
       <td class="text-center"><span class="kpi-badge ${statusClass} font-bold">${r['Status'] || '-'}</span></td>
-      <td class="text-left" style="font-size:0.8rem; max-width:220px; white-space:normal; line-height:1.4;">${r['Feedback Tim FU'] || '-'}</td>
+      <td class="text-left" style="font-size:0.75rem; max-width:130px; white-space:normal; line-height:1.3;">${r['Feedback Tim FU'] || '-'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2037,7 +2114,7 @@ function renderAuditPage() {
       <td class="text-left">${waHtml}</td>
       <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r.keep['Kode Sosmed'] || '-'}</span></td>
       <td class="text-left font-bold" style="color:var(--ink);">${r.keep['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="max-width:250px; white-space:normal;">${itemsBadges}</td>
+      <td class="text-left" style="max-width:160px; white-space:normal; font-size:0.73rem;">${itemsBadges}</td>
       <td class="text-center">${statusBadge}</td>
       <td class="text-center">
         <button class="btn btn-crimson btn-sm" onclick="openARDetailModalFromAudit(${auditRowIdx})" style="padding:4px 10px; font-size:0.78rem; white-space:nowrap;">
