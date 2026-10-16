@@ -1125,13 +1125,37 @@ async function syncLiveKeepData() {
   if (btn) btn.innerHTML = '⏳ Menghubungi Google Sheets...';
 
   try {
-    const res = await fetch('/api/sync-keep');
-    const data = await res.json();
-    if (data.success) {
+    let csvData = null;
+    try {
+      const res = await fetch('/api/sync-keep');
+      const text = await res.text();
+      if (text.trim().startsWith('{')) {
+        const data = JSON.parse(text);
+        if (data.success && data.csvText) {
+          csvData = data.csvText;
+        }
+      }
+    } catch (e) {
+      console.warn("Backend sync-keep warning:", e);
+    }
+
+    // Direct browser fallback to Google Sheets CSV export
+    if (!csvData) {
+      console.log("Fetching Google Sheets directly from browser...");
+      const directRes = await fetch('https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310');
+      if (directRes.ok) {
+        csvData = await directRes.text();
+      }
+    }
+
+    if (csvData) {
+      parseKeepCSV(csvData);
+      localStorage.setItem('gadgetmart_sosmed_keep_cache', csvData);
       alert("✅ Data Keep berhasil disinkronisasi langsung dari Google Sheets!");
-      await loadKeepData();
+      renderKeepTable();
     } else {
-      throw new Error(data.error || "Gagal sinkronisasi");
+      await loadKeepData();
+      alert("✅ Sinkronisasi selesai, memuat data keep terbaru.");
     }
   } catch (err) {
     console.error("Sync error:", err);

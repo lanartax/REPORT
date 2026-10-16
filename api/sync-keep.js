@@ -31,6 +31,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: 'Data keep berhasil disinkronkan langsung dari Google Sheets!',
+      csvText: csvText,
       rowsSample: csvText.slice(0, 150)
     });
   } catch (err) {
