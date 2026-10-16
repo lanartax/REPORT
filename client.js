@@ -1207,6 +1207,11 @@ function parseKeepCSV(csvText) {
 }
 window.parseKeepCSV = parseKeepCSV;
 
+function renderKeepTable() {
+  applyKeepFilters();
+}
+window.renderKeepTable = renderKeepTable;
+
 async function syncLiveKeepData() {
   const btn = document.getElementById('btnSyncKeepData');
   const originalText = btn ? btn.innerHTML : '';
@@ -1243,8 +1248,8 @@ async function syncLiveKeepData() {
       } catch (storageErr) {
         console.warn("Storage quota exceeded for localStorage keep cache:", storageErr);
       }
-      alert("✅ Data Keep berhasil disinkronisasi langsung dari Google Sheets!");
-      renderKeepTable();
+      applyKeepFilters();
+      alert(`✅ Data Keep berhasil disinkronisasi langsung dari Google Sheets!\nTotal ${rawKeepRows.length.toLocaleString('id-ID')} baris data berhasil dimuat.`);
     } else {
       await loadKeepData();
       alert("✅ Sinkronisasi selesai, memuat data keep terbaru.");
@@ -1438,12 +1443,12 @@ function renderKeepPage() {
       <td class="text-left font-bold">${r['Nama'] || '-'}</td>
       <td class="text-left">${waHtml}</td>
       <td class="text-left font-bold" style="color:var(--ink);">${r['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="color:var(--ink-secondary); font-size:0.75rem;">${r['Tanggal Ambil'] || '-'}</td>
-      <td class="text-left" style="font-size:0.75rem; max-width:130px; white-space:normal; line-height:1.3;">${r['Catatan'] || '-'}</td>
+      <td class="text-left" style="color:var(--ink-secondary); font-size:0.8rem; white-space: nowrap;">${r['Tanggal Ambil'] || '-'}</td>
+      <td class="text-left" style="font-size:0.78rem; min-width:220px; white-space:normal; line-height:1.4;">${r['Catatan'] || '-'}</td>
       <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r['Kode Sosmed'] || '-'}</span></td>
       <td class="text-center">${arHtml}</td>
       <td class="text-center"><span class="kpi-badge ${statusClass} font-bold">${r['Status'] || '-'}</span></td>
-      <td class="text-left" style="font-size:0.75rem; max-width:130px; white-space:normal; line-height:1.3;">${r['Feedback Tim FU'] || '-'}</td>
+      <td class="text-left" style="font-size:0.78rem; min-width:180px; white-space:normal; line-height:1.4;">${r['Feedback Tim FU'] || '-'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2493,7 +2498,7 @@ function renderMonthToMonthCharts() {
 
       return `
         <tr class="${isCurrent ? 'row-highlight-active' : ''}">
-          <td class="text-left font-bold">${mName} ${activeYear} ${isCurrent ? '<span class="kpi-pill-badge badge-crimson" style="font-size:0.65rem;">BULAN INI</span>' : ''}</td>
+          <td class="text-left font-bold" style="white-space: nowrap; font-size: 0.85rem;">${mName} ${activeYear} ${isCurrent ? '<span class="kpi-pill-badge badge-crimson" style="font-size:0.68rem; margin-left:8px;">BULAN INI</span>' : ''}</td>
           <td>${formatRupiah(targetVal)}</td>
           <td class="font-bold">${hasData ? formatRupiah(omzetVal) : '-'}</td>
           <td class="font-bold text-center">${hasData ? `${pctOmzet}%` : '-'}</td>

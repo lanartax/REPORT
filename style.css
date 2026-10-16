@@ -1071,34 +1071,28 @@ h1, h2, h3, h4, h5, h6,
   outline: none;
 }
 
-/* NO RESTRICTIVE VERTICAL SCROLLBAR & NO UNWANTED HORIZONTAL SCROLLBAR */
+/* TABLES WIDE AND RESPONSIVE */
 .table-responsive {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
   max-height: none !important; /* Full expansion on screen and export */
   position: relative;
-}
-
-@media (min-width: 1100px) {
-  .table-responsive {
-    overflow-x: hidden; /* Hilangkan scroll samping di layar desktop / laptop */
-  }
+  -webkit-overflow-scrolling: touch;
 }
 
 .kpi-matrix-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   background: white;
-  table-layout: auto;
 }
 
 .kpi-matrix-table th, 
 .kpi-matrix-table td {
-  padding: 5px 6px;
+  padding: 8px 10px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.1);
   border-right: 1px solid rgba(15, 23, 42, 0.05);
   text-align: right;

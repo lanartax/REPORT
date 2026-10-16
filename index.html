@@ -403,46 +403,43 @@
             </div>
           </div>
 
-          <!-- Row 3: Cross Selling Gadget & Ringkasan Evaluasi -->
-          <div class="charts-grid-2col mt-24">
-            <!-- Chart 3: Cross Selling Gadget Bulanan -->
-            <div class="card-tegas chart-card">
-              <div class="chart-card-header">
-                <div class="chart-header-title">
-                  <h3>📱 Trend Cross Selling (>50K) Bulanan</h3>
-                  <p>Jumlah aksesoris & cross selling dibandingkan total unit gadget terjual per bulan</p>
-                </div>
-              </div>
-              <div class="chart-canvas-container">
-                <canvas id="chartTrendCross"></canvas>
+          <!-- Row 3: Trend Cross Selling Bulanan -->
+          <div class="card-tegas chart-card mt-24">
+            <div class="chart-card-header">
+              <div class="chart-header-title">
+                <h3>📱 Trend Cross Selling (>50K) Bulanan</h3>
+                <p>Jumlah aksesoris & cross selling dibandingkan total unit gadget terjual per bulan</p>
               </div>
             </div>
+            <div class="chart-canvas-container" style="height: 300px;">
+              <canvas id="chartTrendCross"></canvas>
+            </div>
+          </div>
 
-            <!-- Table: Ringkasan Evaluasi Bulan ke Bulan (Januari - Desember) -->
-            <div class="card-tegas chart-card">
-              <div class="chart-card-header">
-                <div class="chart-header-title">
-                  <h3>📑 Ringkasan Evaluasi Pencapaian Bulan ke Bulan</h3>
-                  <p>Data konsolidasi tahun 2026 yang bersumber dari arsip bulanan</p>
-                </div>
+          <!-- Table: Ringkasan Evaluasi Bulan ke Bulan (Januari - Desember) - DIBIKIN LEBAR 100% -->
+          <div class="card-tegas table-card mt-24">
+            <div class="table-toolbar">
+              <div class="toolbar-title">
+                <h2>📑 RINGKASAN EVALUASI PENCAPAIAN BULAN KE BULAN (2026)</h2>
+                <span class="pill-badge-red">Data Konsolidasi Tahunan Bersumber dari Arsip Bulanan</span>
               </div>
-              <div class="table-responsive" style="max-height: 290px;">
-                <table class="kpi-matrix-table" id="monthSummaryTable">
-                  <thead>
-                    <tr>
-                      <th class="text-left">BULAN</th>
-                      <th>TARGET OMZET</th>
-                      <th>PENCAPAIAN</th>
-                      <th>% OMZET</th>
-                      <th>TARGET GP (5%)</th>
-                      <th>ACV GP</th>
-                      <th>% GP</th>
-                      <th>STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody id="monthSummaryTableBody"></tbody>
-                </table>
-              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="kpi-matrix-table" id="monthSummaryTable" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th class="text-left" style="min-width: 160px; width: 180px;">BULAN</th>
+                    <th style="min-width: 160px;">TARGET OMZET</th>
+                    <th style="min-width: 160px;">PENCAPAIAN</th>
+                    <th class="text-center" style="min-width: 100px;">% OMZET</th>
+                    <th style="min-width: 150px;">TARGET GP (5%)</th>
+                    <th style="min-width: 150px;">ACV GP</th>
+                    <th class="text-center" style="min-width: 100px;">% GP</th>
+                    <th class="text-center" style="min-width: 150px;">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody id="monthSummaryTableBody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -839,17 +836,17 @@
             <table class="kpi-matrix-table" id="keepTable">
               <thead>
                 <tr>
-                  <th class="col-sticky" style="width: 35px; text-align: center;">NO</th>
-                  <th class="text-left" style="width: 75px;">TANGGAL</th>
-                  <th class="text-left" style="width: 105px;">CUSTOMER</th>
-                  <th class="text-left" style="width: 95px;">NOMOR WA</th>
-                  <th class="text-left" style="width: 135px;">BARANG KEEP</th>
-                  <th class="text-left" style="width: 75px;">TGL AMBIL</th>
-                  <th class="text-left" style="width: 110px;">CATATAN</th>
-                  <th class="text-left" style="width: 80px;">KODE</th>
-                  <th class="text-center" style="width: 80px;">REPORT AR</th>
-                  <th class="text-center" style="width: 85px;">STATUS</th>
-                  <th class="text-left" style="width: 115px;">FEEDBACK TIM FU</th>
+                  <th class="col-sticky" style="width: 50px; text-align: center;">NO</th>
+                  <th class="text-left" style="min-width: 110px;">TANGGAL</th>
+                  <th class="text-left" style="min-width: 140px;">CUSTOMER</th>
+                  <th class="text-left" style="min-width: 165px;">NOMOR WA</th>
+                  <th class="text-left" style="min-width: 220px;">BARANG KEEP</th>
+                  <th class="text-left" style="min-width: 110px;">TGL AMBIL</th>
+                  <th class="text-left" style="min-width: 240px;">CATATAN</th>
+                  <th class="text-left" style="min-width: 130px;">KODE SOSMED</th>
+                  <th class="text-center" style="min-width: 110px;">REPORT AR</th>
+                  <th class="text-center" style="min-width: 120px;">STATUS</th>
+                  <th class="text-left" style="min-width: 200px;">FEEDBACK TIM FU</th>
                 </tr>
               </thead>
               <tbody id="keepTableBody"></tbody>
@@ -958,16 +955,16 @@
             <table class="kpi-matrix-table" id="auditTable">
               <thead>
                 <tr>
-                  <th class="col-sticky" style="width: 35px; text-align: center;">NO</th>
-                  <th class="text-left font-bold" style="width: 90px;">NOMOR AR</th>
-                  <th class="text-left" style="width: 85px;">TGL & CABANG</th>
-                  <th class="text-left" style="width: 95px;">CUSTOMER</th>
-                  <th class="text-left" style="width: 90px;">NOMOR WA</th>
-                  <th class="text-left" style="width: 75px;">KODE SOSMED</th>
-                  <th class="text-left" style="width: 115px;">BARANG KEEP</th>
-                  <th class="text-left" style="width: 140px;">PRODUK DI AR</th>
-                  <th class="text-center" style="width: 90px;">STATUS SOSMED</th>
-                  <th class="text-center" style="width: 75px;">AKSI</th>
+                  <th class="col-sticky" style="width: 50px; text-align: center;">NO</th>
+                  <th class="text-left font-bold" style="min-width: 130px;">NOMOR AR</th>
+                  <th class="text-left" style="min-width: 120px;">TGL & CABANG</th>
+                  <th class="text-left" style="min-width: 140px;">CUSTOMER</th>
+                  <th class="text-left" style="min-width: 160px;">NOMOR WA</th>
+                  <th class="text-left" style="min-width: 130px;">KODE SOSMED</th>
+                  <th class="text-left" style="min-width: 200px;">BARANG KEEP</th>
+                  <th class="text-left" style="min-width: 240px;">PRODUK DI AR</th>
+                  <th class="text-center" style="min-width: 140px;">STATUS SOSMED</th>
+                  <th class="text-center" style="min-width: 120px;">AKSI</th>
                 </tr>
               </thead>
               <tbody id="auditTableBody"></tbody>
