@@ -3072,6 +3072,35 @@ h1, h2, h3, h4, h5, h6,
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* ================= DATA KEEP TABLE - FULL WIDTH NO HORIZONTAL SCROLL ================= */
+#tabContent4 .table-responsive {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+#keepTable {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+}
+
+#keepTable th,
+#keepTable td {
+  padding: 8px 6px !important;
+  font-size: 0.76rem !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  vertical-align: middle !important;
+}
+
+#keepTable th {
+  font-size: 0.72rem !important;
+  letter-spacing: -0.01em;
+}
+
+
 
 
 

@@ -192,24 +192,32 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // API Database Status Check
+  // API Database Status Check (Untuk Realtime Cross-Device Sync)
   if (reqPath === '/api/database-status') {
     const checkFile = (f) => {
-      const p = path.join(PUBLIC_DIR, f);
-      if (fs.existsSync(p)) {
-        const s = fs.statSync(p);
-        return { exists: true, size: s.size, mtime: s.mtime };
-      }
-      return { exists: false };
+      try {
+        const p = path.join(PUBLIC_DIR, f);
+        if (fs.existsSync(p)) {
+          const s = fs.statSync(p);
+          return { exists: true, size: s.size, mtimeMs: s.mtimeMs, mtime: s.mtime };
+        }
+      } catch (e) {}
+      return { exists: false, mtimeMs: 0 };
     };
 
     const status = {
       turnover: checkFile('turnover.xlsx'),
       croselling: checkFile('CROSSELLING-12102026.xlsx'),
       keep: checkFile('keep-data.csv'),
+      archives: checkFile('monthly_archives.json'),
+      targets: checkFile('monthly_targets.json'),
+      photos: checkFile('sales_photos.json'),
       serverTime: new Date().toISOString()
     };
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate'
+    });
     res.end(JSON.stringify(status));
     return;
   }

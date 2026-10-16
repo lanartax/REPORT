@@ -1619,12 +1619,12 @@ function renderKeepPage() {
       <td class="text-left font-bold">${r['Nama'] || '-'}</td>
       <td class="text-left">${waHtml}</td>
       <td class="text-left font-bold" style="color:var(--ink);">${r['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="color:var(--ink-secondary); font-size:0.8rem; white-space: nowrap;">${r['Tanggal Ambil'] || '-'}</td>
-      <td class="text-left" style="font-size:0.78rem; min-width:220px; white-space:normal; line-height:1.4;">${r['Catatan'] || '-'}</td>
+      <td class="text-left" style="color:var(--ink-secondary); font-size:0.75rem;">${r['Tanggal Ambil'] || '-'}</td>
+      <td class="text-left" style="font-size:0.75rem; white-space:normal; line-height:1.3;">${r['Catatan'] || '-'}</td>
       <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r['Kode Sosmed'] || '-'}</span></td>
       <td class="text-center">${arHtml}</td>
       <td class="text-center"><span class="kpi-badge ${statusClass} font-bold">${r['Status'] || '-'}</span></td>
-      <td class="text-left" style="font-size:0.78rem; min-width:180px; white-space:normal; line-height:1.4;">${r['Feedback Tim FU'] || '-'}</td>
+      <td class="text-left" style="font-size:0.75rem; white-space:normal; line-height:1.3;">${r['Feedback Tim FU'] || '-'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -3893,75 +3893,192 @@ if (crosellingDropZone) {
   });
 }
 
-// LOAD BOTH DEFAULT EXCEL FILES (turnover.xlsx & CROSSELLING-12102026.xlsx) WITH INDEXEDDB CACHE PRIORITY
+// ==========================================================================
+// 14. REALTIME CROSS-DEVICE SYNC ENGINE & SERVER DUAL-LOADER
+// ==========================================================================
+let lastKnownSyncStatus = {
+  turnoverMtime: 0,
+  crosellingMtime: 0,
+  archivesMtime: 0,
+  targetsMtime: 0,
+  photosMtime: 0,
+  keepMtime: 0
+};
+
+// LOAD BOTH DEFAULT EXCEL FILES - SERVER FIRST (AGAR PERUBAHAN DARI LAPTOP LAIN LANGSUNG MUNCUL)
 async function loadAllDefaultFiles() {
   const statusTitle = document.getElementById('fileStatusTitle');
-  if (statusTitle) statusTitle.innerText = 'Memuat Data turnover.xlsx & Google Sheets...';
+  if (statusTitle) statusTitle.innerText = 'Menghubungkan ke Server Database...';
   
-  // 1. Fetch and Parse turnover.xlsx (Achievement Report) - Prioritize User's Uploaded File in IndexedDB
+  // 1. Fetch and Parse turnover.xlsx (Prioritaskan versi terbaru di Server)
   let turnoverLoaded = false;
   try {
-    const cachedTurnover = await getFileFromIndexedDB('turnover_file');
-    if (cachedTurnover) {
-      parseTurnoverBuffer(cachedTurnover);
+    const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
+    if (resTurnover.ok) {
+      const buf1 = await resTurnover.arrayBuffer();
+      parseTurnoverBuffer(buf1);
       turnoverLoaded = true;
+      await saveFileToIndexedDB('turnover_file', buf1);
       const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || getFormattedTimestamp();
       updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
-      console.log('✅ turnover.xlsx berhasil dimuat dari IndexedDB lokal!');
+      console.log('✅ turnover.xlsx berhasil dimuat langsung dari server database!');
     }
   } catch (e) {
-    console.warn("Gagal memuat cached turnover dari IndexedDB:", e);
+    console.warn("Server turnover fetch warning, fallback to cache:", e);
   }
 
-  // If no user-uploaded file in IndexedDB, fallback to server default static turnover.xlsx
+  // Fallback to IndexedDB if offline or server failed
   if (!turnoverLoaded) {
     try {
-      const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
-      if (resTurnover.ok) {
-        const buf1 = await resTurnover.arrayBuffer();
-        parseTurnoverBuffer(buf1);
-        const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || 'Default Sistem (13/10/2026 18:00 WITA)';
+      const cachedTurnover = await getFileFromIndexedDB('turnover_file');
+      if (cachedTurnover) {
+        parseTurnoverBuffer(cachedTurnover);
+        turnoverLoaded = true;
+        const ts = localStorage.getItem('gadgetmart_turnover_timestamp') || getFormattedTimestamp();
         updateTurnoverIndicator(`File turnover terupdate per ${ts}`);
-        console.log('✅ turnover.xlsx berhasil dimuat dari database server!');
-      } else {
-        console.warn("turnover.xlsx status not ok:", resTurnover.status);
+        console.log('✅ turnover.xlsx dimuat dari IndexedDB lokal!');
       }
-    } catch (e) {
-      console.warn("Gagal memuat turnover.xlsx:", e);
-    }
+    } catch (e) {}
   }
 
-  // 2. Fetch and Parse CROSSELLING-12102026.xlsx (AR & WhatsApp Customer Search) - Prioritize User's Uploaded File
+  // 2. Fetch and Parse CROSSELLING-12102026.xlsx (Prioritaskan versi terbaru di Server)
   let crosellingLoaded = false;
   try {
-    const cachedCroselling = await getFileFromIndexedDB('croselling_file');
-    if (cachedCroselling) {
-      parseCrosellingBuffer(cachedCroselling);
+    const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
+    if (resCroselling.ok) {
+      const buf2 = await resCroselling.arrayBuffer();
+      parseCrosellingBuffer(buf2);
       crosellingLoaded = true;
-      const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Tersimpan di Peramban';
+      await saveFileToIndexedDB('croselling_file', buf2);
+      const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Default Sistem (12/10/2026)';
       updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
-      console.log('✅ CROSSELLING data dimuat dari IndexedDB lokal!');
+      console.log('✅ CROSSELLING-12102026.xlsx dimuat dari server database!');
     }
-  } catch (e) {}
-
-  if (!crosellingLoaded) {
-    try {
-      const resCroselling = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
-      if (resCroselling.ok) {
-        const buf2 = await resCroselling.arrayBuffer();
-        parseCrosellingBuffer(buf2);
-        const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Default Sistem (12/10/2026)';
-        updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
-        console.log('✅ CROSSELLING-12102026.xlsx berhasil dimuat dari database server!');
-      } else {
-        console.warn("CROSSELLING-12102026.xlsx status not ok:", resCroselling.status);
-      }
-    } catch (e) {
-      console.warn("Gagal memuat CROSSELLING-12102026.xlsx:", e);
-    }
+  } catch (e) {
+    console.warn("Server croselling fetch warning, fallback to cache:", e);
   }
 
-  updateDatabaseBadge(true);
+  // Fallback to IndexedDB if offline
+  if (!crosellingLoaded) {
+    try {
+      const cachedCroselling = await getFileFromIndexedDB('croselling_file');
+      if (cachedCroselling) {
+        parseCrosellingBuffer(cachedCroselling);
+        crosellingLoaded = true;
+        const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Tersimpan di Peramban';
+        updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
+        console.log('✅ CROSSELLING data dimuat dari IndexedDB lokal!');
+      }
+    } catch (e) {}
+  }
+
+  // Inisialisasi status sync server baseline
+  try {
+    const resStatus = await fetch(`/api/database-status?t=${Date.now()}`, { cache: 'no-store' });
+    if (resStatus.ok) {
+      const s = await resStatus.json();
+      if (s.turnover && s.turnover.mtimeMs) lastKnownSyncStatus.turnoverMtime = s.turnover.mtimeMs;
+      if (s.archives && s.archives.mtimeMs) lastKnownSyncStatus.archivesMtime = s.archives.mtimeMs;
+      if (s.croselling && s.croselling.mtimeMs) lastKnownSyncStatus.crosellingMtime = s.croselling.mtimeMs;
+      if (s.targets && s.targets.mtimeMs) lastKnownSyncStatus.targetsMtime = s.targets.mtimeMs;
+      if (s.photos && s.photos.mtimeMs) lastKnownSyncStatus.photosMtime = s.photos.mtimeMs;
+    }
+  } catch(e) {}
+}
+
+// REALTIME POLLING: MENDETEKSI PERUBAHAN & EDIT DARI LAPTOP LAIN SECARA LIVE
+async function pollServerSyncStatus() {
+  try {
+    const res = await fetch(`/api/database-status?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const status = await res.json();
+    if (!status) return;
+
+    // A. Deteksi jika turnover.xlsx diperbarui dari laptop lain
+    if (status.turnover && status.turnover.exists && status.turnover.mtimeMs) {
+      if (lastKnownSyncStatus.turnoverMtime && status.turnover.mtimeMs > lastKnownSyncStatus.turnoverMtime) {
+        console.log('🔄 [Sync Engine] File turnover.xlsx baru terdeteksi dari laptop lain!');
+        lastKnownSyncStatus.turnoverMtime = status.turnover.mtimeMs;
+        const resTurnover = await fetch(`turnover.xlsx?t=${Date.now()}`);
+        if (resTurnover.ok) {
+          const buf = await resTurnover.arrayBuffer();
+          parseTurnoverBuffer(buf);
+          await saveFileToIndexedDB('turnover_file', buf);
+          processAllReports();
+          showSaveToast('🔄 File turnover.xlsx telah diperbarui otomatis dari laptop lain!');
+        }
+      } else if (!lastKnownSyncStatus.turnoverMtime) {
+        lastKnownSyncStatus.turnoverMtime = status.turnover.mtimeMs;
+      }
+    }
+
+    // B. Deteksi jika Arsip Bulanan / Gross Profit diedit dari laptop lain
+    if (status.archives && status.archives.exists && status.archives.mtimeMs) {
+      if (lastKnownSyncStatus.archivesMtime && status.archives.mtimeMs > lastKnownSyncStatus.archivesMtime) {
+        console.log('🔄 [Sync Engine] Arsip bulanan / Gross Profit diperbarui dari laptop lain!');
+        lastKnownSyncStatus.archivesMtime = status.archives.mtimeMs;
+        const resArc = await fetch(`/api/monthly-archives?t=${Date.now()}`);
+        if (resArc.ok) {
+          cachedMonthlyArchives = await resArc.json();
+          localStorage.setItem('gadgetmart_sosmed_archives', JSON.stringify(cachedMonthlyArchives));
+          renderArchiveGrid();
+          renderMonthToMonthCharts();
+          showSaveToast('🔄 Data arsip bulanan & Gross Profit telah diperbarui otomatis dari laptop lain!');
+        }
+      } else if (!lastKnownSyncStatus.archivesMtime) {
+        lastKnownSyncStatus.archivesMtime = status.archives.mtimeMs;
+      }
+    }
+
+    // C. Deteksi jika File Cross Selling diperbarui dari laptop lain
+    if (status.croselling && status.croselling.exists && status.croselling.mtimeMs) {
+      if (lastKnownSyncStatus.crosellingMtime && status.croselling.mtimeMs > lastKnownSyncStatus.crosellingMtime) {
+        console.log('🔄 [Sync Engine] File Cross Selling baru terdeteksi dari laptop lain!');
+        lastKnownSyncStatus.crosellingMtime = status.croselling.mtimeMs;
+        const resCross = await fetch(`CROSSELLING-12102026.xlsx?t=${Date.now()}`);
+        if (resCross.ok) {
+          const buf = await resCross.arrayBuffer();
+          parseCrosellingBuffer(buf);
+          await saveFileToIndexedDB('croselling_file', buf);
+          showSaveToast('🔄 File Cross Selling telah diperbarui otomatis dari laptop lain!');
+        }
+      } else if (!lastKnownSyncStatus.crosellingMtime) {
+        lastKnownSyncStatus.crosellingMtime = status.croselling.mtimeMs;
+      }
+    }
+
+    // D. Deteksi jika Target Bulanan diedit dari laptop lain
+    if (status.targets && status.targets.exists && status.targets.mtimeMs) {
+      if (lastKnownSyncStatus.targetsMtime && status.targets.mtimeMs > lastKnownSyncStatus.targetsMtime) {
+        lastKnownSyncStatus.targetsMtime = status.targets.mtimeMs;
+        await loadMonthlyTargets();
+        renderMonthToMonthCharts();
+      } else if (!lastKnownSyncStatus.targetsMtime) {
+        lastKnownSyncStatus.targetsMtime = status.targets.mtimeMs;
+      }
+    }
+
+    // E. Deteksi jika Foto Sales diedit dari laptop lain
+    if (status.photos && status.photos.exists && status.photos.mtimeMs) {
+      if (lastKnownSyncStatus.photosMtime && status.photos.mtimeMs > lastKnownSyncStatus.photosMtime) {
+        lastKnownSyncStatus.photosMtime = status.photos.mtimeMs;
+        await loadSalesPhotos();
+        renderSalesLeaderboard('omzet');
+      } else if (!lastKnownSyncStatus.photosMtime) {
+        lastKnownSyncStatus.photosMtime = status.photos.mtimeMs;
+      }
+    }
+  } catch (err) {
+    // Silent fail if network briefly disconnected
+  }
+}
+
+let syncEngineInterval = null;
+function startRealtimeSyncEngine() {
+  if (syncEngineInterval) clearInterval(syncEngineInterval);
+  // Polling status server setiap 5 detik
+  syncEngineInterval = setInterval(pollServerSyncStatus, 5000);
+  console.log('📡 Realtime Cross-Device Sync Engine aktif (interval 5s)');
 }
 
 // Legacy function alias
@@ -4487,6 +4604,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   populateDashboardFilterDropdowns();
   applyDashboardFilters();
   loadKeepData();
+  startRealtimeSyncEngine();
 });
 
 

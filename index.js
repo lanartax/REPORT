@@ -13,6 +13,7 @@ app.all('/api/monthly-archives', (req, res) => require('./api/monthly-archives')
 app.all('/api/monthly-targets', (req, res) => require('./api/monthly-targets')(req, res));
 app.all('/api/sales-photos', (req, res) => require('./api/sales-photos')(req, res));
 app.all('/api/save-excel', (req, res) => require('./api/save-excel')(req, res));
+app.all('/api/database-status', (req, res) => require('./api/database-status')(req, res));
 
 // 2. Serve all static assets (CSS, JS, images, fonts, XLSX, CSV)
 app.use(express.static(__dirname));

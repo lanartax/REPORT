@@ -115,7 +115,7 @@
 
     <main class="main-content">
 
-      <!-- Window Top Header Bar: GadgetMart Icon & Brand + Turnover Upload Controls -->
+      <!-- Window Top Header Bar: GadgetMart Icon & Brand (Samping Paling Atas Jendela) -->
       <section class="minimal-upload-section" id="dropZone">
         <!-- GadgetMart Icon & Brand disamping paling atas jendela -->
         <div class="window-top-brand" title="GadgetMart Divisi Sosmed">
@@ -125,26 +125,7 @@
             <span class="window-brand-sub">Sosmed Performance Dashboard</span>
           </div>
         </div>
-
-        <div class="window-top-upload-actions">
-          <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleTurnoverFileSelect(event)">
-          <button class="btn-upload-icon" onclick="document.getElementById('fileInput').click()" title="Unggah File Turnover (turnover.xlsx)">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9" y1="15" x2="12" y2="12"/>
-              <line x1="15" y1="15" x2="12" y2="12"/>
-            </svg>
-          </button>
-          <button class="btn-upload-pill" onclick="document.getElementById('fileInput').click()" title="Unggah File Turnover (turnover.xlsx)">
-            📁 Pilih File Turnover (.xlsx)
-          </button>
-          <div class="turnover-status-badge" id="turnoverStatusBadge" title="Indikator Pembaruan File Turnover">
-            <span class="turnover-status-dot"></span>
-            <span id="turnoverUpdateText">File turnover terupdate per: Memuat status...</span>
-          </div>
-        </div>
+        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleTurnoverFileSelect(event)">
       </section>
 
       <!-- Save Toast Feedback Container -->
@@ -880,17 +861,17 @@
             <table class="kpi-matrix-table" id="keepTable">
               <thead>
                 <tr>
-                  <th class="col-sticky" style="width: 50px; text-align: center;">NO</th>
-                  <th class="text-left" style="min-width: 110px;">TANGGAL</th>
-                  <th class="text-left" style="min-width: 140px;">CUSTOMER</th>
-                  <th class="text-left" style="min-width: 165px;">NOMOR WA</th>
-                  <th class="text-left" style="min-width: 220px;">BARANG KEEP</th>
-                  <th class="text-left" style="min-width: 110px;">TGL AMBIL</th>
-                  <th class="text-left" style="min-width: 240px;">CATATAN</th>
-                  <th class="text-left" style="min-width: 130px;">KODE SOSMED</th>
-                  <th class="text-center" style="min-width: 110px;">REPORT AR</th>
-                  <th class="text-center" style="min-width: 120px;">STATUS</th>
-                  <th class="text-left" style="min-width: 200px;">FEEDBACK TIM FU</th>
+                  <th class="col-sticky" style="width: 3.5%; text-align: center;">NO</th>
+                  <th class="text-left" style="width: 7.5%;">TANGGAL</th>
+                  <th class="text-left" style="width: 10%;">CUSTOMER</th>
+                  <th class="text-left" style="width: 10%;">NOMOR WA</th>
+                  <th class="text-left" style="width: 16%;">BARANG KEEP</th>
+                  <th class="text-left" style="width: 7.5%;">TGL AMBIL</th>
+                  <th class="text-left" style="width: 15%;">CATATAN</th>
+                  <th class="text-left" style="width: 7.5%;">KODE SOSMED</th>
+                  <th class="text-center" style="width: 8%;">REPORT AR</th>
+                  <th class="text-center" style="width: 7.5%;">STATUS</th>
+                  <th class="text-left" style="width: 7.5%;">FEEDBACK TIM FU</th>
                 </tr>
               </thead>
               <tbody id="keepTableBody"></tbody>
