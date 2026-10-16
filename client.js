@@ -40,7 +40,7 @@ function saveMasterSales(list) {
 
 // Default Gemini API configuration
 const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6Lvfri-gb4jU1QFWZYHQyb3pprbRkGJCoV020aWIWCsXA';
-const DEFAULT_GEMINI_MODEL = 'gemini-flash-latest';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 // Global State
 let currentCalculationMode = 'DPP'; // 'DPP' or 'GROSS'
@@ -3735,6 +3735,99 @@ function quickAskYipyep(question) {
   }
 }
 
+function getYipyepAIContext() {
+  const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  // 1. Database Arsip Bulanan Konsolidasi (Januari - Desember 2026)
+  const arsipBulanKeBulan = monthNames.map((mName, i) => {
+    const monthNum = i + 1;
+    const arc = (cachedMonthlyArchives || []).find(a => Number(a.month) === monthNum && (Number(a.year) === activeYear || !a.year));
+    if (arc) {
+      return {
+        bulan: `${mName} ${activeYear}`,
+        status: 'Tersimpan di Arsip',
+        targetOmzet: arc.targetOmzet || 8447356034,
+        realisasiOmzet: arc.totalAchieve || (arc.totalAchieveRaw ? formatRupiah(arc.totalAchieveRaw) : '-'),
+        persenOmzet: arc.pctOmzet ? `${arc.pctOmzet}%` : (arc.progress || '-'),
+        targetGP: arc.targetGP || 422367802,
+        realisasiGP: arc.totalGP || (arc.totalGPRaw ? formatRupiah(arc.totalGPRaw) : '-'),
+        persenGP: arc.pctGP ? `${arc.pctGP}%` : '-',
+        crossSellingRatio: arc.crossRatio || '-'
+      };
+    } else if (monthNum === activeMonth) {
+      const totAch = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
+      const totGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
+      const prog = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
+      return {
+        bulan: `${mName} ${activeYear} (Bulan Berjalan / Live)`,
+        status: 'Sedang Berjalan (Live)',
+        targetOmzet: 8447356034,
+        realisasiOmzet: totAch,
+        persenOmzet: prog,
+        targetGP: 422367802,
+        realisasiGP: totGP,
+        timegone: `${timegonePct}%`
+      };
+    } else {
+      return {
+        bulan: `${mName} ${activeYear}`,
+        status: 'Mendatang (Belum Ada Transaksi)',
+        targetOmzet: 8447356034,
+        realisasiOmzet: '-'
+      };
+    }
+  });
+
+  // 2. Data Penjualan Cabang (Live dari turnover bulan aktif)
+  const cabangMap = {};
+  if (rawTurnoverRows && rawTurnoverRows.length > 0) {
+    rawTurnoverRows.forEach(r => {
+      const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
+      const dpp = Number(r['DPP']) || 0;
+      const total = Number(r['Total']) || 0;
+      const amt = currentCalculationMode === 'DPP' ? dpp : total;
+      cabangMap[cab] = (cabangMap[cab] || 0) + amt;
+    });
+  }
+  const cabangList = Object.keys(cabangMap)
+    .sort((a,b) => cabangMap[b] - cabangMap[a])
+    .map(c => ({
+      kodeCabang: c,
+      namaCabang: CABANG_NAMES[c] || c,
+      totalOmzet: formatRupiah(cabangMap[c]),
+      nominalRaw: cabangMap[c]
+    }));
+
+  // 3. Leaderboard Sales Teratas
+  const salesLeaderboard = (calculatedSalesKPI || []).slice(0, 10).map((s, idx) => ({
+    ranking: idx + 1,
+    namaSales: s.name,
+    omzet: formatRupiah(s.totalRevenue || 0),
+    persenTarget: `${Math.round(s.pctOmzet || 0)}%`,
+    grossProfit: formatRupiah(s.totalGP || 0),
+    scoreRapor: `${Math.round(s.scoreAkhir || 0)}%`
+  }));
+
+  // 4. Data Keep Customer
+  const keepSummary = {
+    totalKeep: filteredKeepRows ? filteredKeepRows.length : 0,
+    closingRate: document.getElementById('keepClosingRate') ? document.getElementById('keepClosingRate').innerText : '0%',
+    win: document.getElementById('keepWinCount') ? document.getElementById('keepWinCount').innerText : '0',
+    progress: document.getElementById('keepProgressCount') ? document.getElementById('keepProgressCount').innerText : '0',
+    lose: document.getElementById('keepLoseCount') ? document.getElementById('keepLoseCount').innerText : '0'
+  };
+
+  return {
+    arsipBulananLengkap: arsipBulanKeBulan,
+    penjualanCabangOktober: cabangList,
+    leaderboardSales: salesLeaderboard,
+    ringkasanKeep: keepSummary
+  };
+}
+
 async function sendYipyepChat() {
   const input = document.getElementById('yipyepChatInput');
   const container = document.getElementById('yipyepMessagesBody');
@@ -3757,7 +3850,7 @@ async function sendYipyepChat() {
   const typingId = `typing_${Date.now()}`;
   container.insertAdjacentHTML('beforeend', `
     <div class="yipyep-msg-bubble yipyep-bot" id="${typingId}">
-      <div class="yipyep-bubble-text"><span class="yipyep-typing-dots"><span>.</span><span>.</span><span>.</span> Yipyep sedang berpikir</span></div>
+      <div class="yipyep-bubble-text"><span class="yipyep-typing-dots"><span>.</span><span>.</span><span>.</span> Yipyep sedang menghitung data</span></div>
     </div>
   `);
   container.scrollTop = container.scrollHeight;
@@ -3799,65 +3892,112 @@ async function sendYipyepChat() {
     return;
   }
 
-  // Gemini API or Fallback
+  // Gemini API with Full Database Context & Multi-Model Auto Fallback
   const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
-  const model = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
+  let userModel = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
+  if (userModel === 'gemini-flash-latest' || userModel === 'gemini-2.5-flash') {
+    userModel = 'gemini-3.5-flash-lite';
+  }
 
+  const modelsToTry = [userModel, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  const uniqueModels = Array.from(new Set(modelsToTry));
+
+  const dbContext = getYipyepAIContext();
+  const systemInstruction = `Kamu adalah Yipyep 🐱✨, asisten AI analitik robot kucing pintar dan ramah untuk Divisi Sosmed GadgetMart.
+Kamu memiliki akses langsung ke DATABASE ARSIP BULANAN (Januari - Desember 2026), DATA PENJUALAN PER CABANG TOKO, LEADERBOARD SALES, dan DATA KEEP CUSTOMER.
+
+DATA SISTEM REAL-TIME:
+${JSON.stringify(dbContext)}
+
+PANDUAN MENJAWAB:
+1. Jawab pertanyaan user dengan ramah, cerdas, akurat, dan percaya diri.
+2. Jika user meminta rincian atau memecah omzet/pencapaian per bulan (misal dari Januari sampai Desember), tampilkan rincian setiap bulan secara jelas dan runtut berdasarkan data 'arsipBulananLengkap'.
+3. Jika user menanyakan cabang tertentu (misal BJMC, BTCC, dll), berikan informasi data cabang yang ada (termasuk kontribusi cabang di bulan berjalan Oktober atau perbandingan dengan total).
+4. Gunakan pemformatan Markdown yang bersih: bullet points (*), teks tebal (**teks**), atau tabel mini bila diperlukan agar sangat mudah dibaca.
+5. Bila user menyapa atau bertanya umum, jawab dengan gaya kucing robot cerdas yang menyenangkan.`;
+
+  let aiSuccess = false;
   if (apiKey) {
-    try {
-      const context = {
-        totalAchieve: document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.5M',
-        totalGP: document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 144Jt',
-        timegone: `${timegonePct}%`,
-        progress: document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '42%'
-      };
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Kamu adalah Yipyep, asisten robot kucing pintar Divisi Sosmed GadgetMart. Jawab dengan ramah, ceria, dan tajam dalam Bahasa Indonesia. Ringkas maksimal 3-4 kalimat. Data tim: ${JSON.stringify(context)}. Pertanyaan user: "${prompt}"` }] }]
-        })
-      });
-      const data = await res.json();
-      if (data.candidates && data.candidates[0].content) {
-        const text = data.candidates[0].content.parts[0].text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        const typingEl = document.getElementById(typingId);
-        if (typingEl) {
-          typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${text}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-          container.scrollTop = container.scrollHeight;
+    for (const m of uniqueModels) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemInstruction}\n\nPertanyaan User: "${prompt}"` }] }]
+          })
+        });
+        const data = await res.json();
+        if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
+          const rawText = data.candidates[0].content.parts[0].text;
+          const text = rawText
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+          const typingEl = document.getElementById(typingId);
+          if (typingEl) {
+            typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${text}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+            container.scrollTop = container.scrollHeight;
+          }
+          aiSuccess = true;
+          break;
         }
-        return;
+      } catch(e) {
+        console.warn(`Yipyep Gemini call with ${m} failed, trying next model:`, e);
       }
-    } catch(e) {
-      console.warn("Yipyep Gemini API fallback:", e);
     }
   }
 
-  // Fallback Local AI Smart Response
-  setTimeout(() => {
-    const typingEl = document.getElementById(typingId);
-    if (!typingEl) return;
-    const q = prompt.toLowerCase();
-    let reply = '';
-    const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3,57 Miliar';
-    const totalGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 144,8 Juta';
-    const progressPct = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '42%';
+  // Fallback Local Database Calculation Engine
+  if (!aiSuccess) {
+    setTimeout(() => {
+      const typingEl = document.getElementById(typingId);
+      if (!typingEl) return;
+      const q = prompt.toLowerCase();
+      let reply = '';
 
-    if (q.includes('omzet') || q.includes('revenue') || q.includes('capaian')) {
-      reply = `Meong! 🐾 Total pencapaian omzet tim sosmed saat ini sudah mencapai <strong>${totalAchieve}</strong> (${progressPct} dari target). Status capaian berada di posisi <strong>🖤 On Track</strong>!`;
-    } else if (q.includes('gp') || q.includes('gross') || q.includes('profit')) {
-      reply = `Gross Profit tim yang telah dikumpulkan mencapai <strong>${totalGP}</strong>. Ingat target GP kita adalah 5%, tetap pantau margin produk di setiap transaksi ya! 📈`;
-    } else if ((q.includes('leaderboard') || q.includes('juara') || q.includes('top')) && !q.includes('cabang')) {
-      reply = `👑 Di leaderboard bulan ini, <strong>DANIEL</strong> dan <strong>SIFA</strong> mendominasi posisi teratas dengan penjualan tertinggi! Kamu juga bisa cek tab All-Time High di dashboard.`;
-    } else if (q.includes('cabang')) {
-      reply = `🏢 <strong>TOP 3 Cabang</strong> dengan penjualan tertinggi saat ini adalah: <strong>1. BJMC (Belitung)</strong> Rp 8,26 M, <strong>2. BTCC (Batulicin)</strong> Rp 2,76 M, dan <strong>3. BJMA (A. Yani)</strong> Rp 2,54 M! 🚀`;
-    } else {
-      reply = `Halo! Aku <strong>Yipyep</strong> 🐱✨. Saat ini tim sudah mencapai omzet <strong>${totalAchieve}</strong> dengan Gross Profit <strong>${totalGP}</strong>. Ada nomor AR, nomor WA, atau performa sales yang ingin kamu tanyakan padaku?`;
-    }
+      const isMonthRangeQuery = q.includes('januari') || q.includes('desember') || q.includes('bulan') || q.includes('arsip') || q.includes('pecah');
+      const matchedCabang = Object.keys(CABANG_NAMES).find(c => q.includes(c.toLowerCase()));
 
-    typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-    container.scrollTop = container.scrollHeight;
-  }, 400);
+      if (isMonthRangeQuery && matchedCabang) {
+        const cabInfo = dbContext.penjualanCabangOktober.find(c => c.kodeCabang === matchedCabang);
+        const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
+        const cabOktoberVal = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
+
+        const lines = dbContext.arsipBulananLengkap.map(m => {
+          return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} <em>(${m.status})</em>`;
+        }).join('<br>');
+
+        reply = `Meong! 🐾 Berikut adalah rincian omzet Divisi Sosmed dari <strong>Database Arsip Bulanan (Januari - Desember 2026)</strong>:<br><br>${lines}<br><br>🏢 <strong>Khusus Cabang ${cabName}:</strong> Pada transaksi bulan berjalan (Oktober 2026), cabang ini mencatat omzet sebesar <strong>${cabOktoberVal}</strong>!`;
+      } else if (isMonthRangeQuery) {
+        const lines = dbContext.arsipBulananLengkap.map(m => {
+          return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} (${m.persenOmzet || m.status})`;
+        }).join('<br>');
+        reply = `Meong! 🐾 Ini data rekapitulasi omzet dari <strong>Database Arsip Bulanan 2026</strong>:<br><br>${lines}`;
+      } else if (matchedCabang) {
+        const cabInfo = dbContext.penjualanCabangOktober.find(c => c.kodeCabang === matchedCabang);
+        const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
+        const val = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
+        reply = `🏢 <strong>Cabang ${cabName}:</strong> Total omzet sosmed yang tercatat di bulan berjalan mencapai <strong>${val}</strong>!`;
+      } else if (q.includes('omzet') || q.includes('revenue') || q.includes('capaian')) {
+        const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
+        const progressPct = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
+        reply = `Meong! 🐾 Total pencapaian omzet tim sosmed bulan ini adalah <strong>${totalAchieve}</strong> (${progressPct} dari target). Status capaian berada di posisi <strong>🖤 On Track</strong>!`;
+      } else if (q.includes('gp') || q.includes('gross') || q.includes('profit')) {
+        const totalGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
+        reply = `Gross Profit tim yang telah dikumpulkan mencapai <strong>${totalGP}</strong>. Ingat target GP kita adalah 5%, pantau terus margin produk ya! 📈`;
+      } else if (q.includes('cabang')) {
+        const top3 = dbContext.penjualanCabangOktober.slice(0, 3).map((c, i) => `<strong>${i+1}. ${c.namaCabang}</strong> (${c.totalOmzet})`).join(', ');
+        reply = `🏢 <strong>Top Cabang Sosmed:</strong> ${top3}! 🚀`;
+      } else {
+        const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
+        reply = `Halo! Aku <strong>Yipyep</strong> 🐱✨. Database arsip bulanan (Januari - Desember) dan data transaksi live sudah terhubung penuh. Tanyakan padaku rincian omzet, data cabang toko, atau performa sales!`;
+      }
+
+      typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
+      container.scrollTop = container.scrollHeight;
+    }, 400);
+  }
 }
 
 // Auto init on page load
