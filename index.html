@@ -142,8 +142,8 @@
       <!-- Save Toast Feedback Container -->
       <div id="saveToast" class="save-toast" style="display:none"></div>
 
-      <!-- KPI Executive Summary Metrics (Visible on Tab 1 only, matching Screenshot 1) -->
-      <section class="kpi-grid-container" id="kpiGridSection">
+      <!-- KPI Executive Summary Metrics (Dihapus dari Tampilan Sesuai Permintaan User) -->
+      <section class="kpi-grid-container" id="kpiGridSection" style="display: none !important;">
         <div class="kpi-grid">
           <div class="card-tegas kpi-card">
             <div class="kpi-header">
@@ -198,8 +198,8 @@
 
       <!-- ================= TAB 1: DASHBOARD EKSEKUTIF, TREN BULANAN & SALES LEADERBOARD ================= -->
       <section id="tabContent1" class="tab-content active">
-        <!-- Interactive Dashboard Filter Bar -->
-        <div class="card-tegas dashboard-filter-bar mb-20" id="dashFilterBar">
+        <!-- Interactive Dashboard Filter Bar (Dihapus dari Tampilan Sesuai Permintaan User) -->
+        <div class="card-tegas dashboard-filter-bar mb-20" id="dashFilterBar" style="display: none !important;">
           <div class="filter-bar-title">
             <span class="icon-filter">⚡</span>
             <div>
@@ -380,16 +380,39 @@
 
           <!-- Row 2: TOP 3 Cabang Penjualan Terbanyak & MoM Growth -->
           <div class="charts-grid-2col mt-24">
-            <!-- Chart 4: TOP 3 Cabang dengan Penjualan Terbanyak -->
+            <!-- Chart 4: Penjualan Divisi Sosmed di Pontianak, Balikpapan & Sungai Danau -->
             <div class="card-tegas chart-card">
               <div class="chart-card-header">
                 <div class="chart-header-title">
-                  <h3>🏬 TOP 3 Cabang dengan Penjualan Terbanyak</h3>
-                  <p>Cabang toko dengan kontribusi transaksi dan revenue omzet sosmed terbesar</p>
+                  <h3>📍 Penjualan Divisi Sosmed di Pontianak, Balikpapan & Sungai Danau</h3>
+                  <p>Perbandingan penjualan sosmed (Acuan Kode Sales: BJM.SOS.0 & BJM.SOS.K)</p>
                 </div>
               </div>
-              <div class="chart-canvas-container">
-                <canvas id="chartTopCabang"></canvas>
+              <div class="regional-stats-chips">
+                <div class="regional-chip chip-ptk">
+                  <span class="chip-dot"></span>
+                  <div class="chip-info">
+                    <span class="chip-name">Pontianak (PTKC)</span>
+                    <strong class="chip-val" id="chipValPtk">0 Penjualan (Rp 0)</strong>
+                  </div>
+                </div>
+                <div class="regional-chip chip-bpp">
+                  <span class="chip-dot"></span>
+                  <div class="chip-info">
+                    <span class="chip-name">Balikpapan (BPPC/BP2C)</span>
+                    <strong class="chip-val" id="chipValBpp">0 Penjualan (Rp 0)</strong>
+                  </div>
+                </div>
+                <div class="regional-chip chip-sdn">
+                  <span class="chip-dot"></span>
+                  <div class="chip-info">
+                    <span class="chip-name">Sungai Danau (SDNC)</span>
+                    <strong class="chip-val" id="chipValSdn">0 Penjualan (Rp 0)</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="chart-canvas-container" style="height: 250px;">
+                <canvas id="chartRegionalSosmed"></canvas>
               </div>
             </div>
 

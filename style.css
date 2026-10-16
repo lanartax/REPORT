@@ -2010,6 +2010,54 @@ h1, h2, h3, h4, h5, h6,
   padding-top: 8px;
 }
 
+/* Regional Stats Chips (Pontianak, Balikpapan, Sungai Danau) */
+.regional-stats-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.regional-chip {
+  flex: 1;
+  min-width: 130px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.regional-chip .chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip-ptk .chip-dot { background: #0284c7; box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2); }
+.chip-bpp .chip-dot { background: #c8102e; box-shadow: 0 0 0 2px rgba(200, 16, 46, 0.2); }
+.chip-sdn .chip-dot { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+
+.regional-chip .chip-name {
+  display: block;
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.regional-chip .chip-val {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
 /* ==========================================================================
    SALES LEADERBOARD (EXACT MATCH REFERENCE IMAGE 3)
    ========================================================================== */

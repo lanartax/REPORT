@@ -781,21 +781,32 @@ function updateExecutiveKPICards(picStats, activePICs) {
   const gpPct = grandGPTarget > 0 ? (grandGP / grandGPTarget) * 100 : 0;
   const crossRatio = grandGadget > 0 ? Math.min(100, Math.round((grandCross / grandGadget) * 3 * 100)) : 0;
 
-  document.getElementById('kpiTotalAchieve').innerText = formatRupiah(grandTotal);
-  document.getElementById('kpiTargetSub').innerText = `Target: ${formatRupiah(grandTarget)}`;
-  document.getElementById('kpiProgressPct').innerText = formatPercent(pct);
-  document.getElementById('kpiProgressBar').style.width = `${Math.min(pct, 100)}%`;
-  document.getElementById('kpiSisaTarget').innerText = formatRupiah(sisa);
+  const elAch = document.getElementById('kpiTotalAchieve');
+  if (elAch) elAch.innerText = formatRupiah(grandTotal);
+  const elTgt = document.getElementById('kpiTargetSub');
+  if (elTgt) elTgt.innerText = `Target: ${formatRupiah(grandTarget)}`;
+  const elPct = document.getElementById('kpiProgressPct');
+  if (elPct) elPct.innerText = formatPercent(pct);
+  const elBar = document.getElementById('kpiProgressBar');
+  if (elBar) elBar.style.width = `${Math.min(pct, 100)}%`;
+  const elSisa = document.getElementById('kpiSisaTarget');
+  if (elSisa) elSisa.innerText = formatRupiah(sisa);
 
-  document.getElementById('kpiTotalGP').innerText = formatRupiah(grandGP);
-  document.getElementById('kpiTargetGP').innerText = formatRupiah(grandGPTarget);
-  document.getElementById('kpiGPPct').innerText = formatPercent(gpPct);
+  const elGP = document.getElementById('kpiTotalGP');
+  if (elGP) elGP.innerText = formatRupiah(grandGP);
+  const elTgtGP = document.getElementById('kpiTargetGP');
+  if (elTgtGP) elTgtGP.innerText = formatRupiah(grandGPTarget);
+  const elGPPct = document.getElementById('kpiGPPct');
+  if (elGPPct) elGPPct.innerText = formatPercent(gpPct);
 
-  document.getElementById('kpiCrossRatio').innerText = formatPercent(crossRatio);
-  document.getElementById('kpiTotalGadget').innerText = grandGadget.toLocaleString('id-ID');
+  const elCross = document.getElementById('kpiCrossRatio');
+  if (elCross) elCross.innerText = formatPercent(crossRatio);
+  const elGadget = document.getElementById('kpiTotalGadget');
+  if (elGadget) elGadget.innerText = grandGadget.toLocaleString('id-ID');
 
   const teamStatus = pct >= (timegonePct - 4) ? '🖤 On Track' : '💔 Warning';
-  document.getElementById('kpiTeamStatusIcon').innerText = teamStatus;
+  const elStatus = document.getElementById('kpiTeamStatusIcon');
+  if (elStatus) elStatus.innerText = teamStatus;
 }
 
 // 7. TAB NAVIGATION & VIEW MODE FILTER (SUPPORT 7 UNIFIED TABS)
@@ -2486,7 +2497,7 @@ function renderMonthToMonthCharts() {
 
   const defaultFont = { family: "'Plus Jakarta Sans', sans-serif" };
 
-  // --- CHART 1: Realisasi Omzet vs % Target (Gambar 1 & 2 BaHunda Style) ---
+  // --- CHART 1: Realisasi Omzet vs Target Bulanan (Berdasarkan Angka Miliar, Bukan Persen) ---
   const ctxOmzet = document.getElementById('chartTrendOmzet');
   if (ctxOmzet) {
     if (chartInstances.omzet) chartInstances.omzet.destroy();
@@ -2498,22 +2509,23 @@ function renderMonthToMonthCharts() {
           {
             type: 'bar',
             label: 'Realisasi Omzet (Miliar)',
-            data: monthlyOmzetData.map(v => v !== null ? v / 1000000000 : null),
+            data: monthlyOmzetData.map(v => v !== null ? (Math.round((v / 1000000000) * 100) / 100) : null),
             backgroundColor: '#c8102e',
-            borderRadius: 6,
-            yAxisID: 'y'
+            borderRadius: 6
           },
           {
             type: 'line',
-            label: '% Achievement Target',
-            data: monthlyPctOmzet,
+            label: 'Target Omzet (Miliar)',
+            data: monthlyTargets.map(v => v !== null ? (Math.round((v / 1000000000) * 100) / 100) : null),
             borderColor: '#0f172a',
-            borderWidth: 2.2,
+            borderWidth: 2.5,
             borderDash: [5, 5],
             pointBackgroundColor: '#0f172a',
-            pointRadius: 4,
-            tension: 0.3,
-            yAxisID: 'yPct'
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.2
           }
         ]
       },
@@ -2525,27 +2537,23 @@ function renderMonthToMonthCharts() {
           tooltip: {
             callbacks: {
               label: (ctx) => {
+                const idx = ctx.dataIndex;
+                const realisasi = monthlyOmzetData[idx];
+                const target = monthlyTargets[idx];
+                const pct = (realisasi && target) ? Math.round((realisasi / target) * 100) : 0;
                 if (ctx.dataset.type === 'bar') {
-                  const val = monthlyOmzetData[ctx.dataIndex];
-                  return `Omzet: ${formatRupiah(val)}`;
+                  return `Realisasi Omzet: ${formatRupiah(realisasi)} (${pct}% dari Target)`;
                 }
-                return `Pencapaian: ${ctx.parsed.y}%`;
+                return `Target Omzet: ${formatRupiah(target)}`;
               }
             }
           }
         },
         scales: {
           y: {
-            title: { display: true, text: 'Omzet (Rp Miliar)', font: defaultFont },
+            beginAtZero: true,
+            title: { display: true, text: 'Omzet & Target (Rp Miliar)', font: defaultFont },
             ticks: { callback: v => `Rp ${v}M`, font: defaultFont }
-          },
-          yPct: {
-            position: 'right',
-            title: { display: true, text: '% Target', font: defaultFont },
-            min: 0,
-            max: 120,
-            ticks: { callback: v => `${v}%`, font: defaultFont },
-            grid: { drawOnChartArea: false }
           },
           x: { ticks: { font: defaultFont } }
         }
@@ -2553,7 +2561,7 @@ function renderMonthToMonthCharts() {
     });
   }
 
-  // --- CHART 2: Gross Profit vs Target 5% ---
+  // --- CHART 2: Gross Profit vs Target 5% (Dengan Bullet Poin Yang Jelas Naik/Turunnya) ---
   const ctxGP = document.getElementById('chartTrendGP');
   if (ctxGP) {
     if (chartInstances.gp) chartInstances.gp.destroy();
@@ -2565,18 +2573,23 @@ function renderMonthToMonthCharts() {
           {
             type: 'bar',
             label: 'Realisasi GP (Juta)',
-            data: monthlyGPData.map(v => v !== null ? v / 1000000 : null),
+            data: monthlyGPData.map(v => v !== null ? (Math.round((v / 1000000) * 10) / 10) : null),
             backgroundColor: '#10b981',
             borderRadius: 6
           },
           {
             type: 'line',
             label: 'Target GP 5% (Rp 422Jt)',
-            data: monthlyTargetGP.map(v => v / 1000000),
+            data: monthlyTargetGP.map(v => Math.round((v / 1000000) * 10) / 10),
             borderColor: '#0f172a',
-            borderWidth: 2,
-            borderDash: [4, 4],
-            pointRadius: 0
+            borderWidth: 2.5,
+            borderDash: [5, 5],
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointBackgroundColor: '#0f172a',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            tension: 0.2
           }
         ]
       },
@@ -2587,14 +2600,24 @@ function renderMonthToMonthCharts() {
           legend: { position: 'top', labels: { font: defaultFont, boxWidth: 12 } },
           tooltip: {
             callbacks: {
-              label: ctx => `${ctx.dataset.label}: Rp ${Math.round(ctx.parsed.y).toLocaleString('id-ID')} Juta`
+              label: (ctx) => {
+                const idx = ctx.dataIndex;
+                const realisasiGP = monthlyGPData[idx];
+                const targetGP = monthlyTargetGP[idx];
+                const pct = (realisasiGP && targetGP) ? Math.round((realisasiGP / targetGP) * 100) : 0;
+                if (ctx.dataset.type === 'bar') {
+                  return `Realisasi GP: ${formatRupiah(realisasiGP)} (${pct}% dari Target)`;
+                }
+                return `Target GP 5%: ${formatRupiah(targetGP)}`;
+              }
             }
           }
         },
         scales: {
           y: {
+            beginAtZero: true,
             ticks: { callback: v => `Rp ${v}Jt`, font: defaultFont },
-            title: { display: true, text: 'Gross Profit (Juta)', font: defaultFont }
+            title: { display: true, text: 'Gross Profit (Juta Rp)', font: defaultFont }
           },
           x: { ticks: { font: defaultFont } }
         }
@@ -2644,8 +2667,8 @@ function renderMonthToMonthCharts() {
     });
   }
 
-  // --- CHART 4: TOP 3 Cabang Penjualan Terbanyak ---
-  renderTopCabangChart();
+  // --- CHART 4: Penjualan Divisi Sosmed di Pontianak, Balikpapan & Sungai Danau ---
+  renderRegionalSosmedChart();
 
   // --- CHART 5: Pertumbuhan Bulan ke Bulan (MoM % Growth) ---
   renderMoMGrowthChart(monthlyOmzetData);
@@ -2714,62 +2737,125 @@ const CABANG_NAMES = {
   'BJMD': 'BJMD (D. Indah)'
 };
 
-// Chart TOP 3 Cabang
-function renderTopCabangChart() {
-  const canvas = document.getElementById('chartTopCabang');
+// Chart Penjualan Divisi Sosmed di Pontianak, Balikpapan & Sungai Danau (Acuan Kode: BJM.SOS.0 & BJM.SOS.K)
+function renderRegionalSosmedChart() {
+  const canvas = document.getElementById('chartRegionalSosmed');
   if (!canvas || typeof Chart === 'undefined') return;
 
-  const cabangMap = {};
-  if (rawTurnoverRows) {
+  const isDPP = (currentCalculationMode === 'DPP');
+
+  const regionalData = {
+    'Pontianak': {
+      label: 'Pontianak (PTKC)',
+      codes: ['PTKC', 'PTKX'],
+      trxCount: 0,
+      omzetDPP: 0,
+      omzetGross: 0,
+      color: '#0284c7'
+    },
+    'Balikpapan': {
+      label: 'Balikpapan (BPPC/BP2C)',
+      codes: ['BPPC', 'BP2C', 'BP2X'],
+      trxCount: 0,
+      omzetDPP: 0,
+      omzetGross: 0,
+      color: '#c8102e'
+    },
+    'Sungai Danau': {
+      label: 'Sungai Danau (SDNC)',
+      codes: ['SDNC'],
+      trxCount: 0,
+      omzetDPP: 0,
+      omzetGross: 0,
+      color: '#10b981'
+    }
+  };
+
+  if (rawTurnoverRows && rawTurnoverRows.length > 0) {
     rawTurnoverRows.forEach(r => {
-      const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
+      const emp = String(r['Sales Employee Name'] || '');
+      const rem = String(r['Remarks'] || '');
+      const cab = String(r['SalesCabang'] || '');
+
+      // Acuan data ditarik dari kode sales employee "bjm.sos.0" dan "bjm.sos.k"
+      if (!isSosmedSalesCode(emp, rem, cab)) return;
+
+      const c = String(r['Cabang'] || r['SalesCabang'] || '').trim().toUpperCase();
       const dpp = Number(r['DPP']) || 0;
       const total = Number(r['Total']) || 0;
-      const amt = currentCalculationMode === 'DPP' ? dpp : total;
-      cabangMap[cab] = (cabangMap[cab] || 0) + amt;
+
+      for (const regKey in regionalData) {
+        const reg = regionalData[regKey];
+        const isMatch = reg.codes.some(code => c.includes(code)) || 
+                        c.startsWith(regKey.slice(0, 3).toUpperCase());
+        if (isMatch) {
+          reg.trxCount++;
+          reg.omzetDPP += dpp;
+          reg.omzetGross += total;
+          break;
+        }
+      }
     });
   }
 
-  const sortedCabang = Object.entries(cabangMap).sort((a, b) => b[1] - a[1]);
-  const top3 = sortedCabang.slice(0, 3);
-  const others = sortedCabang.slice(3).reduce((sum, item) => sum + item[1], 0);
+  // Update stat chips
+  const elPtk = document.getElementById('chipValPtk');
+  const elBpp = document.getElementById('chipValBpp');
+  const elSdn = document.getElementById('chipValSdn');
+  if (elPtk) elPtk.innerText = `${regionalData['Pontianak'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Pontianak'].omzetDPP : regionalData['Pontianak'].omzetGross)})`;
+  if (elBpp) elBpp.innerText = `${regionalData['Balikpapan'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Balikpapan'].omzetDPP : regionalData['Balikpapan'].omzetGross)})`;
+  if (elSdn) elSdn.innerText = `${regionalData['Sungai Danau'].trxCount} Penjualan (${formatRupiah(isDPP ? regionalData['Sungai Danau'].omzetDPP : regionalData['Sungai Danau'].omzetGross)})`;
 
-  const labels = top3.map(x => CABANG_NAMES[x[0]] || x[0]);
-  const dataVals = top3.map(x => Math.round(x[1] / 1000000));
-  const bgColors = ['#c8102e', '#0284c7', '#10b981', '#f59e0b'];
+  const labels = Object.values(regionalData).map(r => r.label);
+  const trxCounts = Object.values(regionalData).map(r => r.trxCount);
+  const colors = Object.values(regionalData).map(r => r.color);
 
-  if (others > 0) {
-    labels.push('CABANG LAINNYA');
-    dataVals.push(Math.round(others / 1000000));
-  }
+  const defaultFont = { family: "'Plus Jakarta Sans', sans-serif" };
 
-  if (chartInstances.topCabang) chartInstances.topCabang.destroy();
-  chartInstances.topCabang = new Chart(canvas, {
-    type: 'doughnut',
+  if (chartInstances.regionalSosmed) chartInstances.regionalSosmed.destroy();
+  chartInstances.regionalSosmed = new Chart(canvas, {
+    type: 'bar',
     data: {
       labels,
-      datasets: [{
-        data: dataVals,
-        backgroundColor: bgColors.slice(0, labels.length),
-        borderWidth: 2,
-        borderColor: '#ffffff'
-      }]
+      datasets: [
+        {
+          label: 'Jumlah Penjualan / Transaksi (Trx)',
+          data: trxCounts,
+          backgroundColor: colors,
+          borderRadius: 8,
+          barPercentage: 0.55
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } } },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: (ctx) => {
-              const raw = ctx.parsed * 1000000;
-              return ` ${ctx.label}: ${formatRupiah(raw)}`;
+              const regKey = Object.keys(regionalData)[ctx.dataIndex];
+              const reg = regionalData[regKey];
+              const omzetVal = isDPP ? reg.omzetDPP : reg.omzetGross;
+              return [
+                ` Jumlah Penjualan: ${ctx.parsed.y} Transaksi`,
+                ` Total Omzet (${isDPP ? 'DPP' : 'Gross'}): ${formatRupiah(omzetVal)}`
+              ];
             }
           }
         }
       },
-      cutout: '58%'
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Banyak Penjualan (Jumlah Transaksi)', font: defaultFont },
+          ticks: { font: defaultFont, precision: 0 }
+        },
+        x: {
+          ticks: { font: { ...defaultFont, weight: '700' } }
+        }
+      }
     }
   });
 }
