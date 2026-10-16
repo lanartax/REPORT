@@ -594,20 +594,66 @@ h1, h2, h3, h4, h5, h6,
 
 .minimal-upload-section {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 14px 0 24px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px -3px rgba(15, 23, 42, 0.05);
+}
+
+.window-top-brand {
+  display: flex;
   align-items: center;
   gap: 12px;
-  margin: 18px 0 24px;
+}
+
+.window-top-logo {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.06));
+}
+
+.window-top-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.window-brand-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.window-brand-sub {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.window-top-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .btn-upload-icon {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid #e11d48;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #ffffff;
   color: #e11d48;
   cursor: pointer;
@@ -621,21 +667,129 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .btn-upload-pill {
-  padding: 9px 24px;
+  padding: 9px 20px;
   border: 2px solid #0f172a;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #ffffff;
   color: #0f172a;
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   cursor: pointer;
   box-shadow: 0 2px 0 #0f172a;
   transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btn-upload-pill:hover {
   background: #f8fafc;
   transform: translateY(-1px);
+}
+
+/* ================= CROSELLING UPLOAD CARD (KHUSUS CEK AR) ================= */
+.croselling-upload-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-left: 6px solid #10b981;
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: 0 4px 14px -3px rgba(16, 185, 129, 0.08);
+}
+
+.croselling-upload-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.croselling-upload-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  border: 1.5px solid #a7f3d0;
+  flex-shrink: 0;
+}
+
+.croselling-upload-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 3px;
+}
+
+.croselling-upload-sub {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.croselling-upload-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-croselling-upload-pill {
+  padding: 9px 18px;
+  border: 2px solid #10b981;
+  border-radius: 10px;
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-croselling-upload-pill:hover {
+  background: #059669;
+  border-color: #059669;
+  transform: translateY(-1px);
+}
+
+.croselling-status-badge {
+  background: #f0fdf4 !important;
+  border: 1.5px solid #86efac !important;
+  color: #166534 !important;
+}
+
+.dot-green {
+  background: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25) !important;
+}
+
+.btn-archive-edit-gp {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-archive-edit-gp:hover {
+  background: #e2e8f0;
+  transform: scale(1.08);
 }
 
 /* ================= REPORT 1 & 2 VIEW FILTER BAR ================= */

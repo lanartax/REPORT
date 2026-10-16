@@ -13,6 +13,7 @@
   <script src="lib/xlsx.full.min.js"></script>
   <script src="lib/html2canvas.min.js"></script>
   <script src="lib/chart.umd.min.js"></script>
+  <link rel="icon" type="image/png" href="logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -114,28 +115,35 @@
 
     <main class="main-content">
 
-      <!-- Minimalist File Upload Buttons (Exact Screenshot Match: [ 📄 ] [ Pilih File Excel ]) -->
+      <!-- Window Top Header Bar: GadgetMart Icon & Brand + Turnover Upload Controls -->
       <section class="minimal-upload-section" id="dropZone">
-        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleFileSelect(event)">
-        <button class="btn-upload-icon" onclick="document.getElementById('fileInput').click()" title="Unggah File Excel">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="12" y2="12"/>
-            <line x1="15" y1="15" x2="12" y2="12"/>
-          </svg>
-        </button>
-        <button class="btn-upload-pill" onclick="document.getElementById('fileInput').click()">
-          Pilih File Excel
-        </button>
-        <div class="turnover-status-badge" id="turnoverStatusBadge" title="Indikator Pembaruan File Turnover">
-          <span class="turnover-status-dot"></span>
-          <span id="turnoverUpdateText">File turnover terupdate per: Memuat status...</span>
+        <!-- GadgetMart Icon & Brand disamping paling atas jendela -->
+        <div class="window-top-brand" title="GadgetMart Divisi Sosmed">
+          <img src="logo.png" alt="GadgetMart Logo" class="window-top-logo">
+          <div class="window-top-meta">
+            <span class="window-brand-title">GADGETMART</span>
+            <span class="window-brand-sub">Sosmed Performance Dashboard</span>
+          </div>
         </div>
-        <div class="db-sync-badge" id="dbSyncBadge" title="Status Sinkronisasi Database Server">
-          <span class="db-pulse-dot"></span>
-          <span id="dbSyncStatusText">Database Server: Tersimpan & Tersinkron LAN</span>
+
+        <div class="window-top-upload-actions">
+          <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleTurnoverFileSelect(event)">
+          <button class="btn-upload-icon" onclick="document.getElementById('fileInput').click()" title="Unggah File Turnover (turnover.xlsx)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="12" y2="12"/>
+              <line x1="15" y1="15" x2="12" y2="12"/>
+            </svg>
+          </button>
+          <button class="btn-upload-pill" onclick="document.getElementById('fileInput').click()" title="Unggah File Turnover (turnover.xlsx)">
+            📁 Pilih File Turnover (.xlsx)
+          </button>
+          <div class="turnover-status-badge" id="turnoverStatusBadge" title="Indikator Pembaruan File Turnover">
+            <span class="turnover-status-dot"></span>
+            <span id="turnoverUpdateText">File turnover terupdate per: Memuat status...</span>
+          </div>
         </div>
       </section>
 
@@ -471,38 +479,13 @@
           </div>
         </div>
 
-        <!-- 3. Sales Leaderboard (Referensi Gambar 3 Sales Leaderboard) -->
+        <!-- 3. Sales Leaderboard (Hanya untuk OMZET Sesuai Permintaan User) -->
         <div class="card-tegas leaderboard-container-card mb-28" id="leaderboardSection">
           <div class="leaderboard-header-bar">
             <div class="leaderboard-title-group">
               <span class="leaderboard-eyebrow">DIVISI SOSMED GADGETMART</span>
-              <h2 id="leaderboardTitleText">🏆 SALES LEADERBOARD &bull; BULAN BERJALAN (OKTOBER 2026)</h2>
-              <p id="leaderboardSubText">Peringkat performa sales sosmed berdasarkan kontribusi omzet, gross profit, dan deals closing.</p>
-            </div>
-            
-            <div class="leaderboard-controls-wrap">
-              <!-- Switch: Bulan Berjalan vs All-Time High -->
-              <div class="leaderboard-mode-switch">
-                <button class="btn-mode-toggle active" id="btnModeCurrentMonth" onclick="setLeaderboardPeriodMode('current')">
-                  📅 Bulan Berjalan
-                </button>
-                <button class="btn-mode-toggle" id="btnModeATH" onclick="setLeaderboardPeriodMode('ath')">
-                  👑 All-Time High
-                </button>
-              </div>
-
-              <!-- Sort Controls -->
-              <div class="leaderboard-sort-controls">
-                <button class="btn-sort-pill active" id="btnSortOmzet" onclick="setLeaderboardSort('omzet')">
-                  🥇 Urutkan Omzet
-                </button>
-                <button class="btn-sort-pill" id="btnSortGP" onclick="setLeaderboardSort('gp')">
-                  💰 Urutkan GP
-                </button>
-                <button class="btn-sort-pill" id="btnSortScore" onclick="setLeaderboardSort('score')">
-                  ⭐ Urutkan Rapor Akhir
-                </button>
-              </div>
+              <h2 id="leaderboardTitleText">🏆 SALES LEADERBOARD &bull; REALISASI OMZET BULAN BERJALAN</h2>
+              <p id="leaderboardSubText">Peringkat performa sales sosmed berdasarkan kontribusi realisasi omzet tertinggi.</p>
             </div>
           </div>
 
@@ -657,6 +640,28 @@
 
       <!-- ================= TAB 3: CEK AR & PENCARIAN PELANGGAN VIA WHATSAPP (GOOGLE SHEETS) ================= -->
       <section id="tabContent3" class="tab-content">
+        <!-- Dedicated Cross Selling File Upload for Cek AR (Permintaan User: File Cek AR Berbeda dengan Turnover) -->
+        <div class="croselling-upload-card mb-20" id="crosellingDropZone">
+          <div class="croselling-upload-main">
+            <div class="croselling-upload-icon-wrap">
+              <span class="croselling-badge-icon">📑</span>
+            </div>
+            <div class="croselling-upload-info">
+              <h4 class="croselling-upload-title">Database Cross Selling & No. WhatsApp (Khusus Menu Cek AR)</h4>
+              <p class="croselling-upload-sub">Unggah file Excel <strong>CROSSELLING-12102026.xlsx</strong> atau unduhan Google Sheets untuk pencarian faktur AR dan WhatsApp customer.</p>
+            </div>
+          </div>
+          <div class="croselling-upload-action-row">
+            <input type="file" id="crosellingFileInput" accept=".xlsx, .xls" style="display:none" onchange="handleCrosellingFileSelect(event)">
+            <button class="btn-croselling-upload-pill" onclick="document.getElementById('crosellingFileInput').click()">
+              📁 Unggah File Cross Selling (.xlsx)
+            </button>
+            <div class="turnover-status-badge croselling-status-badge" id="crosellingStatusBadge" title="Indikator Pembaruan File Cross Selling">
+              <span class="turnover-status-dot dot-green"></span>
+              <span id="crosellingUpdateText">File Cross Selling: Memuat status...</span>
+            </div>
+          </div>
+        </div>
         <div class="ar-search-minimal-box">
           <div class="ar-search-header-minimal">
             <h3 class="ar-search-title">🔍 Cek AR & Pencarian Pembelian via No. WhatsApp (Google Sheets)</h3>

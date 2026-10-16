@@ -840,24 +840,20 @@ function switchTab(tabIndex) {
   // Toggle KPI Cards and Gemini Prompt visibility
   const kpiSection = document.getElementById('kpiGridSection');
   const aiSection = document.getElementById('aiPromptSection');
+  if (kpiSection) kpiSection.style.display = 'none'; // Sesuai instruksi: kartu KPI atas disembunyikan
   if (tabIndex === 1) {
     if (aiSection) aiSection.style.display = 'flex';
-    if (kpiSection) kpiSection.style.display = 'block';
     populateDashboardFilterDropdowns();
     applyDashboardFilters();
     if (lastProcessedPicStats && lastActivePICs.length > 0) {
       renderSpeedometerGauges(lastProcessedPicStats, lastActivePICs);
       renderMonthToMonthCharts();
-      renderSalesLeaderboard(currentLeaderboardSort);
+      renderSalesLeaderboard('omzet');
     }
   } else if (tabIndex === 2) {
     if (aiSection) aiSection.style.display = 'flex';
-    if (kpiSection) {
-      kpiSection.style.display = (currentReportViewMode === 'r2') ? 'none' : 'block';
-    }
   } else {
     if (aiSection) aiSection.style.display = 'none';
-    if (kpiSection) kpiSection.style.display = 'none';
   }
 
   if (tabIndex === 4 && rawKeepRows.length === 0) loadKeepData();
@@ -2917,38 +2913,16 @@ function renderMoMGrowthChart(monthlyOmzetData) {
 }
 
 // ==========================================================================
-// 12. SALES LEADERBOARD (MATCHING USER REFERENCE IMAGE 3 & ALL-TIME HIGH)
+// 12. SALES LEADERBOARD (HANYA UNTUK OMZET - SESUAI PERMINTAAN USER)
 // ==========================================================================
 function setLeaderboardPeriodMode(mode) {
-  leaderboardPeriodMode = mode;
-  const btnCurr = document.getElementById('btnModeCurrentMonth');
-  const btnATH = document.getElementById('btnModeATH');
-  const titleEl = document.getElementById('leaderboardTitleText');
-  const subEl = document.getElementById('leaderboardSubText');
-
-  if (btnCurr) btnCurr.classList.toggle('active', mode === 'current');
-  if (btnATH) btnATH.classList.toggle('active', mode === 'ath');
-
-  if (mode === 'ath') {
-    if (titleEl) titleEl.innerText = '👑 SALES LEADERBOARD • ALL-TIME HIGH (REKOR SEPANJANG MASA)';
-    if (subEl) subEl.innerText = 'Akumulasi rekor performa tertinggi seluruh PIC sales sosmed dari arsip bulanan dan periode berjalan.';
-  } else {
-    if (titleEl) titleEl.innerText = '🏆 SALES LEADERBOARD • BULAN BERJALAN (OKTOBER 2026)';
-    if (subEl) subEl.innerText = 'Peringkat performa sales sosmed berdasarkan kontribusi omzet, gross profit, dan deals closing bulan ini.';
-  }
-
-  renderSalesLeaderboard(currentLeaderboardSort);
+  leaderboardPeriodMode = 'current';
+  renderSalesLeaderboard('omzet');
 }
 
 function setLeaderboardSort(sortBy) {
-  currentLeaderboardSort = sortBy;
-  const btnOmzet = document.getElementById('btnSortOmzet');
-  const btnGP = document.getElementById('btnSortGP');
-  const btnScore = document.getElementById('btnSortScore');
-  if (btnOmzet) btnOmzet.classList.toggle('active', sortBy === 'omzet');
-  if (btnGP) btnGP.classList.toggle('active', sortBy === 'gp');
-  if (btnScore) btnScore.classList.toggle('active', sortBy === 'score');
-  renderSalesLeaderboard(sortBy);
+  currentLeaderboardSort = 'omzet';
+  renderSalesLeaderboard('omzet');
 }
 
 function renderSalesLeaderboard(sortBy = 'omzet') {
@@ -2971,32 +2945,12 @@ function renderSalesLeaderboard(sortBy = 'omzet') {
     }
   }
 
-  const isATH = (leaderboardPeriodMode === 'ath');
-
-  // Build ranking dataset based on mode (Current Month vs All-Time High)
+  // Build ranking dataset strictly based on current month real performance
   const rankingList = lastActivePICs.map(pic => {
     const stat = lastProcessedPicStats[pic];
     const currOmzet = stat.pencapaian;
     const currGP = stat.acvGP;
     const currDeals = picDeals[pic] || Math.round(stat.pencapaian / 18500000) || 12;
-
-    if (isATH) {
-      // Aggregate historical months (multiplier or archive accumulation)
-      const athMultiplier = 9.2; // 9 previous archived months + current
-      const athOmzet = Math.round(currOmzet * athMultiplier);
-      const athGP = Math.round(currGP * athMultiplier);
-      const athDeals = Math.round(currDeals * athMultiplier);
-      return {
-        name: pic,
-        omzet: athOmzet,
-        gp: athGP,
-        deals: athDeals,
-        pctOmzet: Math.min(100, Math.round(stat.pctOmzet * 1.05)),
-        pctGP: stat.pctGP,
-        score: stat.pctAkhir,
-        isATH: true
-      };
-    }
 
     return {
       name: pic,
@@ -3010,13 +2964,8 @@ function renderSalesLeaderboard(sortBy = 'omzet') {
     };
   });
 
-  // Sort PICs based on selection
-  rankingList.sort((a, b) => {
-    if (sortBy === 'omzet') return b.omzet - a.omzet;
-    if (sortBy === 'gp') return b.gp - a.gp;
-    if (sortBy === 'score') return b.score - a.score;
-    return 0;
-  });
+  // Urutkan PIC HANYA berdasarkan OMZET tertinggi (Instruksi: leaderboard hanya untuk OMZET)
+  rankingList.sort((a, b) => b.omzet - a.omzet);
 
   const masterList = getMasterSales();
 
@@ -3155,17 +3104,75 @@ function renderArchiveGrid() {
     <div class="archive-month-card">
       <div class="archive-month-header">
         <h3 class="archive-month-title">📁 ${a.title}</h3>
-        <span class="kpi-badge badge-crimson">${a.dateSaved}</span>
+        <span class="kpi-badge badge-crimson">${a.dateSaved || 'Tersimpan'}</span>
       </div>
       <div class="archive-stats" style="font-size:0.83rem; line-height:1.6; color:#334155;">
         <p style="display:flex; justify-content:space-between;"><span>Pencapaian:</span> <strong style="color:#0f172a;">${a.totalAchieve}</strong></p>
-        <p style="display:flex; justify-content:space-between;"><span>Gross Profit:</span> <strong style="color:#10b981;">${a.totalGP}</strong></p>
+        <p style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Gross Profit:</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <strong style="color:#10b981;">${a.totalGP}</strong>
+            <button class="btn-archive-edit-gp" onclick="editArchiveGP(${a.month}, ${a.year})" title="Edit Gross Profit ${a.title}">✏️</button>
+          </span>
+        </p>
         <p style="display:flex; justify-content:space-between;"><span>Timegone:</span> <strong>${a.timegone}%</strong></p>
         <p style="display:flex; justify-content:space-between;"><span>Progress Target:</span> <strong style="color:#c8102e;">${a.progress}</strong></p>
         <p style="display:flex; justify-content:space-between;"><span>Cross-Selling:</span> <strong>${a.crossRatio}</strong></p>
       </div>
+      <div class="archive-card-actions" style="margin-top:14px; padding-top:10px; border-top:1px dashed #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-outline btn-xs" onclick="editArchiveGP(${a.month}, ${a.year})">
+          ✏️ Edit Gross Profit
+        </button>
+        <button class="btn btn-outline btn-xs" style="color:#ef4444; border-color:#fca5a5;" onclick="deleteArchiveMonth(${a.month}, ${a.year})">
+          🗑️ Hapus
+        </button>
+      </div>
     </div>
   `).join('');
+}
+
+// EDIT GROSS PROFIT PADA SNAPSHOT ARSIP BULANAN (PERMINTAAN USER)
+async function editArchiveGP(month, year) {
+  const archive = cachedMonthlyArchives.find(a => Number(a.month) === Number(month) && Number(a.year) === Number(year));
+  if (!archive) {
+    alert("Arsip bulan tidak ditemukan!");
+    return;
+  }
+  const currentVal = archive.totalGPRaw || Number(String(archive.totalGP || '0').replace(/[^0-9.-]+/g, ''));
+  const promptVal = prompt(
+    `Edit Gross Profit untuk "${archive.title}":\n\nMasukkan nominal angka baru (contoh: 420000000 atau Rp 420.000.000):`,
+    currentVal
+  );
+  if (promptVal === null) return; // Dibatalkan pengguna
+
+  const cleanNum = Number(String(promptVal).replace(/[^0-9.-]+/g, ''));
+  if (isNaN(cleanNum) || cleanNum < 0) {
+    alert("Nominal Gross Profit tidak valid! Harap masukkan angka yang benar.");
+    return;
+  }
+
+  archive.totalGPRaw = cleanNum;
+  archive.totalGP = formatRupiah(cleanNum);
+  if (archive.targetGP && archive.targetGP > 0) {
+    archive.pctGP = Math.round((cleanNum / archive.targetGP) * 100);
+  }
+
+  await persistMonthlyArchivesToServer();
+  renderArchiveGrid();
+  renderMonthToMonthCharts();
+  alert(`✅ Gross Profit untuk "${archive.title}" berhasil diubah menjadi ${formatRupiah(cleanNum)}!\nGrafik tren bulanan telah otomatis diperbarui.`);
+}
+
+async function deleteArchiveMonth(month, year) {
+  const archive = cachedMonthlyArchives.find(a => Number(a.month) === Number(month) && Number(a.year) === Number(year));
+  if (!archive) return;
+  if (!confirm(`Apakah Anda yakin ingin menghapus arsip "${archive.title}" dari database?`)) return;
+
+  cachedMonthlyArchives = cachedMonthlyArchives.filter(a => !(Number(a.month) === Number(month) && Number(a.year) === Number(year)));
+  await persistMonthlyArchivesToServer();
+  renderArchiveGrid();
+  renderMonthToMonthCharts();
+  alert(`Arsip "${archive.title}" berhasil dihapus.`);
 }
 
 async function handleArchiveExcelUpload() {
@@ -3760,28 +3767,131 @@ function filterTableDate(query) {
   }
 }
 
-// 14. FILE UPLOAD & DEFAULT DUAL-LOADER
-function handleFileSelect(e) {
+// 14. SEPARATE FILE UPLOADERS: TURNOVER (DASHBOARD & LAPORAN) VS CROSSELLING (CEK AR)
+function handleTurnoverFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (evt) => parseExcelFile(evt.target.result, file.name);
+  reader.onload = async (evt) => {
+    try {
+      const buffer = evt.target.result;
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
+      if (!jsonData || jsonData.length === 0) {
+        alert("File Excel turnover kosong atau tidak terbaca!");
+        return;
+      }
+      rawTurnoverRows = jsonData;
+      const updateTs = getFormattedTimestamp();
+      await saveFileToIndexedDB('turnover_file', buffer);
+      localStorage.setItem('gadgetmart_turnover_timestamp', updateTs);
+      localStorage.setItem('gadgetmart_turnover_is_custom', 'true');
+      updateTurnoverIndicator(`File turnover terupdate per ${updateTs}`);
+      saveExcelToServer(buffer, 'turnover');
+      processAllReports();
+      alert(`✅ Berhasil mengunggah file turnover.xlsx (${jsonData.length.toLocaleString('id-ID')} baris transaksi)!\nDashboard & Laporan Pencapaian telah diperbarui dan data tersimpan permanen.`);
+    } catch (err) {
+      console.error("Gagal membaca file turnover:", err);
+      alert("Gagal membaca file Excel turnover. Pastikan format file valid.");
+    }
+  };
   reader.readAsArrayBuffer(file);
 }
 
+function handleCrosellingFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    try {
+      const buffer = evt.target.result;
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
+      if (!jsonData || jsonData.length === 0) {
+        alert("File Excel Cross Selling kosong atau tidak terbaca!");
+        return;
+      }
+      rawCrosellingRows = jsonData;
+      const updateTs = getFormattedTimestamp();
+      await saveFileToIndexedDB('croselling_file', buffer);
+      localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
+      updateCrosellingIndicator(`File Cross Selling terupdate per ${updateTs}`);
+      saveExcelToServer(buffer, 'croselling');
+      alert(`✅ Berhasil mengunggah file Cross Selling (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase Cek AR & WhatsApp customer telah diperbarui dan tersimpan.`);
+      if (document.getElementById('arInputSearch') && document.getElementById('arInputSearch').value.trim()) {
+        executeARSearch();
+      }
+    } catch (err) {
+      console.error("Gagal membaca file cross selling:", err);
+      alert("Gagal membaca file Excel Cross Selling. Pastikan format file valid.");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function updateCrosellingIndicator(text) {
+  const el = document.getElementById('crosellingUpdateText');
+  if (el) el.innerText = text;
+}
+
+// Function alias for backwards compatibility
+function handleFileSelect(e) {
+  handleTurnoverFileSelect(e);
+}
+
 const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  if (e.dataTransfer.files.length > 0) {
-    const file = e.dataTransfer.files[0];
-    const reader = new FileReader();
-    reader.onload = (evt) => parseExcelFile(evt.target.result, file.name);
-    reader.readAsArrayBuffer(file);
-  }
-});
+if (dropZone) {
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const reader = new FileReader();
+      reader.onload = (evt) => parseExcelFile(evt.target.result, file.name);
+      reader.readAsArrayBuffer(file);
+    }
+  });
+}
+
+// Dedicated Cross Selling dropzone
+const crosellingDropZone = document.getElementById('crosellingDropZone');
+if (crosellingDropZone) {
+  crosellingDropZone.addEventListener('dragover', (e) => { e.preventDefault(); crosellingDropZone.classList.add('drag-over'); });
+  crosellingDropZone.addEventListener('dragleave', () => crosellingDropZone.classList.remove('drag-over'));
+  crosellingDropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    crosellingDropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const buffer = evt.target.result;
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          if (!jsonData || jsonData.length === 0) return;
+          rawCrosellingRows = jsonData;
+          const updateTs = getFormattedTimestamp();
+          await saveFileToIndexedDB('croselling_file', buffer);
+          localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
+          updateCrosellingIndicator(`File Cross Selling terupdate per ${updateTs}`);
+          saveExcelToServer(buffer, 'croselling');
+          alert(`✅ Berhasil mengimpor file Cross Selling (${jsonData.length.toLocaleString('id-ID')} baris data)!`);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  });
+}
 
 // LOAD BOTH DEFAULT EXCEL FILES (turnover.xlsx & CROSSELLING-12102026.xlsx) WITH INDEXEDDB CACHE PRIORITY
 async function loadAllDefaultFiles() {
@@ -3828,6 +3938,8 @@ async function loadAllDefaultFiles() {
     if (cachedCroselling) {
       parseCrosellingBuffer(cachedCroselling);
       crosellingLoaded = true;
+      const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Tersimpan di Peramban';
+      updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
       console.log('✅ CROSSELLING data dimuat dari IndexedDB lokal!');
     }
   } catch (e) {}
@@ -3838,6 +3950,8 @@ async function loadAllDefaultFiles() {
       if (resCroselling.ok) {
         const buf2 = await resCroselling.arrayBuffer();
         parseCrosellingBuffer(buf2);
+        const ts = localStorage.getItem('gadgetmart_croselling_timestamp') || 'Default Sistem (12/10/2026)';
+        updateCrosellingIndicator(`File Cross Selling terupdate per ${ts}`);
         console.log('✅ CROSSELLING-12102026.xlsx berhasil dimuat dari database server!');
       } else {
         console.warn("CROSSELLING-12102026.xlsx status not ok:", resCroselling.status);
