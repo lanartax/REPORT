@@ -1,6 +1,7 @@
 {
   "name": "REPORT",
-  "version": "1.0.3",
+  "version": "1.0.4",
+  "main": "index.js",
   "scripts": {
     "start": "node local-server.js"
   },
