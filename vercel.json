@@ -1,3 +1,7 @@
 {
-  "cleanUrls": true
+  "functions": {
+    "index.js": {
+      "includeFiles": "**"
+    }
+  }
 }

@@ -1,11 +1,12 @@
 {
   "name": "REPORT",
-  "version": "1.0.5",
+  "version": "1.0.6",
+  "main": "index.js",
   "scripts": {
-    "build": "echo 'Static site ready'",
     "start": "node local-server.js"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0"
+    "@neondatabase/serverless": "^1.2.0",
+    "express": "^4.21.2"
   }
 }
