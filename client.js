@@ -38,6 +38,10 @@ function saveMasterSales(list) {
   localStorage.setItem('gadgetmart_sosmed_master', JSON.stringify(list));
 }
 
+// Default Gemini API configuration
+const DEFAULT_GEMINI_API_KEY = 'AQ.Ab8RN6Lvfri-gb4jU1QFWZYHQyb3pprbRkGJCoV020aWIWCsXA';
+const DEFAULT_GEMINI_MODEL = 'gemini-flash-latest';
+
 // Global State
 let currentCalculationMode = 'DPP'; // 'DPP' or 'GROSS'
 let rawTurnoverRows = [];     // Source for Report 1 & 2 Achievement (with DPP)
@@ -2386,6 +2390,34 @@ function renderMonthToMonthCharts() {
   }
 }
 
+// Branch friendly name dictionary
+const CABANG_NAMES = {
+  'BJMC': 'BJMC (Belitung)',
+  'BTCC': 'BTCC (Batulicin)',
+  'BJMA': 'BJMA (A. Yani)',
+  'SPTC': 'SPTC (Sampit)',
+  'KPSC': 'KPSC (Kapuas)',
+  'BJB2': 'BJB2 (Banjarbaru 2)',
+  'BJMP': 'BJMP (Perintis)',
+  'PTKC': 'PTKC (Pontianak)',
+  'MTPC': 'MTPC (Martapura)',
+  'TJGC': 'TJGC (Tanjung)',
+  'AMTC': 'AMTC (Amuntai)',
+  'BJMY': 'BJMY (Veteran)',
+  'BJMX': 'BJMX (Express)',
+  'BJBC': 'BJBC (Banjarbaru)',
+  'PLHC': 'PLHC (Pelaihari)',
+  'BDM3': 'BDM3 (D. Mall)',
+  'KTBC': 'KTBC (Kotabaru)',
+  'BP2C': 'BP2C (Balikpapan 2)',
+  'BBKC': 'BBKC (Barabai)',
+  'BPPC': 'BPPC (Balikpapan)',
+  'SPT2': 'SPT2 (Sampit 2)',
+  'SESQ': 'SESQ (Samsung)',
+  'SDNC': 'SDNC (Sudimampir)',
+  'BJMD': 'BJMD (D. Indah)'
+};
+
 // Chart TOP 3 Cabang
 function renderTopCabangChart() {
   const canvas = document.getElementById('chartTopCabang');
@@ -2394,7 +2426,7 @@ function renderTopCabangChart() {
   const cabangMap = {};
   if (rawTurnoverRows) {
     rawTurnoverRows.forEach(r => {
-      const cab = String(r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
+      const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
       const dpp = Number(r['DPP']) || 0;
       const total = Number(r['Total']) || 0;
       const amt = currentCalculationMode === 'DPP' ? dpp : total;
@@ -2406,7 +2438,7 @@ function renderTopCabangChart() {
   const top3 = sortedCabang.slice(0, 3);
   const others = sortedCabang.slice(3).reduce((sum, item) => sum + item[1], 0);
 
-  const labels = top3.map(x => x[0]);
+  const labels = top3.map(x => CABANG_NAMES[x[0]] || x[0]);
   const dataVals = top3.map(x => Math.round(x[1] / 1000000));
   const bgColors = ['#c8102e', '#0284c7', '#10b981', '#f59e0b'];
 
@@ -3270,8 +3302,8 @@ async function executeGeminiPrompt() {
     return;
   }
 
-  const apiKey = localStorage.getItem('gemini_api_key');
-  const model = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
+  const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
+  const model = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
 
   if (apiKey) {
     try {
@@ -3427,8 +3459,8 @@ function exportActiveReport() {
 // 16. MODALS
 function openGeminiModal() {
   document.getElementById('geminiModal').style.display = 'flex';
-  document.getElementById('geminiApiKeyInput').value = localStorage.getItem('gemini_api_key') || '';
-  document.getElementById('geminiModelSelect').value = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
+  document.getElementById('geminiApiKeyInput').value = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
+  document.getElementById('geminiModelSelect').value = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
 }
 function closeGeminiModal() { document.getElementById('geminiModal').style.display = 'none'; }
 function saveGeminiConfig() {
@@ -3455,13 +3487,16 @@ function populateDashboardFilterDropdowns() {
   const cabSet = new Set();
   if (rawTurnoverRows) {
     rawTurnoverRows.forEach(r => {
-      const c = String(r['SalesCabang'] || '').trim();
+      const c = String(r['Cabang'] || r['SalesCabang'] || '').trim();
       if (c && c !== 'undefined') cabSet.add(c);
     });
   }
   const sortedCabang = Array.from(cabSet).sort();
   cabangSel.innerHTML = '<option value="all">Semua Cabang Toko</option>' + 
-    sortedCabang.map(c => `<option value="${c}" ${c === currentCabang ? 'selected' : ''}>${c}</option>`).join('');
+    sortedCabang.map(c => {
+      const label = CABANG_NAMES[c] || c;
+      return `<option value="${c}" ${c === currentCabang ? 'selected' : ''}>${label}</option>`;
+    }).join('');
 
   // Sales list from active PICs
   const masterList = getMasterSales().filter(x => x.active);
@@ -3512,7 +3547,7 @@ function applyDashboardFilters() {
     rawTurnoverRows.forEach(r => {
       // 1. Cabang filter
       if (targetCabang !== 'all') {
-        const c = String(r['SalesCabang'] || '').trim();
+        const c = String(r['Cabang'] || r['SalesCabang'] || '').trim();
         if (c !== targetCabang) return;
       }
 
@@ -3580,7 +3615,7 @@ function quickAskYipyep(question) {
 
 async function sendYipyepChat() {
   const input = document.getElementById('yipyepChatInput');
-  const container = document.getElementById('yipyepChatMessages');
+  const container = document.getElementById('yipyepMessagesBody');
   if (!input || !container) return;
 
   const prompt = input.value.trim();
@@ -3588,9 +3623,9 @@ async function sendYipyepChat() {
 
   const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
   const userHtml = `
-    <div class="yipyep-msg-bubble user">
-      <div>${prompt}</div>
-      <div class="yipyep-msg-time">${timeStr}</div>
+    <div class="yipyep-msg-bubble yipyep-user">
+      <div class="yipyep-bubble-text">${prompt}</div>
+      <div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; text-align:right; margin-top:4px;">${timeStr}</div>
     </div>
   `;
   container.insertAdjacentHTML('beforeend', userHtml);
@@ -3599,8 +3634,8 @@ async function sendYipyepChat() {
 
   const typingId = `typing_${Date.now()}`;
   container.insertAdjacentHTML('beforeend', `
-    <div class="yipyep-msg-bubble ai" id="${typingId}">
-      <span class="yipyep-typing-dots"><span>.</span><span>.</span><span>.</span> Yipyep sedang berpikir</span>
+    <div class="yipyep-msg-bubble yipyep-bot" id="${typingId}">
+      <div class="yipyep-bubble-text"><span class="yipyep-typing-dots"><span>.</span><span>.</span><span>.</span> Yipyep sedang berpikir</span></div>
     </div>
   `);
   container.scrollTop = container.scrollHeight;
@@ -3615,7 +3650,7 @@ async function sendYipyepChat() {
     quickCheckAR(phone);
     const typingEl = document.getElementById(typingId);
     if (typingEl) {
-      typingEl.innerHTML = `<div>📱 <strong>Hasil Cek WA (${phone}):</strong> Aku sudah alihkan ke <strong>Tab 3 (Cek AR & WhatsApp)</strong> untuk melihat data pelanggan dan transaksi!</div><div class="yipyep-msg-time">${timeStr}</div>`;
+      typingEl.innerHTML = `<div class="yipyep-bubble-text">📱 <strong>Hasil Cek WA (${phone}):</strong> Aku sudah alihkan ke <strong>Tab 3 (Cek AR & WhatsApp)</strong> untuk melihat data pelanggan dan transaksi!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
       container.scrollTop = container.scrollHeight;
     }
     return;
@@ -3626,7 +3661,7 @@ async function sendYipyepChat() {
     quickCheckAR(docNo);
     const typingEl = document.getElementById(typingId);
     if (typingEl) {
-      typingEl.innerHTML = `<div>🔍 <strong>Hasil Cek AR ${docNo}:</strong> Aku sudah buka rincian faktur di <strong>Tab 3</strong> untuk memverifikasi item sosmed!</div><div class="yipyep-msg-time">${timeStr}</div>`;
+      typingEl.innerHTML = `<div class="yipyep-bubble-text">🔍 <strong>Hasil Cek AR ${docNo}:</strong> Aku sudah buka rincian faktur di <strong>Tab 3</strong> untuk memverifikasi item sosmed!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
       container.scrollTop = container.scrollHeight;
     }
     return;
@@ -3636,15 +3671,15 @@ async function sendYipyepChat() {
     switchTab(4);
     const typingEl = document.getElementById(typingId);
     if (typingEl) {
-      typingEl.innerHTML = `<div>📋 <strong>Data Keep:</strong> Aku sudah membawamu ke <strong>Tab 4 (Data Keep Customer)</strong> untuk mengecek status WIN/Progress/Lose!</div><div class="yipyep-msg-time">${timeStr}</div>`;
+      typingEl.innerHTML = `<div class="yipyep-bubble-text">📋 <strong>Data Keep:</strong> Aku sudah membawamu ke <strong>Tab 4 (Data Keep Customer)</strong> untuk mengecek status WIN/Progress/Lose!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
       container.scrollTop = container.scrollHeight;
     }
     return;
   }
 
   // Gemini API or Fallback
-  const apiKey = localStorage.getItem('gemini_api_key');
-  const model = localStorage.getItem('gemini_model') || 'gemini-1.5-flash';
+  const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
+  const model = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
 
   if (apiKey) {
     try {
@@ -3666,7 +3701,7 @@ async function sendYipyepChat() {
         const text = data.candidates[0].content.parts[0].text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         const typingEl = document.getElementById(typingId);
         if (typingEl) {
-          typingEl.innerHTML = `<div>🐱 <strong>Yipyep:</strong><br>${text}</div><div class="yipyep-msg-time">${timeStr}</div>`;
+          typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${text}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
           container.scrollTop = container.scrollHeight;
         }
         return;
@@ -3690,15 +3725,15 @@ async function sendYipyepChat() {
       reply = `Meong! 🐾 Total pencapaian omzet tim sosmed saat ini sudah mencapai <strong>${totalAchieve}</strong> (${progressPct} dari target). Status capaian berada di posisi <strong>🖤 On Track</strong>!`;
     } else if (q.includes('gp') || q.includes('gross') || q.includes('profit')) {
       reply = `Gross Profit tim yang telah dikumpulkan mencapai <strong>${totalGP}</strong>. Ingat target GP kita adalah 5%, tetap pantau margin produk di setiap transaksi ya! 📈`;
-    } else if (q.includes('leaderboard') || q.includes('juara') || q.includes('top')) {
+    } else if ((q.includes('leaderboard') || q.includes('juara') || q.includes('top')) && !q.includes('cabang')) {
       reply = `👑 Di leaderboard bulan ini, <strong>DANIEL</strong> dan <strong>SIFA</strong> mendominasi posisi teratas dengan penjualan tertinggi! Kamu juga bisa cek tab All-Time High di dashboard.`;
     } else if (q.includes('cabang')) {
-      reply = `🏢 <strong>TOP 3 Cabang</strong> dengan kontribusi penjualan sosmed tertinggi adalah: <strong>BJM A. Yani</strong>, <strong>BJM Belitung</strong>, dan <strong>BJB Banjarbaru</strong>.`;
+      reply = `🏢 <strong>TOP 3 Cabang</strong> dengan penjualan tertinggi saat ini adalah: <strong>1. BJMC (Belitung)</strong> Rp 8,26 M, <strong>2. BTCC (Batulicin)</strong> Rp 2,76 M, dan <strong>3. BJMA (A. Yani)</strong> Rp 2,54 M! 🚀`;
     } else {
       reply = `Halo! Aku <strong>Yipyep</strong> 🐱✨. Saat ini tim sudah mencapai omzet <strong>${totalAchieve}</strong> dengan Gross Profit <strong>${totalGP}</strong>. Ada nomor AR, nomor WA, atau performa sales yang ingin kamu tanyakan padaku?`;
     }
 
-    typingEl.innerHTML = `<div>🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time">${timeStr}</div>`;
+    typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
     container.scrollTop = container.scrollHeight;
   }, 400);
 }
