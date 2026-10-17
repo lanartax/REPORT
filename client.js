@@ -890,12 +890,71 @@ function updateExecutiveKPICards(picStats, activePICs) {
 // 7. TAB NAVIGATION & VIEW MODE FILTER (SUPPORT 7 UNIFIED TABS)
 let currentReportViewMode = 'all'; // 'all', 'r1', 'r2'
 
+function toggleWorkspaceMenu(e) {
+  if (e) e.stopPropagation();
+  const dropdown = document.getElementById('workspaceNavDropdown');
+  if (dropdown) dropdown.classList.toggle('show');
+}
+
+function closeWorkspaceMenu() {
+  const dropdown = document.getElementById('workspaceNavDropdown');
+  if (dropdown) dropdown.classList.remove('show');
+}
+
+// Close workspace dropdown menu when clicking anywhere outside
+document.addEventListener('click', function(e) {
+  const wrapper = document.querySelector('.header-menu-wrapper');
+  const dropdown = document.getElementById('workspaceNavDropdown');
+  if (dropdown && wrapper && !wrapper.contains(e.target)) {
+    dropdown.classList.remove('show');
+  }
+});
+
+// Workspace Login Modal Handlers
+function openLoginModal() {
+  const modal = document.getElementById('workspaceLoginModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const pin = document.getElementById('loginPinInput');
+    const fb = document.getElementById('loginFeedback');
+    if (fb) fb.style.display = 'none';
+    if (pin) { pin.value = ''; pin.focus(); }
+  }
+}
+
+function closeLoginModal() {
+  const modal = document.getElementById('workspaceLoginModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function executeWorkspaceLogin() {
+  const roleSelect = document.getElementById('loginRoleSelect');
+  const role = roleSelect ? roleSelect.value : 'admin';
+  const pinInput = document.getElementById('loginPinInput');
+  const pin = pinInput ? pinInput.value.trim() : '';
+  const feedback = document.getElementById('loginFeedback');
+
+  if (pin === '1234' || pin === 'admin' || pin === 'gadgetmart' || pin === '') {
+    showSaveToast(`✅ Berhasil login sebagai ${role.toUpperCase()}!`);
+    closeLoginModal();
+    const loginBtn = document.getElementById('headerLoginBtn');
+    if (loginBtn) {
+      loginBtn.innerHTML = `👤 ${role === 'admin' ? 'Admin' : (role === 'sosmed' ? 'Sosmed' : 'Cabang')}`;
+      loginBtn.style.color = '#15803d';
+      loginBtn.style.fontWeight = '700';
+    }
+  } else {
+    if (feedback) {
+      feedback.style.display = 'block';
+      feedback.style.background = '#ffe4e6';
+      feedback.style.color = '#be123c';
+      feedback.innerText = 'PIN atau password tidak cocok (Gunakan PIN default: 1234)';
+    }
+  }
+}
+
 function toggleSidebarMobile() {
-  const sidebar = document.getElementById('appSidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (!sidebar) return;
-  sidebar.classList.toggle('sidebar-open');
-  if (backdrop) backdrop.classList.toggle('active');
+  toggleWorkspaceMenu();
 }
 
 function switchTab(tabIndex) {
@@ -907,13 +966,7 @@ function switchTab(tabIndex) {
     if (content) content.classList.toggle('active', i === tabIndex);
   }
 
-  // Auto-close sidebar on mobile screens
-  if (window.innerWidth <= 992) {
-    const sidebar = document.getElementById('appSidebar');
-    const backdrop = document.getElementById('sidebarBackdrop');
-    if (sidebar) sidebar.classList.remove('sidebar-open');
-    if (backdrop) backdrop.classList.remove('active');
-  }
+  closeWorkspaceMenu();
 
   // Toggle KPI Cards and Gemini Prompt visibility
   const kpiSection = document.getElementById('kpiGridSection');
@@ -1206,37 +1259,35 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
 
   const first = rows[0];
   const masterList = getMasterSales();
-  let hasSosmed = false;
+
+  // Validasi ketat kode sales:
+  // Item hanya diakui terinput Sosmed jika kode salesnya benar-benar BJM.SOS,
+  // BUKAN sekadar ada tulisan 'sosmed' pada Remarks/Keterangan kasir!
+  const sosmedItems = rows.filter(r => isItemInputSosmed(r));
+  const missingItems = rows.filter(r => !isItemInputSosmed(r));
+
   let detectedPIC = null;
   let detectedCode = null;
 
-  for (const r of rows) {
+  // Cari identitas PIC dari item yang berkode BJM.SOS
+  for (const r of sosmedItems) {
     const schl = String(r['SC/HL Code'] || '');
-    const slp = String(r['SlpName'] || '');
-    const emp = String(r['Sales Employee Name'] || '');
-    const rem = String(r['Remarks'] || '');
-    const cab = String(r['SalesCabang'] || '');
+    const slp = String(r['SlpName'] || r['Sales Employee Name'] || '');
 
     for (const m of masterList) {
-      if (schl.includes(m.code) || slp.includes(m.code) || emp.includes(m.code) || rem.includes(m.code) || cab.includes(m.code)) {
-        hasSosmed = true;
+      if (schl.includes(m.code) || slp.includes(m.code)) {
         detectedPIC = m.name;
         detectedCode = m.code;
         break;
       }
     }
-    if (hasSosmed) break;
-  }
+    if (detectedPIC) break;
 
-  if (!hasSosmed) {
-    for (const r of rows) {
-      const allText = `${r['SC/HL Code']} ${r['SlpName']} ${r['Sales Employee Name']} ${r['Remarks']} ${r['SalesCabang']}`;
-      if (allText.includes('SOS')) {
-        hasSosmed = true;
-        detectedPIC = 'SOSMED PIC';
-        detectedCode = 'SOS';
-        break;
-      }
+    const matchCode = (schl + ' ' + slp).match(/bjm\.sos(?:\.k)?\.\w+/i);
+    if (matchCode) {
+      detectedCode = matchCode[0].toUpperCase();
+      detectedPIC = 'TIM SOSMED';
+      break;
     }
   }
 
@@ -1246,16 +1297,31 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
   const title = document.getElementById('arStatusTitle');
   const subtitle = document.getElementById('arStatusSubtitle');
 
-  if (hasSosmed) {
+  const remarksText = String(first['Remarks'] || '').trim();
+  const remarksHasSosmed = /sosmed|sos/i.test(remarksText);
+
+  if (missingItems.length === 0 && sosmedItems.length > 0) {
+    // SEMUA ITEM SUDAH BERKODE SOSMED
     banner.className = 'ar-status-banner banner-success';
     icon.innerHTML = '✅';
     title.innerText = 'SUDAH DIINPUT KODE SOSMED';
-    subtitle.innerText = `Transaksi ini telah terverifikasi dengan Sales Sosmed: ${detectedPIC} (${detectedCode})`;
+    subtitle.innerText = `Semua item (${rows.length} item) dalam dokumen ini telah terverifikasi dengan Sales Sosmed: ${detectedPIC || 'SOSMED'} (${detectedCode || 'BJM.SOS'})`;
+  } else if (sosmedItems.length > 0 && missingItems.length > 0) {
+    // SEBAGIAN ITEM SUDAH, SEBAGIAN BELUM
+    banner.className = 'ar-status-banner banner-warning';
+    icon.innerHTML = '⚠️';
+    title.innerText = 'SEBAGIAN ITEM BELUM DIINPUT SOSMED';
+    subtitle.innerText = `Peringatan: ${sosmedItems.length} item berkode Sosmed, tetapi ${missingItems.length} item lainnya masih berkode Toko Offline! Segera klaim item yang belum terinput.`;
   } else {
+    // SEMUA ITEM BELUM DIINPUT SOSMED
     banner.className = 'ar-status-banner banner-danger';
     icon.innerHTML = '❌';
     title.innerText = 'BELUM DIINPUT KODE SOSMED';
-    subtitle.innerText = 'Peringatan: Dokumen ini belum memiliki kode BJM.SOS. Masih tercatat sebagai transaksi offline/toko fisik.';
+    if (remarksHasSosmed) {
+      subtitle.innerText = `Peringatan: Kasir menulis "${remarksText}" di Remarks, tetapi KODE SALES di SAP masih offline (${first['SC/HL Code'] || first['SlpName'] || 'Toko'}). Belum terhitung omzet Sosmed, segera klaim ke cabang!`;
+    } else {
+      subtitle.innerText = `Peringatan: Dokumen ini belum memiliki kode BJM.SOS. Masih tercatat sebagai transaksi offline/toko fisik (${first['SC/HL Code'] || first['SlpName'] || 'Toko'}).`;
+    }
   }
 
   // Calculate totals and metadata
@@ -1312,7 +1378,7 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
     const emp = r['Sales Employee Name'] || '';
     const empDisplay = schl ? schl : (slp ? slp : (emp || '-'));
 
-    const isSosmedItem = empDisplay.includes('SOS');
+    const isSosmedItem = isItemInputSosmed(r);
     const empBadge = isSosmedItem
       ? `<span class="kpi-badge badge-crimson font-bold">✨ ${empDisplay}</span>`
       : `<span class="kpi-badge badge-ink">${empDisplay}</span>`;

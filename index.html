@@ -17,116 +17,80 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-layout">
-    <!-- Left Vertical Sidebar (UI Header disamping - Persis Sesuai Mockup Gambar) -->
-    <aside class="app-sidebar" id="appSidebar">
-      <div class="sidebar-brand-section">
-        <div class="sidebar-logo-container">
-          <img src="logo.png" alt="GadgetMart Logo" class="sidebar-logo-img">
-        </div>
-        <div class="sidebar-brand-title">WORKSPACE DIVISI SOSMED</div>
+  <div class="app-layout" id="dropZone">
+    <!-- Top Horizontal Navigation Header Bar (Persis Sesuai Mockup Gambar User) -->
+    <header class="workspace-header-bar">
+      <div class="header-left">
+        <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Gadgetmart's%20Workspace.%20Tolong%20perbaiki%20segera." target="_blank" class="header-link-yahya" title="Hubungi Yahya via WhatsApp">
+          Hubungi Yahya
+        </a>
       </div>
 
-      <nav class="sidebar-nav">
-        <!-- Group 1: MENU UTAMA -->
-        <div class="sidebar-group-header">MENU UTAMA</div>
+      <div class="header-center">
+        <span class="header-brand-title">Gadgetmart's Workspace</span>
+      </div>
 
-        <button class="sidebar-nav-item active" id="tabBtn1" onclick="switchTab(1)">
-          <span class="nav-item-icon">🏆</span>
-          <span class="nav-item-text">Dashboard & Leaderboard</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
+      <div class="header-right">
+        <button class="header-btn" onclick="switchTab(7)" title="Buka Pengaturan Admin">Setting</button>
+        <button class="header-btn" id="headerLoginBtn" onclick="openLoginModal()" title="Login Akun Workspace">Login</button>
+        <div class="header-menu-wrapper">
+          <button class="header-btn btn-menu-toggle" id="headerMenuBtn" onclick="toggleWorkspaceMenu(event)" title="Buka Menu Navigasi">Menu</button>
+          
+          <!-- Dropdown Menu Navigasi Workspace -->
+          <div class="workspace-nav-dropdown" id="workspaceNavDropdown">
+            <div class="dropdown-group-title">MENU UTAMA</div>
+            <button class="dropdown-item active" id="tabBtn1" onclick="switchTab(1); closeWorkspaceMenu();">
+              <span class="dropdown-icon">🏆</span>
+              <span class="dropdown-text">Dashboard & Leaderboard</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn2" onclick="switchTab(2); closeWorkspaceMenu();">
+              <span class="dropdown-icon">📊</span>
+              <span class="dropdown-text">Laporan Pencapaian & KPI</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn3" onclick="switchTab(3); closeWorkspaceMenu();">
+              <span class="dropdown-icon">🔍</span>
+              <span class="dropdown-text">Cek AR & WhatsApp</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn4" onclick="switchTab(4); closeWorkspaceMenu();">
+              <span class="dropdown-icon">📋</span>
+              <span class="dropdown-text">Data Keep Customer</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn5" onclick="switchTab(5); closeWorkspaceMenu();">
+              <span class="dropdown-icon">⚠️</span>
+              <span class="dropdown-text">Audit AR Belum Sosmed</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn6" onclick="switchTab(6); closeWorkspaceMenu();">
+              <span class="dropdown-icon">📁</span>
+              <span class="dropdown-text">Arsip Pencapaian Bulanan</span>
+            </button>
 
-        <button class="sidebar-nav-item" id="tabBtn2" onclick="switchTab(2)">
-          <span class="nav-item-icon">📊</span>
-          <span class="nav-item-text">Laporan Pencapaian & KPI</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
+            <div class="dropdown-separator"></div>
+            <div class="dropdown-group-title">ADMINISTRASI</div>
+            <button class="dropdown-item" id="tabBtn7" onclick="switchTab(7); closeWorkspaceMenu();">
+              <span class="dropdown-icon">⚙️</span>
+              <span class="dropdown-text">Pengaturan Admin</span>
+            </button>
+            <a href="https://kandidatgadgetmart.my.id" target="_blank" class="dropdown-item dropdown-link" title="Buka Portal Rekrutmen Kandidat GadgetMart">
+              <span class="dropdown-icon">🚀</span>
+              <span class="dropdown-text">Kandidat Gadgetmart</span>
+              <span class="dropdown-ext-arrow">↗</span>
+            </a>
 
-        <button class="sidebar-nav-item" id="tabBtn3" onclick="switchTab(3)">
-          <span class="nav-item-icon">🔍</span>
-          <span class="nav-item-text">Cek AR & WhatsApp</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
-
-        <button class="sidebar-nav-item" id="tabBtn4" onclick="switchTab(4)">
-          <span class="nav-item-icon">📋</span>
-          <span class="nav-item-text">Data Keep Customer</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
-
-        <button class="sidebar-nav-item" id="tabBtn5" onclick="switchTab(5)">
-          <span class="nav-item-icon">⚠️</span>
-          <span class="nav-item-text">Audit AR Belum Sosmed</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
-
-        <button class="sidebar-nav-item" id="tabBtn6" onclick="switchTab(6)">
-          <span class="nav-item-icon">📁</span>
-          <span class="nav-item-text">Arsip Pencapaian Bulanan</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
-
-        <!-- Group 2: ADMINISTRASI -->
-        <div class="sidebar-group-header">ADMINISTRASI</div>
-
-        <button class="sidebar-nav-item" id="tabBtn7" onclick="switchTab(7)">
-          <span class="nav-item-icon">⚙️</span>
-          <span class="nav-item-text">Pengaturan Admin</span>
-          <span class="nav-active-indicator">▪</span>
-        </button>
-
-        <a href="https://kandidatgadgetmart.my.id" target="_blank" class="sidebar-nav-item sidebar-ext-item" title="Buka Portal Rekrutmen Kandidat GadgetMart">
-          <span class="nav-item-icon">🚀</span>
-          <span class="nav-item-text">Kandidat Gadgetmart</span>
-          <span class="nav-ext-arrow">↗</span>
-        </a>
-      </nav>
-
-      <!-- Sidebar Bottom: Hubungi Yahya -->
-      <div class="sidebar-bottom-section">
-        <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Dashboard%20Sosmed%20Gadgetmart.%20Tolong%20perbaiki%20segera." target="_blank" class="sidebar-btn-yahya" title="Hubungi Pemilik / Developer Website">
-          <div class="yahya-content-left">
-            <span class="yahya-pulse-dot"></span>
-            <span class="yahya-icon-key">🔑</span>
-            <span class="yahya-title">Hubungi Yahya</span>
+            <div class="dropdown-separator"></div>
+            <button class="dropdown-item dropdown-upload-btn" onclick="document.getElementById('fileInput').click(); closeWorkspaceMenu();">
+              <span class="dropdown-icon">📂</span>
+              <span class="dropdown-text">Unggah File Turnover (.xlsx)</span>
+            </button>
           </div>
-          <span class="yahya-badge-online">Online</span>
-        </a>
+        </div>
       </div>
-    </aside>
+    </header>
 
-    <!-- Mobile Drawer Backdrop -->
-    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebarMobile()"></div>
+    <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleTurnoverFileSelect(event)">
 
     <!-- Main Content Area Wrapper -->
     <div class="app-main-wrapper">
-      <!-- Mobile Top Bar Header -->
-      <div class="mobile-top-bar">
-        <button class="mobile-hamburger-btn" onclick="toggleSidebarMobile()" title="Buka Menu Navigasi">
-          ☰
-        </button>
-        <div class="mobile-brand-wrapper">
-          <img src="logo.png" alt="GadgetMart" class="mobile-brand-logo">
-          <span class="mobile-brand-tag">DIVISI SOSMED</span>
-        </div>
-        <a href="https://wa.me/6289603864476" target="_blank" class="mobile-btn-wa" title="WhatsApp Yahya">💬</a>
-      </div>
-
-    <main class="main-content">
-
-      <!-- Window Top Header Bar: GadgetMart Icon & Brand (Samping Paling Atas Jendela) -->
-      <section class="minimal-upload-section" id="dropZone">
-        <!-- GadgetMart Icon & Brand disamping paling atas jendela -->
-        <div class="window-top-brand" title="GadgetMart Divisi Sosmed">
-          <img src="logo.png" alt="GadgetMart Logo" class="window-top-logo">
-          <div class="window-top-meta">
-            <span class="window-brand-title">GADGETMART</span>
-            <span class="window-brand-sub">Sosmed Performance Dashboard</span>
-          </div>
-        </div>
-        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none" onchange="handleTurnoverFileSelect(event)">
-      </section>
+      <main class="main-content">
 
       <!-- Save Toast Feedback Container -->
       <div id="saveToast" class="save-toast" style="display:none"></div>
@@ -1488,6 +1452,34 @@
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>
           </svg>
         </button>
+      </div>
+  <!-- Workspace Login Modal -->
+  <div id="workspaceLoginModal" class="workspace-modal" style="display:none;">
+    <div class="workspace-modal-backdrop" onclick="closeLoginModal()"></div>
+    <div class="workspace-modal-dialog">
+      <div class="workspace-modal-header">
+        <h3 class="font-heading">🔐 Login Gadgetmart's Workspace</h3>
+        <button class="modal-close-btn" onclick="closeLoginModal()">&times;</button>
+      </div>
+      <div class="workspace-modal-body">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="display:block; margin-bottom: 6px; font-weight:600; font-size:0.88rem;">Pilih Role / Pengguna</label>
+          <select id="loginRoleSelect" class="form-select" style="width:100%; padding: 8px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-family:'Inter',sans-serif;">
+            <option value="admin">Administrator / Manager</option>
+            <option value="sosmed">Tim PIC Sales Sosmed</option>
+            <option value="cabang">Kepala Cabang / Kasir</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display:block; margin-bottom: 6px; font-weight:600; font-size:0.88rem;">PIN / Password Akses</label>
+          <input type="password" id="loginPinInput" class="form-input" placeholder="Masukkan PIN akses..." style="width:100%; padding: 8px 12px; border-radius:8px; border:1.5px solid #cbd5e1; font-family:'Inter',sans-serif;" onkeyup="if(event.key==='Enter') executeWorkspaceLogin()">
+          <span style="font-size:0.75rem; color:#64748b; margin-top:4px; display:block;">Default PIN admin: 1234</span>
+        </div>
+        <div id="loginFeedback" style="display:none; margin-bottom:12px; font-size:0.85rem; padding:8px 12px; border-radius:6px;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-secondary" onclick="closeLoginModal()" style="padding:7px 16px;">Batal</button>
+          <button class="btn btn-primary" onclick="executeWorkspaceLogin()" style="padding:7px 18px; background:#0f172a; color:#fff; border-color:#0f172a;">Masuk</button>
+        </div>
       </div>
     </div>
   </div>
