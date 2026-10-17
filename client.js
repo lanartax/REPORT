@@ -940,7 +940,7 @@ function executeWorkspaceLogin() {
     const loginBtn = document.getElementById('headerLoginBtn');
     if (loginBtn) {
       loginBtn.innerHTML = `👤 ${role === 'admin' ? 'Admin' : (role === 'sosmed' ? 'Sosmed' : 'Cabang')}`;
-      loginBtn.style.color = '#15803d';
+      loginBtn.style.color = '#ffc72c';
       loginBtn.style.fontWeight = '700';
     }
   } else {
