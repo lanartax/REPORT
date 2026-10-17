@@ -267,6 +267,20 @@ function isSosmedSalesCode(empStr, remStr = '', cabStr = '') {
   return false;
 }
 
+// Validasi ketat kode sales item faktur: harus benar-benar diinput dengan KODE SALES SOSMED (BJM.SOS)
+// Catatan: Jika kode salesnya FL. (Floor/Toko) atau SC. (Sales Counter Toko), meskipun di Remarks ada tulisan 'sosmed',
+// item tersebut TETAP BELUM TERINPUT SOSMED di SAP kasir!
+function isItemInputSosmed(row) {
+  if (!row) return false;
+  const schl = String(row['SC/HL Code'] || '').trim();
+  const slp = String(row['SlpName'] || row['Sales Employee Name'] || '').trim();
+
+  if (/^bjm\.sos/i.test(schl) || /bjm\.sos(?:\.k)?\./i.test(schl)) return true;
+  if (/^bjm\.sos/i.test(slp) || /bjm\.sos(?:\.k)?\./i.test(slp)) return true;
+
+  return false;
+}
+
 // Helper untuk memilih sheet transaksi turnover yang tepat (misal TARIKKAN pada file KPI SOSMED)
 function resolveTurnoverSheet(workbook) {
   if (workbook.SheetNames.includes('TARIKKAN')) return workbook.Sheets['TARIKKAN'];
@@ -1142,7 +1156,7 @@ function renderWhatsAppCustomerView(query, rows) {
     const waktu = r['Waktu'] || '';
 
     // Check if sales code indicates sosmed
-    const isSosmed = schl.includes('BJM.SOS') || schl.includes('SOS') || slp.includes('BJM.SOS') || rem.includes('SOS');
+    const isSosmed = isItemInputSosmed(r);
     const empDisplay = schl ? schl : (slp ? slp : '-');
     const empBadge = isSosmed 
       ? `<span class="kpi-badge badge-crimson font-bold">✨ ${empDisplay}</span>`
@@ -1775,8 +1789,7 @@ function openARDetailModal(docNumber, keepContext = null) {
     const subtotal = Number(r['Harga Jual']) || 0;
     totalDocVal += subtotal;
 
-    const code = `${r['SC/HL Code'] || ''} ${r['SlpName'] || ''} ${r['Sales Employee Name'] || ''} ${r['Remarks'] || ''} ${r['SalesCabang'] || ''}`;
-    const isSosmed = code.includes('BJM.SOS') || code.includes('SOS');
+    const isSosmed = isItemInputSosmed(r);
     if (isSosmed) {
       allMissing = false;
     } else {
@@ -1870,12 +1883,7 @@ function renderModalItemsTable() {
     totalQty += qty;
     totalVal += subtotal;
 
-    const schl = String(r['SC/HL Code'] || '');
-    const slp = String(r['SlpName'] || '');
-    const emp = String(r['Sales Employee Name'] || '');
-    const rem = String(r['Remarks'] || '');
-    const code = `${schl} ${slp} ${emp} ${rem}`;
-    const isSosmed = code.includes('BJM.SOS') || code.includes('SOS');
+    const isSosmed = isItemInputSosmed(r);
     const empDisplay = schl || slp || emp || '-';
 
     const isChecked = currentModalCheckedItems.has(idx);
@@ -2137,11 +2145,10 @@ function runARMissingSosmedAudit() {
       let totalDocValue = 0;
 
       items.forEach(it => {
-        const code = `${it['SC/HL Code'] || ''} ${it['SlpName'] || ''} ${it['Sales Employee Name'] || ''} ${it['Remarks'] || ''} ${it['SalesCabang'] || ''}`;
         const lineTotal = Number(it['Harga Jual']) || 0;
         totalDocValue += lineTotal;
 
-        if (code.includes('BJM.SOS') || code.includes('SOS')) {
+        if (isItemInputSosmed(it)) {
           sosmedItems++;
         } else {
           missingItems++;
@@ -2226,9 +2233,19 @@ function applyAuditFilters() {
           isoDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
         }
       } else if (typeof r.postingDate === 'string') {
-        const parts = r.postingDate.split(/[\/\-]/);
+        const parts = r.postingDate.trim().split(/[\/\-]/);
         if (parts.length >= 3) {
-          isoDate = `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
+          if (parts[0].length === 4) {
+            isoDate = `${parts[0]}-${String(parts[1]).padStart(2,'0')}-${String(parts[2]).padStart(2,'0')}`;
+          } else {
+            const d1 = `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
+            const d2 = `${parts[2]}-${String(parts[0]).padStart(2,'0')}-${String(parts[1]).padStart(2,'0')}`;
+            if (d1 === tanggalARVal || d2 === tanggalARVal) {
+              isoDate = tanggalARVal;
+            } else {
+              isoDate = d1;
+            }
+          }
         }
       }
       if (isoDate !== tanggalARVal) return false;
@@ -2328,8 +2345,7 @@ function renderAuditPage() {
 
     // Products breakdown badges
     const itemsBadges = r.items.map(it => {
-      const code = `${it['SC/HL Code'] || ''} ${it['SlpName'] || ''} ${it['Sales Employee Name'] || ''} ${it['Remarks'] || ''}`;
-      const isSos = code.includes('BJM.SOS') || code.includes('SOS');
+      const isSos = isItemInputSosmed(it);
       const desc = it['Dscription'] || '-';
       const qty = Number(it['Quantity']) || 1;
       return isSos
