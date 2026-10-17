@@ -41,16 +41,16 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  cursor: url('cursor-default.png') 6 2, auto;
+  cursor: url('cursor-default.png') 6 4, auto;
 }
 
 html {
-  cursor: url('cursor-default.png') 6 2, auto;
+  cursor: url('cursor-default.png') 6 4, auto;
 }
 
-/* Custom Sukuna / Demon Flaming Pointer for All Clickable Elements */
+/* Custom Cat Paw Pointer for All Clickable Elements */
 a, button, input[type="button"], input[type="submit"], select, .cursor-pointer, [onclick], .dropdown-item, .header-btn, .header-link-yahya, .quick-ask-chip, .btn, .btn-action, .kpi-badge, th.cursor-pointer {
-  cursor: url('cursor-pointer.png') 10 4, pointer !important;
+  cursor: url('cursor-pointer.png') 16 3, pointer !important;
 }
 
 /* Text Elements: Inter */
