@@ -79,7 +79,7 @@ function formatRupiah(num) {
   const isNeg = num < 0;
   const absVal = Math.abs(num);
   const formatted = absVal.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  return (isNeg ? '-Rp ' : 'Rp ') + formatted;
+  return (isNeg ? '- Rp ' : 'Rp ') + formatted;
 }
 
 function formatPercent(pct) {
@@ -267,12 +267,18 @@ function isSosmedSalesCode(empStr, remStr = '', cabStr = '') {
   return false;
 }
 
+// Helper untuk memilih sheet transaksi turnover yang tepat (misal TARIKKAN pada file KPI SOSMED)
+function resolveTurnoverSheet(workbook) {
+  if (workbook.SheetNames.includes('TARIKKAN')) return workbook.Sheets['TARIKKAN'];
+  if (workbook.SheetNames.includes('Sheet1')) return workbook.Sheets['Sheet1'];
+  return workbook.Sheets[workbook.SheetNames[0]];
+}
+
 // 2. PARSER ENGINE FOR turnover.xlsx (Achievement DPP)
 function parseTurnoverBuffer(arrayBuffer) {
   try {
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const sheet = resolveTurnoverSheet(workbook);
     const jsonData = XLSX.utils.sheet_to_json(sheet);
 
     if (!jsonData || jsonData.length === 0) return;
@@ -333,8 +339,7 @@ function updateDatabaseStatus() {
 async function parseExcelFile(arrayBuffer, fileName = '') {
   try {
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    const sheet = resolveTurnoverSheet(workbook);
     const jsonData = XLSX.utils.sheet_to_json(sheet);
 
     if (!jsonData || jsonData.length === 0) {
@@ -498,35 +503,70 @@ function processAllReports() {
     if (docNo) {
       if (!docTransactions[docNo]) {
         docTransactions[docNo] = {
-          pic: matchedPIC || 'SOSMED',
+          pic: matchedPIC || null,
+          gadgetPics: new Set(),
+          accPics: new Set(),
+          accTotal: 0,
           hasGadget: false,
           hasCross: false
         };
       }
-      const grp = String(row['Group Name'] || '').trim().toUpperCase();
-      if (grp === 'GAD T') {
-        docTransactions[docNo].hasGadget = true;
+      if (matchedPIC && !docTransactions[docNo].pic) {
+        docTransactions[docNo].pic = matchedPIC;
       }
-      if (grp === 'ACC T' && (total >= 50000 || dpp >= 45000)) {
-        docTransactions[docNo].hasCross = true;
+
+      // Klasifikasi kategori sesuai rumus standar FILL GRUP Excel
+      // TM = Tebus Murah (diberi 'X' agar tidak dihitung sebagai gadget/croselling reguler)
+      const itemDesc = String(row['Item/Service Description'] || '');
+      const grpRaw = String(row['Group Name'] || '').trim().toUpperCase();
+      let grp = grpRaw.slice(0, 3);
+      if (itemDesc.startsWith('TM ')) grp = 'X';
+      else if (itemDesc.startsWith('GMART CARE') || itemDesc.startsWith('JASA SERVICE T') || itemDesc.startsWith('JASA SERVICE FLEX T')) grp = 'ACC';
+
+      if (grp === 'GAD') {
+        docTransactions[docNo].hasGadget = true;
+        if (matchedPIC) {
+          docTransactions[docNo].gadgetPics.add(matchedPIC);
+          docTransactions[docNo].pic = matchedPIC;
+        }
+      } else if (grp === 'ACC') {
+        docTransactions[docNo].accTotal += total;
+        if (matchedPIC) {
+          docTransactions[docNo].accPics.add(matchedPIC);
+        }
       }
     }
   }
 
   // Calculate Cross-Selling Counts from Document groups
+  // Rumus Standar Excel: JLH CROSS >50K adalah akumulasi Total Aksesoris dalam satu faktur/nota > 50.000
   let totalSosmedGadget = 0;
   let totalSosmedCross = 0;
   for (const doc in docTransactions) {
     const item = docTransactions[doc];
     if (item.hasGadget) {
       totalSosmedGadget++;
-      if (item.hasCross) {
+      const isCross = item.accTotal > 50000;
+      item.hasCross = isCross;
+      if (isCross) {
         totalSosmedCross++;
       }
-      if (item.pic && picStats[item.pic]) {
-        picStats[item.pic].gadgetCount++;
-        if (item.hasCross) {
-          picStats[item.pic].crossCount++;
+
+      // Hitung Gadget per PIC
+      item.gadgetPics.forEach(pic => {
+        if (picStats[pic]) picStats[pic].gadgetCount++;
+      });
+
+      // Hitung Cross (>50K) per PIC
+      if (isCross) {
+        if (item.accPics.size > 0) {
+          item.accPics.forEach(pic => {
+            if (picStats[pic]) picStats[pic].crossCount++;
+          });
+        } else {
+          item.gadgetPics.forEach(pic => {
+            if (picStats[pic]) picStats[pic].crossCount++;
+          });
         }
       }
     }
@@ -567,6 +607,13 @@ function renderReport1Table(activePICs) {
   const theadRow = document.getElementById('matrixHeaderRow');
   const tbody = document.getElementById('matrixTableBody');
   const tfoot = document.getElementById('matrixTableFoot');
+
+  const titleEl = document.getElementById('report1MainTitle');
+  if (titleEl) {
+    const monthNames = ['', 'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'];
+    const mStr = monthNames[Number(activeMonth)] || String(activeMonth).toUpperCase();
+    titleEl.innerText = `REPORT 1: DAILY ACHIEVEMENT SOSMED ${mStr} ${activeYear}`;
+  }
 
   let headerHtml = `<th class="col-sticky col-date">TANGGAL</th>`;
   activePICs.forEach(pic => headerHtml += `<th>${pic}</th>`);
@@ -612,7 +659,7 @@ function renderReport1Table(activePICs) {
   let sumTarget = 0;
   activePICs.forEach(pic => {
     const m = masterList.find(x => x.name === pic);
-    const target = m ? m.target : 867261886;
+    const target = m ? getSalesTargetForMonth(m.code, activeMonth, activeYear, m.target) : 867261886;
     sumTarget += target;
     const total = colTotals[pic];
     const sisa = total - target;
@@ -621,16 +668,30 @@ function renderReport1Table(activePICs) {
     totalHtml += `<td>${formatRupiah(total)}</td>`;
     sisaHtml += `<td>${formatRupiah(sisa)}</td>`;
     targetHtml += `<td>${formatRupiah(target)}</td>`;
-    progressHtml += `<td>${formatPercent(pct)}</td>`;
+    progressHtml += `<td>
+      <div class="progress-cell-inner">
+        <span class="progress-val">${formatPercent(pct)}</span>
+        <div class="mini-progress-track">
+          <div class="mini-progress-bar" style="width:${Math.min(100, Math.max(0, Math.round(pct)))}%;"></div>
+        </div>
+      </div>
+    </td>`;
   });
 
   const grandSisa = grandTotalAchieve - sumTarget;
   const grandPct = sumTarget > 0 ? (grandTotalAchieve / sumTarget) * 100 : 0;
 
-  totalHtml += `<td class="col-achieve">${formatRupiah(grandTotalAchieve)}</td><td></td><td></td></tr>`;
-  sisaHtml += `<td class="col-achieve">${formatRupiah(grandSisa)}</td><td></td><td></td></tr>`;
-  targetHtml += `<td class="col-achieve">${formatRupiah(sumTarget)}</td><td></td><td></td></tr>`;
-  progressHtml += `<td class="col-achieve">${formatPercent(grandPct)}</td><td></td><td></td></tr>`;
+  totalHtml += `<td class="col-achieve">${formatRupiah(grandTotalAchieve)}</td><td class="col-week text-center">-</td><td class="col-avg text-center">-</td></tr>`;
+  sisaHtml += `<td class="col-achieve">${formatRupiah(grandSisa)}</td><td class="col-week text-center">-</td><td class="col-avg text-center">-</td></tr>`;
+  targetHtml += `<td class="col-achieve">${formatRupiah(sumTarget)}</td><td class="col-week text-center">-</td><td class="col-avg text-center">-</td></tr>`;
+  progressHtml += `<td class="col-achieve">
+    <div class="progress-cell-inner">
+      <span class="progress-val">${formatPercent(grandPct)}</span>
+      <div class="mini-progress-track">
+        <div class="mini-progress-bar" style="width:${Math.min(100, Math.max(0, Math.round(grandPct)))}%;"></div>
+      </div>
+    </div>
+  </td><td class="col-week text-center">-</td><td class="col-avg text-center">-</td></tr>`;
 
   tfoot.innerHTML = totalHtml + sisaHtml + targetHtml + progressHtml;
 }
@@ -3298,17 +3359,23 @@ async function handleArchiveExcelUpload() {
 
         const docNo = row['Document Number'];
         if (docNo) {
-          if (!docGroups[docNo]) docGroups[docNo] = { hasGadget: false, hasCross: false };
-          const grp = String(row['Group Name'] || '').trim().toUpperCase();
-          if (grp === 'GAD T') docGroups[docNo].hasGadget = true;
-          if (grp === 'ACC T' && (total >= 50000 || dpp >= 45000)) docGroups[docNo].hasCross = true;
+          if (!docGroups[docNo]) docGroups[docNo] = { hasGadget: false, accTotal: 0, hasCross: false };
+          // TM = Tebus Murah (diberi 'X' agar tidak dihitung sebagai gadget/croselling reguler)
+          const itemDesc = String(row['Item/Service Description'] || '');
+          const grpRaw = String(row['Group Name'] || '').trim().toUpperCase();
+          let grp = grpRaw.slice(0, 3);
+          if (itemDesc.startsWith('TM ')) grp = 'X';
+          else if (itemDesc.startsWith('GMART CARE') || itemDesc.startsWith('JASA SERVICE T') || itemDesc.startsWith('JASA SERVICE FLEX T')) grp = 'ACC';
+
+          if (grp === 'GAD') docGroups[docNo].hasGadget = true;
+          if (grp === 'ACC') docGroups[docNo].accTotal += total;
         }
       }
 
       for (const d in docGroups) {
         if (docGroups[d].hasGadget) {
           totalGadget++;
-          if (docGroups[d].hasCross) totalCross++;
+          if (docGroups[d].accTotal > 50000) totalCross++;
         }
       }
 
@@ -3839,8 +3906,7 @@ function handleTurnoverFileSelect(e) {
     try {
       const buffer = evt.target.result;
       const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
+      const sheet = resolveTurnoverSheet(workbook);
       const jsonData = XLSX.utils.sheet_to_json(sheet);
       if (!jsonData || jsonData.length === 0) {
         alert("File Excel turnover kosong atau tidak terbaca!");
@@ -4693,8 +4759,33 @@ PANDUAN MENJAWAB:
   }
 }
 
+// Live Real-Time Date and Clock Engine for Report Header
+function initLiveClock() {
+  function update() {
+    const now = new Date();
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const dayName = days[now.getDay()];
+    const dateNum = String(now.getDate()).padStart(2, '0');
+    const monthName = months[now.getMonth()];
+    const year = now.getFullYear();
+
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    const dateEl = document.getElementById('liveClockDate');
+    const timeEl = document.getElementById('liveClockTime');
+    if (dateEl) dateEl.innerText = `${dayName}, ${dateNum} ${monthName} ${year}`;
+    if (timeEl) timeEl.innerText = `${hours}:${minutes}:${seconds} WITA`;
+  }
+  update();
+  setInterval(update, 1000);
+}
+
 // Auto init on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  initLiveClock();
   await loadMonthlyTargets();
   await loadSalesPhotos();
   await loadMonthlyArchives();

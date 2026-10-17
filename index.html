@@ -509,15 +509,26 @@
         <!-- Section Report 1: Daily Achievement Matrix -->
         <div id="report1ViewWrap">
           <div class="card-tegas table-card" id="report1Container">
-            <div class="table-toolbar">
-              <div class="toolbar-title">
-                <h2>REPORT 1: DAILY ACHIEVEMENT SOSMED OKTOBER 2026</h2>
-                <span class="pill-badge-red" id="modeIndicatorTag">Nilai DPP (Sebelum PPN 11%)</span>
+            <div class="table-toolbar report1-toolbar-themed">
+              <div class="toolbar-brand-section">
+                <img src="logo.png" alt="GadgetMart" class="report-header-logo">
+                <div class="toolbar-divider-v"></div>
+                <div class="toolbar-title">
+                  <h2 id="report1MainTitle">REPORT 1: DAILY ACHIEVEMENT SOSMED OKTOBER 2026</h2>
+                  <span class="pill-badge-red" id="modeIndicatorTag">Nilai DPP (Sebelum PPN 11%)</span>
+                </div>
               </div>
               <div class="toolbar-controls">
-                <input type="text" id="tableSearchInput" placeholder="Cari tanggal..." onkeyup="filterTableDate(this.value)">
-                <button class="btn btn-sm btn-outline" style="border-radius:999px;" onclick="resetTableHighlight()">Reset Highlight</button>
-                <button class="btn btn-sm btn-crimson" onclick="downloadElementAsPNG('report1Container', 'Report1_Daily_Achievement_Sosmed')">📷 Unduh Gambar Lengkap</button>
+                <div class="live-clock-badge" id="reportLiveClock" title="Waktu dan Tanggal Berjalan Realtime">
+                  <svg class="clock-svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span id="liveClockDate" class="clock-date-text">Memuat tanggal...</span>
+                  <span class="clock-dot-sep">•</span>
+                  <span id="liveClockTime" class="clock-time-val">00:00:00 WITA</span>
+                </div>
+                <button class="btn btn-sm btn-crimson btn-download-themed" onclick="downloadElementAsPNG('report1Container', 'Report1_Daily_Achievement_Sosmed')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Unduh Gambar Lengkap
+                </button>
               </div>
             </div>
 
