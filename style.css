@@ -3477,3 +3477,50 @@ h1, h2, h3, h4, h5, h6,
   color: #ffffff !important;
   border-color: #047857 !important;
 }
+
+/* ================= AUDIT AR TABLE - FULL WIDTH NO HORIZONTAL SCROLL ================= */
+#tabContent5 .table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto;
+}
+
+@media (min-width: 992px) {
+  #tabContent5 .table-responsive {
+    overflow-x: hidden !important;
+  }
+}
+
+#auditTable {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
+}
+
+#auditTable th,
+#auditTable td {
+  padding: 6px 5px !important;
+  font-size: 0.73rem !important;
+  vertical-align: middle !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+#auditTable th {
+  font-size: 0.70rem !important;
+  letter-spacing: -0.01em;
+  padding: 8px 5px !important;
+  white-space: nowrap !important;
+}
+
+#auditTable .audit-col-no { width: 3.2%; text-align: center; }
+#auditTable .audit-col-doc { width: 8.8%; }
+#auditTable .audit-col-date { width: 8.5%; }
+#auditTable .audit-col-cust { width: 10.5%; }
+#auditTable .audit-col-wa { width: 11.5%; }
+#auditTable .audit-col-sosmed { width: 8.5%; }
+#auditTable .audit-col-keep { width: 19.5%; }
+#auditTable .audit-col-items { width: 20.5%; }
+#auditTable .audit-col-status { width: 9%; text-align: center; }
+

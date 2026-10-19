@@ -1225,21 +1225,27 @@ function renderWhatsAppCustomerView(query, rows) {
     </a>
   `;
 
+  // Global state for Tab 3 Cek AR search results & copy
+  currentARSearchResults = rows;
+  currentARSearchDoc = '';
+
   // Update Table Headers
   document.getElementById('itemsTableTitle').innerText = `🛒 Riwayat Pembelian Produk oleh Customer (${displayWA} - ${custName}):`;
   document.getElementById('arItemsCountBadge').innerText = `${rows.length} Baris Produk (${totalQty} Qty)`;
 
   document.getElementById('arItemsTableHead').innerHTML = `
-    <th class="col-sticky" style="width: 45px;">NO</th>
+    <th class="col-sticky" style="width: 35px; text-align: center;">NO</th>
     <th>NO. AR / FAKTUR</th>
     <th>TANGGAL & WAKTU</th>
     <th>CABANG</th>
-    <th class="text-left" style="min-width: 220px;">NAMA PRODUK / ITEM DESCRIPTION</th>
-    <th>QTY</th>
+    <th class="text-left" style="min-width: 200px;">NAMA PRODUK / ITEM DESCRIPTION</th>
+    <th style="width: 45px;">QTY</th>
     <th>HARGA SATUAN</th>
     <th>TOTAL BELANJA</th>
-    <th class="text-left" style="min-width: 210px;">SALES EMPLOYEE (PER ITEM)</th>
-    <th class="text-center">STATUS SOSMED</th>
+    <th class="text-left" style="min-width: 170px;">SALES EMPLOYEE (PER ITEM)</th>
+    <th class="text-center" style="width: 110px;">STATUS SOSMED</th>
+    <th class="text-center" style="width: 90px;">POTENSI DENDA</th>
+    <th class="text-center" style="width: 100px;">SALIN EXCEL</th>
   `;
 
   // Render Rows
@@ -1267,6 +1273,17 @@ function renderWhatsAppCustomerView(query, rows) {
       ? `<span class="status-badge badge-accent">✨ Terinput Sosmed</span>`
       : `<span class="status-badge badge-ink">🏢 Offline Toko / Kasir</span>`;
 
+    const dendaStatus = getItemPotensiDenda(r);
+    const dendaBadge = dendaStatus === 'DENDA'
+      ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.68rem; padding:2px 6px;">🚨 DENDA</span>`
+      : `<span class="kpi-badge badge-ink" style="font-size:0.68rem; padding:2px 6px;">PASS</span>`;
+
+    const copyBtn = `
+      <button class="btn-copy-item-sm" onclick="copyARSearchItemToClipboard(${idx}, this)" title="Salin item ini ke format 12 kolom Excel (tanpa header)">
+        📋 Copy Rekap
+      </button>
+    `;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-sticky">${idx + 1}</td>
@@ -1279,6 +1296,8 @@ function renderWhatsAppCustomerView(query, rows) {
       <td class="font-bold">${formatRupiah(subtotal)}</td>
       <td class="text-left">${empBadge}</td>
       <td class="text-center">${statusBadge}</td>
+      <td class="text-center">${dendaBadge}</td>
+      <td class="text-center">${copyBtn}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -1289,7 +1308,7 @@ function renderWhatsAppCustomerView(query, rows) {
       <td><strong>${totalQty}</strong></td>
       <td>-</td>
       <td class="font-bold">${formatRupiah(totalSpent)}</td>
-      <td colspan="2" class="text-left font-bold text-accent">${uniqueDocs.length} Faktur Dokumen</td>
+      <td colspan="4" class="text-left font-bold text-accent">${uniqueDocs.length} Faktur Dokumen</td>
     </tr>
   `;
 
@@ -1397,18 +1416,24 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
 
   document.getElementById('arMetaRemarks').innerText = first['Remarks'] || '- (Tidak ada catatan)';
 
+  // Global state for Tab 3 Cek AR search results & copy
+  currentARSearchResults = rows;
+  currentARSearchDoc = docNumber;
+
   // Table Headers
   document.getElementById('itemsTableTitle').innerText = `Daftar Item / Produk dalam Dokumen AR ${first['Document Number'] || docNumber}:`;
   document.getElementById('arItemsTableHead').innerHTML = `
-    <th class="col-sticky" style="width: 45px;">NO</th>
-    <th class="text-left" style="min-width: 220px;">NAMA PRODUK / ITEM DESCRIPTION</th>
+    <th class="col-sticky" style="width: 35px; text-align: center;">NO</th>
+    <th class="text-left" style="min-width: 200px;">NAMA PRODUK / ITEM DESCRIPTION</th>
     <th class="text-center">KATEGORI / BRAND</th>
-    <th>QTY</th>
-    <th class="text-left" style="min-width: 210px;">SALES EMPLOYEE (PER ITEM)</th>
-    <th class="text-left" style="min-width: 140px;">CABANG</th>
+    <th style="width: 45px;">QTY</th>
+    <th class="text-left" style="min-width: 170px;">SALES EMPLOYEE (PER ITEM)</th>
+    <th class="text-left" style="min-width: 120px;">CABANG</th>
     <th>HARGA SATUAN</th>
     <th>TOTAL</th>
-    <th class="text-center">STATUS SOSMED</th>
+    <th class="text-center" style="width: 100px;">STATUS SOSMED</th>
+    <th class="text-center" style="width: 90px;">POTENSI DENDA</th>
+    <th class="text-center" style="width: 100px;">SALIN EXCEL</th>
   `;
 
   const tbody = document.getElementById('arItemsBody');
@@ -1431,6 +1456,17 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
       ? `<span class="kpi-badge badge-crimson font-bold">✨ ${empDisplay}</span>`
       : `<span class="kpi-badge badge-ink">${empDisplay}</span>`;
 
+    const dendaStatus = getItemPotensiDenda(r);
+    const dendaBadge = dendaStatus === 'DENDA'
+      ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.68rem; padding:2px 6px;">🚨 DENDA</span>`
+      : `<span class="kpi-badge badge-ink" style="font-size:0.68rem; padding:2px 6px;">PASS</span>`;
+
+    const copyBtn = `
+      <button class="btn-copy-item-sm" onclick="copyARSearchItemToClipboard(${idx}, this)" title="Salin item ini ke format 12 kolom Excel (tanpa header)">
+        📋 Copy Rekap
+      </button>
+    `;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-sticky">${idx + 1}</td>
@@ -1442,6 +1478,8 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
       <td>${formatRupiah(price)}</td>
       <td class="font-bold">${formatRupiah(subtotal)}</td>
       <td class="text-center">${isSosmedItem ? '<span class="status-badge badge-accent">✨ Sosmed</span>' : '<span class="status-badge badge-ink">🏢 Offline</span>'}</td>
+      <td class="text-center">${dendaBadge}</td>
+      <td class="text-center">${copyBtn}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -1455,7 +1493,7 @@ function renderARDocumentView(docNumber, rows, source = 'CROSSELLING') {
       <td><strong>${totalDocQty}</strong></td>
       <td colspan="3"></td>
       <td class="font-bold">${formatRupiah(totalDocVal)}</td>
-      <td></td>
+      <td colspan="3"></td>
     </tr>
   `;
 
@@ -2453,7 +2491,7 @@ function renderAuditPage() {
   document.getElementById('btnAuditNext').disabled = auditCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data audit AR yang sesuai filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data audit AR yang sesuai filter.</td></tr>`;
     return;
   }
 
@@ -2466,9 +2504,9 @@ function renderAuditPage() {
     const displayWA = formatPhoneDisplay(rawWA);
 
     const waHtml = (normWA && normWA.length >= 8) ? `
-      <div style="display:flex; align-items:center; gap:6px;">
+      <div style="display:flex; align-items:center; gap:4px;">
         <span class="font-bold">${displayWA}</span>
-        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:2px 7px; font-size:0.7rem;" title="Chat customer ini di WhatsApp">
+        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:1px 5px; font-size:0.68rem;" title="Chat customer ini di WhatsApp">
           💬 WA
         </a>
       </div>
@@ -2482,15 +2520,15 @@ function renderAuditPage() {
       const qty = Number(it['Quantity']) || 1;
       const dendaStatus = getItemPotensiDenda(it);
       const dendaBadge = dendaStatus === 'DENDA'
-        ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.65rem; padding:1px 5px; flex-shrink:0;">🚨 DENDA</span>`
-        : `<span class="kpi-badge badge-ink" style="font-size:0.65rem; padding:1px 5px; flex-shrink:0;">PASS</span>`;
+        ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.64rem; padding:1px 4px; flex-shrink:0;">🚨 DENDA</span>`
+        : `<span class="kpi-badge badge-ink" style="font-size:0.64rem; padding:1px 4px; flex-shrink:0;">PASS</span>`;
 
       return `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px; font-size:0.75rem; line-height:1.3; background:rgba(0,0,0,0.02); padding:3px 6px; border-radius:6px; border:1px solid rgba(0,0,0,0.04);">
-          <span style="color:${isSos ? '#15803d' : '#b91c1c'}; font-weight:${isSos ? 'normal' : '700'}; word-break:break-word;">
-            ${isSos ? '✅' : '❌'} ${desc} (Qty: ${qty})
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:3px; font-size:0.71rem; line-height:1.2; background:rgba(0,0,0,0.02); padding:2px 4px; border-radius:4px; border:1px solid rgba(0,0,0,0.04);">
+          <span style="color:${isSos ? '#15803d' : '#b91c1c'}; font-weight:${isSos ? '600' : '700'}; word-break:break-word; flex:1; min-width:0;">
+            ${isSos ? '✅' : '❌'} ${desc} (${qty})
           </span>
-          <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
             ${dendaBadge}
             <button class="btn-copy-item-sm" onclick="event.stopPropagation(); copyAuditItemToClipboard(${auditRowIdx}, ${itemIdx}, this)" title="Salin item ini ke format 12 kolom Excel (tanpa header)">
               📋 Copy
@@ -2502,32 +2540,27 @@ function renderAuditPage() {
 
     // Status Badge
     const statusBadge = r.status === 'ALL_MISSING'
-      ? `<span class="status-badge badge-crimson font-bold" style="white-space:nowrap;">❌ 100% Offline (Belum Sosmed)</span>`
-      : `<span class="status-badge badge-gold font-bold" style="white-space:nowrap;">⚠️ Sebagian Belum (${r.missingItems}/${r.totalItems} Item)</span>`;
+      ? `<span class="status-badge badge-crimson font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">❌ 100% Offline</span>`
+      : `<span class="status-badge badge-gold font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">⚠️ Sebagian (${r.missingItems}/${r.totalItems})</span>`;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="col-sticky">${globalIdx}</td>
-      <td class="text-left">
+      <td class="col-sticky audit-col-no">${globalIdx}</td>
+      <td class="text-left audit-col-doc">
         <span class="font-bold text-crimson cursor-pointer" onclick="openARDetailModalFromAudit(${auditRowIdx})" title="Klik untuk cek detail & lapor Akmal">
           📄 ${r.doc}
         </span>
       </td>
-      <td class="text-left">
+      <td class="text-left audit-col-date">
         <div>${formatCrosellingDate(r.postingDate)}</div>
-        <span class="kpi-badge badge-ink" style="font-size:0.7rem; margin-top:3px;">${r.cabang || '-'}</span>
+        <span class="kpi-badge badge-ink" style="font-size:0.66rem; margin-top:2px; padding:1px 4px;">${r.cabang || '-'}</span>
       </td>
-      <td class="text-left font-bold">${keepObj['Nama'] || '-'}</td>
-      <td class="text-left">${waHtml}</td>
-      <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${keepObj['Kode Sosmed'] || '-'}</span></td>
-      <td class="text-left font-bold" style="color:var(--ink);">${keepObj['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="min-width:280px; white-space:normal; font-size:0.73rem;">${itemsBadges || '-'}</td>
-      <td class="text-center">${statusBadge}</td>
-      <td class="text-center">
-        <button class="btn btn-crimson btn-sm" onclick="openARDetailModalFromAudit(${auditRowIdx})" style="padding:4px 10px; font-size:0.78rem; white-space:nowrap;">
-          🚨 Cek & Lapor AR
-        </button>
-      </td>
+      <td class="text-left font-bold audit-col-cust">${keepObj['Nama'] || '-'}</td>
+      <td class="text-left audit-col-wa">${waHtml}</td>
+      <td class="text-left audit-col-sosmed"><span class="kpi-badge badge-crimson font-bold" style="font-size:0.68rem; padding:1px 4px;">${keepObj['Kode Sosmed'] || '-'}</span></td>
+      <td class="text-left font-bold audit-col-keep" style="color:var(--ink);">${keepObj['Barang Keep'] || '-'}</td>
+      <td class="text-left audit-col-items" style="white-space:normal; font-size:0.71rem;">${itemsBadges || '-'}</td>
+      <td class="text-center audit-col-status">${statusBadge}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2786,6 +2819,76 @@ async function copyModalSelectedItems(btnElement = null) {
       }, 1500);
     }
   } catch (err) {
+    alert("Gagal menyalin: " + err.message);
+  }
+}
+
+function findKeepForARItem(item, docNumber = null) {
+  const doc = docNumber || (item ? item['Document Number'] : '') || '';
+  const digitsOnly = String(doc).replace(/\D/g, '');
+  const rawWA = item ? (item['No HP Customer'] || '') : '';
+  const normWA = normalizePhone(rawWA);
+
+  let matched = null;
+  if (rawKeepRows && rawKeepRows.length > 0) {
+    if (digitsOnly) {
+      matched = rawKeepRows.find(k => String(k['REPORT AR'] || '').replace(/\D/g, '') === digitsOnly);
+    }
+    if (!matched && normWA && normWA.length >= 8) {
+      matched = rawKeepRows.find(k => normalizePhone(k['Nomor WA']) === normWA);
+    }
+  }
+
+  // Fallback: If not found in rawKeepRows (e.g. offline customer), build fallback keep object
+  if (!matched) {
+    matched = {
+      'PERIODE': 'Oktober-26',
+      'Nomor WA': rawWA,
+      'Nama': (item && (item['Name'] || item['Customer/Vendor Name'])) || '-',
+      'Barang Keep': (item && (item['Dscription'] || item['Item/Service Description'])) || '-',
+      'Kode Sosmed': '-',
+      'Sender': '-',
+      'Tanggal Ambil': '-',
+      'Catatan': (item && item['Remarks']) || ''
+    };
+  }
+  return matched;
+}
+
+async function copyARSearchItemToClipboard(rowIdx, btnElement = null) {
+  if (!currentARSearchResults || !currentARSearchResults[rowIdx]) {
+    alert("Data item tidak ditemukan.");
+    return;
+  }
+  const item = currentARSearchResults[rowIdx];
+  const docNum = item['Document Number'] || currentARSearchDoc || '';
+  const matchedKeep = findKeepForARItem(item, docNum);
+
+  const auditItem = {
+    doc: docNum,
+    postingDate: item['Posting Date'],
+    cabang: item['Cabang'] || item['SalesCabang'] || '-',
+    items: [item],
+    keep: matchedKeep
+  };
+
+  const tsvText = generateAuditItemTSV(auditItem, item);
+  try {
+    await writeTextToClipboard(tsvText);
+    const itemName = item['Dscription'] || item['Item/Service Description'] || `Item #${rowIdx + 1}`;
+    showSaveToast(`📋 Rekap "${itemName}" berhasil disalin! Format 12 kolom siap di-paste ke Excel.`);
+
+    if (btnElement) {
+      const origText = btnElement.innerHTML;
+      btnElement.innerHTML = '✅ Tersalin!';
+      btnElement.classList.add('btn-copied-pulse');
+      setTimeout(() => {
+        btnElement.innerHTML = origText;
+        btnElement.classList.remove('btn-copied-pulse');
+      }, 1500);
+    }
+  } catch (err) {
+    console.error("Gagal menyalin:", err);
     alert("Gagal menyalin: " + err.message);
   }
 }
