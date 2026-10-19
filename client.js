@@ -2426,7 +2426,8 @@ function applyAuditFilters() {
     // 5. Keyword search
     if (keyword) {
       const itemsText = r.items.map(it => it['Dscription'] || '').join(' ');
-      const combined = `${r.doc} ${r.keep['Nama'] || ''} ${r.keep['Nomor WA'] || ''} ${r.keep['Barang Keep'] || ''} ${r.cabang || ''} ${itemsText}`.toLowerCase();
+      const arRemarks = (r.items && r.items[0] && r.items[0]['Remarks']) || '';
+      const combined = `${r.doc} ${r.keep['Nama'] || ''} ${r.keep['Nomor WA'] || ''} ${r.keep['Barang Keep'] || ''} ${r.keep['Catatan'] || ''} ${arRemarks} ${r.cabang || ''} ${itemsText}`.toLowerCase();
       if (!combined.includes(keyword)) return false;
     }
 
@@ -2491,7 +2492,7 @@ function renderAuditPage() {
   document.getElementById('btnAuditNext').disabled = auditCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data audit AR yang sesuai filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data audit AR yang sesuai filter.</td></tr>`;
     return;
   }
 
@@ -2543,6 +2544,22 @@ function renderAuditPage() {
       ? `<span class="status-badge badge-crimson font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">❌ 100% Offline</span>`
       : `<span class="status-badge badge-gold font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">⚠️ Sebagian (${r.missingItems}/${r.totalItems})</span>`;
 
+    // Notes HTML (Keep Catatan and/or Cashier Remarks)
+    const keepCatatan = String(keepObj['Catatan'] || '').trim();
+    const arRemarks = String((r.items && r.items[0] && r.items[0]['Remarks']) || '').trim();
+
+    let catatanHtml = '-';
+    if (keepCatatan && arRemarks && keepCatatan.toLowerCase() !== arRemarks.toLowerCase()) {
+      catatanHtml = `
+        <div style="font-size:0.71rem; line-height:1.25; color:var(--ink); word-break:break-word;">${keepCatatan}</div>
+        <div style="font-size:0.66rem; color:var(--text-muted); margin-top:2px; word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>
+      `;
+    } else if (keepCatatan) {
+      catatanHtml = `<div style="font-size:0.71rem; line-height:1.25; color:var(--ink); word-break:break-word;">${keepCatatan}</div>`;
+    } else if (arRemarks) {
+      catatanHtml = `<div style="font-size:0.70rem; line-height:1.25; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-sticky audit-col-no">${globalIdx}</td>
@@ -2559,6 +2576,7 @@ function renderAuditPage() {
       <td class="text-left audit-col-wa">${waHtml}</td>
       <td class="text-left audit-col-sosmed"><span class="kpi-badge badge-crimson font-bold" style="font-size:0.68rem; padding:1px 4px;">${keepObj['Kode Sosmed'] || '-'}</span></td>
       <td class="text-left font-bold audit-col-keep" style="color:var(--ink);">${keepObj['Barang Keep'] || '-'}</td>
+      <td class="text-left audit-col-notes" style="white-space:normal;">${catatanHtml}</td>
       <td class="text-left audit-col-items" style="white-space:normal; font-size:0.71rem;">${itemsBadges || '-'}</td>
       <td class="text-center audit-col-status">${statusBadge}</td>
     `;

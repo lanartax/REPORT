@@ -3514,13 +3514,14 @@ h1, h2, h3, h4, h5, h6,
   white-space: nowrap !important;
 }
 
-#auditTable .audit-col-no { width: 3.2%; text-align: center; }
-#auditTable .audit-col-doc { width: 8.8%; }
-#auditTable .audit-col-date { width: 8.5%; }
-#auditTable .audit-col-cust { width: 10.5%; }
-#auditTable .audit-col-wa { width: 11.5%; }
-#auditTable .audit-col-sosmed { width: 8.5%; }
-#auditTable .audit-col-keep { width: 19.5%; }
-#auditTable .audit-col-items { width: 20.5%; }
-#auditTable .audit-col-status { width: 9%; text-align: center; }
+#auditTable .audit-col-no { width: 3%; text-align: center; }
+#auditTable .audit-col-doc { width: 8.5%; }
+#auditTable .audit-col-date { width: 8%; }
+#auditTable .audit-col-cust { width: 9.5%; }
+#auditTable .audit-col-wa { width: 10.5%; }
+#auditTable .audit-col-sosmed { width: 7.5%; }
+#auditTable .audit-col-keep { width: 14%; }
+#auditTable .audit-col-notes { width: 14%; }
+#auditTable .audit-col-items { width: 17%; }
+#auditTable .audit-col-status { width: 8%; text-align: center; }
 
