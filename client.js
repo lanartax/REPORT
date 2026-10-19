@@ -759,6 +759,7 @@ function renderReport2Tables(picStats, activePICs) {
 
   let sumTarget = 0, sumAch = 0, sumTargetGP = 0, sumAcvGP = 0;
   let sumGadget = 0, sumCross = 0;
+  const tg = (typeof timegonePct === 'number' && timegonePct > 0) ? timegonePct : 100;
 
   activePICs.forEach(pic => {
     const s = picStats[pic];
@@ -772,7 +773,6 @@ function renderReport2Tables(picStats, activePICs) {
     // Ratio & Status based on Excel formula:
     // Ratio = (Achievement% / Timegone%) * 100
     // If Ratio < 80% => ☠️, If Ratio < 90% => 💔, Else => 🖤
-    const tg = (typeof timegonePct === 'number' && timegonePct > 0) ? timegonePct : 100;
 
     // Omzet % and status
     const pctOmzet = s.target > 0 ? (s.pencapaian / s.target) * 100 : 0;
@@ -2459,7 +2459,9 @@ function renderAuditPage() {
 
   pageRows.forEach((r, i) => {
     const globalIdx = startIdx + i + 1;
-    const rawWA = String(r.keep['Nomor WA'] || '').replace(/\D/g, '');
+    const auditRowIdx = startIdx + i;
+    const keepObj = r.keep || {};
+    const rawWA = String(keepObj['Nomor WA'] || '').replace(/\D/g, '');
     const normWA = normalizePhone(rawWA);
     const displayWA = formatPhoneDisplay(rawWA);
 
@@ -2473,9 +2475,10 @@ function renderAuditPage() {
     ` : (displayWA || '-');
 
     // Products breakdown badges with individual item copy button
-    const itemsBadges = r.items.map((it, itemIdx) => {
+    const items = Array.isArray(r.items) ? r.items : [];
+    const itemsBadges = items.map((it, itemIdx) => {
       const isSos = isItemInputSosmed(it);
-      const desc = it['Dscription'] || '-';
+      const desc = it['Dscription'] || it['Item/Service Description'] || '-';
       const qty = Number(it['Quantity']) || 1;
       const dendaStatus = getItemPotensiDenda(it);
       const dendaBadge = dendaStatus === 'DENDA'
@@ -2502,7 +2505,6 @@ function renderAuditPage() {
       ? `<span class="status-badge badge-crimson font-bold" style="white-space:nowrap;">❌ 100% Offline (Belum Sosmed)</span>`
       : `<span class="status-badge badge-gold font-bold" style="white-space:nowrap;">⚠️ Sebagian Belum (${r.missingItems}/${r.totalItems} Item)</span>`;
 
-    const auditRowIdx = startIdx + i;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-sticky">${globalIdx}</td>
@@ -2515,11 +2517,11 @@ function renderAuditPage() {
         <div>${formatCrosellingDate(r.postingDate)}</div>
         <span class="kpi-badge badge-ink" style="font-size:0.7rem; margin-top:3px;">${r.cabang || '-'}</span>
       </td>
-      <td class="text-left font-bold">${r.keep['Nama'] || '-'}</td>
+      <td class="text-left font-bold">${keepObj['Nama'] || '-'}</td>
       <td class="text-left">${waHtml}</td>
-      <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r.keep['Kode Sosmed'] || '-'}</span></td>
-      <td class="text-left font-bold" style="color:var(--ink);">${r.keep['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="min-width:280px; white-space:normal; font-size:0.73rem;">${itemsBadges}</td>
+      <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${keepObj['Kode Sosmed'] || '-'}</span></td>
+      <td class="text-left font-bold" style="color:var(--ink);">${keepObj['Barang Keep'] || '-'}</td>
+      <td class="text-left" style="min-width:280px; white-space:normal; font-size:0.73rem;">${itemsBadges || '-'}</td>
       <td class="text-center">${statusBadge}</td>
       <td class="text-center">
         <button class="btn btn-crimson btn-sm" onclick="openARDetailModalFromAudit(${auditRowIdx})" style="padding:4px 10px; font-size:0.78rem; white-space:nowrap;">
