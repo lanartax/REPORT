@@ -1328,8 +1328,10 @@
                   <th>QTY</th>
                   <th>HARGA SATUAN</th>
                   <th>TOTAL</th>
-                  <th class="text-left" style="min-width: 200px;">SALES EMPLOYEE TERINPUT</th>
+                  <th class="text-left" style="min-width: 180px;">SALES EMPLOYEE TERINPUT</th>
                   <th class="text-center">STATUS SOSMED</th>
+                  <th class="text-center" style="width: 100px;">POTENSI DENDA</th>
+                  <th class="text-center" style="width: 110px;">SALIN EXCEL</th>
                 </tr>
               </thead>
               <tbody id="modalItemsTableBody"></tbody>
@@ -1337,7 +1339,10 @@
             </table>
           </div>
 
-          <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+          <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <button class="btn btn-outline" onclick="copyModalSelectedItems(this)" style="font-weight: 700; border: 1.5px solid #0f172a;" title="Salin semua item yang dicentang ke format 12 kolom Excel (tanpa header)">
+              📋 Salin Item Tercentang (Format Excel)
+            </button>
             <button class="btn btn-crimson" onclick="switchModalSubTab(2)">
               🚨 Laporkan Ada yang Belum Terinput / Salah ke Akmal &raquo;
             </button>

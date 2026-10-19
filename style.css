@@ -3448,8 +3448,32 @@ h1, h2, h3, h4, h5, h6,
   letter-spacing: -0.01em;
 }
 
-
-
-
-
-
+/* Audit AR Item Copy Buttons */
+.btn-copy-item-sm {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1.5px solid #0f172a;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
+}
+.btn-copy-item-sm:hover {
+  background: #f1f5f9;
+  border-color: #be123c;
+  color: #be123c;
+  transform: translateY(-1px);
+}
+.btn-copy-item-sm.copied,
+.btn-copied-pulse {
+  background: #059669 !important;
+  color: #ffffff !important;
+  border-color: #047857 !important;
+}

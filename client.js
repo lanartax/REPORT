@@ -288,12 +288,43 @@ function resolveTurnoverSheet(workbook) {
   return workbook.Sheets[workbook.SheetNames[0]];
 }
 
+// Helper untuk membaca data turnover secara cepat & hemat memori (mencegah crash/OOM peramban pada file >50MB)
+function readTurnoverJsonFromBuffer(arrayBuffer) {
+  let targetSheetName = 'TARIKKAN';
+  try {
+    const metaWb = XLSX.read(arrayBuffer, { type: 'array', bookSheets: true });
+    if (metaWb && Array.isArray(metaWb.SheetNames) && metaWb.SheetNames.length > 0) {
+      if (metaWb.SheetNames.includes('TARIKKAN')) targetSheetName = 'TARIKKAN';
+      else if (metaWb.SheetNames.includes('Sheet1')) targetSheetName = 'Sheet1';
+      else targetSheetName = metaWb.SheetNames[0];
+    }
+  } catch (e) {
+    console.warn('Meta read error:', e);
+  }
+
+  try {
+    const wb = XLSX.read(arrayBuffer, {
+      type: 'array',
+      sheets: [targetSheetName],
+      cellFormula: false,
+      cellHTML: false,
+      cellText: false
+    });
+    const sheet = wb.Sheets[targetSheetName];
+    if (sheet) return XLSX.utils.sheet_to_json(sheet);
+  } catch (err) {
+    console.warn('Optimized read failed, fallback to standard read:', err);
+  }
+
+  const standardWb = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheet = resolveTurnoverSheet(standardWb);
+  return XLSX.utils.sheet_to_json(sheet);
+}
+
 // 2. PARSER ENGINE FOR turnover.xlsx (Achievement DPP)
 function parseTurnoverBuffer(arrayBuffer) {
   try {
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheet = resolveTurnoverSheet(workbook);
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
+    const jsonData = readTurnoverJsonFromBuffer(arrayBuffer);
 
     if (!jsonData || jsonData.length === 0) return;
     rawTurnoverRows = jsonData;
@@ -352,9 +383,7 @@ function updateDatabaseStatus() {
 // SMART FILE UPLOAD HANDLER (WITH INDEXEDDB PERSISTENCE & LIVE INDICATOR)
 async function parseExcelFile(arrayBuffer, fileName = '') {
   try {
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const sheet = resolveTurnoverSheet(workbook);
-    const jsonData = XLSX.utils.sheet_to_json(sheet);
+    const jsonData = readTurnoverJsonFromBuffer(arrayBuffer);
 
     if (!jsonData || jsonData.length === 0) {
       alert("File Excel kosong atau tidak memiliki data.");
@@ -1039,6 +1068,15 @@ function setReportViewMode(mode) {
 // AUTO-SAVE EXCEL TO SERVER FOR LAN PERSISTENCE
 async function saveExcelToServer(arrayBuffer, type = 'turnover') {
   try {
+    // Vercel serverless functions memiliki batas payload maksimal 4.5 MB.
+    // Jika file berukuran besar (> 4MB seperti KPI SOSMED 53MB), simpan lokal di browser (IndexedDB)
+    // dan lewati upload serverless untuk mencegah error 413 Payload Too Large.
+    if (arrayBuffer.byteLength > 4 * 1024 * 1024) {
+      console.log(`File ${(arrayBuffer.byteLength / 1024 / 1024).toFixed(1)} MB disimpan di IndexedDB browser (melebihi limit 4.5MB serverless Vercel).`);
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return;
+      }
+    }
     const res = await fetch(`/api/save-excel?type=${encodeURIComponent(type)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -1960,9 +1998,18 @@ function renderModalItemsTable() {
     totalVal += subtotal;
 
     const isSosmed = isItemInputSosmed(r);
+    const schl = String(r['SC/HL Code'] || '').trim();
+    const slp = String(r['SlpName'] || '').trim();
+    const emp = String(r['Sales Employee Name'] || '').trim();
     const empDisplay = schl || slp || emp || '-';
 
     const isChecked = currentModalCheckedItems.has(idx);
+
+    // Potensi Denda: Handphone = DENDA, Aksesoris/lainnya = PASS
+    const dendaStatus = getItemPotensiDenda(r);
+    const dendaBadge = dendaStatus === 'DENDA'
+      ? '<span class="kpi-badge badge-crimson font-bold">🚨 DENDA</span>'
+      : '<span class="kpi-badge badge-ink">PASS</span>';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1980,6 +2027,12 @@ function renderModalItemsTable() {
           ? '<span class="status-badge badge-accent">✅ Sudah Sosmed</span>'
           : '<span class="status-badge badge-crimson font-bold">❌ Belum Sosmed</span>'}
       </td>
+      <td class="text-center">${dendaBadge}</td>
+      <td class="text-center">
+        <button class="btn btn-outline btn-xs" onclick="copyModalSingleItem(${idx}, this)" style="padding: 3px 8px; font-size: 0.74rem; font-weight:700;" title="Salin baris item ini ke format 12 kolom Excel (tanpa header)">
+          📋 Copy Rekap
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -1990,7 +2043,7 @@ function renderModalItemsTable() {
       <td><strong>${totalQty}</strong></td>
       <td>-</td>
       <td class="font-bold">${formatRupiah(totalVal)}</td>
-      <td colspan="2" class="text-left font-bold text-accent">${currentModalRows.length} Baris Produk</td>
+      <td colspan="4" class="text-left font-bold text-accent">${currentModalRows.length} Baris Produk</td>
     </tr>
   `;
 
@@ -2419,14 +2472,29 @@ function renderAuditPage() {
       </div>
     ` : (displayWA || '-');
 
-    // Products breakdown badges
-    const itemsBadges = r.items.map(it => {
+    // Products breakdown badges with individual item copy button
+    const itemsBadges = r.items.map((it, itemIdx) => {
       const isSos = isItemInputSosmed(it);
       const desc = it['Dscription'] || '-';
       const qty = Number(it['Quantity']) || 1;
-      return isSos
-        ? `<div style="font-size:0.75rem; color:#15803d; line-height:1.4;">✅ ${desc} (Qty: ${qty})</div>`
-        : `<div style="font-size:0.75rem; color:#b91c1c; font-weight:700; line-height:1.4;">❌ ${desc} (Qty: ${qty})</div>`;
+      const dendaStatus = getItemPotensiDenda(it);
+      const dendaBadge = dendaStatus === 'DENDA'
+        ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.65rem; padding:1px 5px; flex-shrink:0;">🚨 DENDA</span>`
+        : `<span class="kpi-badge badge-ink" style="font-size:0.65rem; padding:1px 5px; flex-shrink:0;">PASS</span>`;
+
+      return `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px; font-size:0.75rem; line-height:1.3; background:rgba(0,0,0,0.02); padding:3px 6px; border-radius:6px; border:1px solid rgba(0,0,0,0.04);">
+          <span style="color:${isSos ? '#15803d' : '#b91c1c'}; font-weight:${isSos ? 'normal' : '700'}; word-break:break-word;">
+            ${isSos ? '✅' : '❌'} ${desc} (Qty: ${qty})
+          </span>
+          <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+            ${dendaBadge}
+            <button class="btn-copy-item-sm" onclick="event.stopPropagation(); copyAuditItemToClipboard(${auditRowIdx}, ${itemIdx}, this)" title="Salin item ini ke format 12 kolom Excel (tanpa header)">
+              📋 Copy
+            </button>
+          </div>
+        </div>
+      `;
     }).join('');
 
     // Status Badge
@@ -2451,7 +2519,7 @@ function renderAuditPage() {
       <td class="text-left">${waHtml}</td>
       <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r.keep['Kode Sosmed'] || '-'}</span></td>
       <td class="text-left font-bold" style="color:var(--ink);">${r.keep['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="max-width:160px; white-space:normal; font-size:0.73rem;">${itemsBadges}</td>
+      <td class="text-left" style="min-width:280px; white-space:normal; font-size:0.73rem;">${itemsBadges}</td>
       <td class="text-center">${statusBadge}</td>
       <td class="text-center">
         <button class="btn btn-crimson btn-sm" onclick="openARDetailModalFromAudit(${auditRowIdx})" style="padding:4px 10px; font-size:0.78rem; white-space:nowrap;">
@@ -2467,6 +2535,257 @@ function openARDetailModalFromAudit(auditIndex) {
   const auditItem = filteredAuditARList[auditIndex];
   if (!auditItem) return;
   openARDetailModal(auditItem.doc, auditItem.keep);
+}
+
+// ==========================================================================
+// AUDIT AR ITEM CLIPBOARD EXPORT ENGINE (12 KOLOM EXCEL TANPA HEADER)
+// ==========================================================================
+
+function isHandphoneProduct(item) {
+  if (!item) return false;
+  const desc = String(item['Dscription'] || item['Item/Service Description'] || '').trim().toUpperCase();
+  const grp = String(item['ItmsGrpNam'] || item['Group Name'] || item['Group'] || '').trim().toUpperCase();
+
+  // Aksesoris / Jasa / Opr / Bukan Unit Handphone
+  const isAcc = desc.startsWith('SG ') || desc.includes('TMPR') || desc.includes('CASE ') || 
+                desc.includes('CASING') || desc.includes('TEMPERED') || desc.includes('HYDROGEL') || 
+                desc.includes('ADAPTOR') || desc.includes('CABLE') || desc.includes('KABEL') || 
+                desc.includes('CHARGER') || desc.includes('TWS') || desc.includes('HEADSET') || 
+                desc.includes('EARBUDS') || desc.includes('POWERBANK') || desc.includes('SPEAKER') ||
+                desc.includes('MEMORY') || desc.includes('STRAP') || desc.includes('HOLDER') ||
+                desc.includes('KARTU') || desc.startsWith('TM ') || desc.includes('GMART CARE') ||
+                desc.includes('SERVICE') || desc.includes('JASA') || grp.startsWith('ACC') || grp.startsWith('OPR');
+  if (isAcc) return false;
+
+  if (grp.startsWith('GAD') || grp.includes('GADGET') || grp.includes('HANDPHONE') || grp.includes('SMARTPHONE')) {
+    return true;
+  }
+
+  const phoneKeywords = [
+    'IPHONE', 'GALAXY', 'SAMSUNG R', 'SAMSUNG A', 'SAMSUNG S', 'SAMSUNG Z',
+    'OPPO A', 'OPPO RENO', 'OPPO FIND', 'VIVO Y', 'VIVO V', 'VIVO X',
+    'REDMI', 'XIAOMI', 'POCO', 'REALME', 'INFINIX', 'TECNO', 'ITEL',
+    'SMARTPHONE', 'HANDPHONE'
+  ];
+  return phoneKeywords.some(k => desc.includes(k));
+}
+
+function getItemPotensiDenda(item) {
+  return isHandphoneProduct(item) ? 'DENDA' : 'PASS';
+}
+
+function formatKeepTextForClipboard(keep) {
+  if (!keep) return '-';
+  const tagSender = keep['Sender'] ? `@${keep['Sender']}` : '';
+  const nama = keep['Nama'] || '-';
+  const rawWa = keep['Nomor WA'] || '-';
+  const cleanWa = String(rawWa).replace(/\D/g, '');
+  const barang = keep['Barang Keep'] || '-';
+  const tglAmbil = keep['Tanggal Ambil'] || '-';
+  const catatan = keep['Catatan'] || '';
+
+  const lines = [];
+  if (tagSender) lines.push(tagSender);
+  lines.push('*Format Keep*');
+  lines.push(`Nama: ${nama}`);
+  lines.push(`Nomor WA: ${cleanWa}`);
+  lines.push(`Barang keep: ${barang}`);
+  lines.push(`Tanggal pengambilan: ${tglAmbil}`);
+  lines.push(`Catatan: ${catatan}`);
+
+  return lines.join('\n');
+}
+
+function generateAuditItemTSV(auditItem, item) {
+  if (!auditItem || !item) return '';
+
+  // 1. TANGGAL (format DD/MM/YYYY)
+  const tgl = formatCrosellingDate(auditItem.postingDate);
+
+  // 2. PERIODE (e.g. Oktober-26)
+  const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
+    ? String(auditItem.keep['PERIODE']).trim() 
+    : 'Oktober-26';
+
+  // 3. NO AR
+  const noAR = String(auditItem.doc || '').trim();
+
+  // 4. NO.HP USER
+  const rawHp = (auditItem.keep && auditItem.keep['Nomor WA']) 
+    ? auditItem.keep['Nomor WA'] 
+    : (auditItem.items && auditItem.items[0] && auditItem.items[0]['No HP Customer'] ? auditItem.items[0]['No HP Customer'] : '');
+  const noHP = String(rawHp).replace(/\D/g, '');
+
+  // 5. KODE SOSMED
+  const kodeSosmed = (auditItem.keep && auditItem.keep['Kode Sosmed']) 
+    ? String(auditItem.keep['Kode Sosmed']).trim() 
+    : '-';
+
+  // 6. PIC SOSMED
+  let picSosmed = (auditItem.keep && auditItem.keep['Sender']) 
+    ? String(auditItem.keep['Sender']).trim() 
+    : '';
+  if (!picSosmed && kodeSosmed && typeof getMasterSales === 'function') {
+    const m = getMasterSales().find(x => kodeSosmed.includes(x.code) || kodeSosmed.includes(x.name));
+    if (m) picSosmed = m.name;
+  }
+  if (!picSosmed) picSosmed = '-';
+
+  // 7. CABANG
+  const cabang = String(auditItem.cabang || (auditItem.items && auditItem.items[0] ? auditItem.items[0]['Cabang'] : '') || '-').trim();
+
+  // 8. POTENSI DENDA (HP = DENDA, Aksesoris/lainnya = PASS)
+  const potensiDenda = getItemPotensiDenda(item);
+
+  // 9. BARANG (Item description yang dibeli di faktur AR)
+  const namaBarang = String(item['Dscription'] || item['Item/Service Description'] || '-').trim();
+
+  // 10. KEEP (Format Keep WhatsApp lengkap dibungkus kutip dua untuk in-cell newline di Excel)
+  const rawKeepText = formatKeepTextForClipboard(auditItem.keep);
+  const keepEscaped = `"${rawKeepText.replace(/"/g, '""')}"`;
+
+  // 11. EVIDENCE (dikosongin sesuai permintaan)
+  const evidence = '';
+
+  // 12. AR SALES EMPLOYEE (tim toko offline yang menginput di AR)
+  const salesOffline = String(item['SC/HL Code'] || item['SlpName'] || item['Sales Employee Name'] || item['User Input'] || '-').trim();
+
+  return [
+    tgl,
+    periode,
+    noAR,
+    noHP,
+    kodeSosmed,
+    picSosmed,
+    cabang,
+    potensiDenda,
+    namaBarang,
+    keepEscaped,
+    evidence,
+    salesOffline
+  ].join('\t');
+}
+
+async function writeTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) resolve();
+      else reject(new Error('execCommand copy failed'));
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+async function copyAuditItemToClipboard(auditIndex, itemIndex, btnElement = null) {
+  const auditItem = filteredAuditARList[auditIndex];
+  if (!auditItem || !auditItem.items || !auditItem.items[itemIndex]) {
+    alert("Data item audit AR tidak ditemukan.");
+    return;
+  }
+
+  const item = auditItem.items[itemIndex];
+  const tsvText = generateAuditItemTSV(auditItem, item);
+
+  try {
+    await writeTextToClipboard(tsvText);
+    const itemName = item['Dscription'] || `Item #${itemIndex + 1}`;
+    showSaveToast(`📋 Rekap "${itemName}" berhasil disalin! Format 12 kolom siap di-paste ke Excel.`);
+
+    if (btnElement) {
+      const origText = btnElement.innerHTML;
+      btnElement.innerHTML = '✅ Tersalin!';
+      btnElement.classList.add('btn-copied-pulse');
+      setTimeout(() => {
+        btnElement.innerHTML = origText;
+        btnElement.classList.remove('btn-copied-pulse');
+      }, 1500);
+    }
+  } catch (err) {
+    console.error("Gagal menyalin:", err);
+    alert("Gagal menyalin ke clipboard: " + err.message);
+  }
+}
+
+async function copyModalSingleItem(itemIndex, btnElement = null) {
+  if (!currentModalRows || !currentModalRows[itemIndex]) return;
+  const item = currentModalRows[itemIndex];
+  const auditItem = {
+    doc: currentModalDoc,
+    postingDate: item['Posting Date'],
+    cabang: item['Cabang'],
+    items: currentModalRows,
+    keep: currentModalKeep
+  };
+
+  const tsvText = generateAuditItemTSV(auditItem, item);
+  try {
+    await writeTextToClipboard(tsvText);
+    const itemName = item['Dscription'] || `Item #${itemIndex + 1}`;
+    showSaveToast(`📋 Rekap "${itemName}" berhasil disalin! Format 12 kolom siap di-paste ke Excel.`);
+
+    if (btnElement) {
+      const origText = btnElement.innerHTML;
+      btnElement.innerHTML = '✅ Tersalin!';
+      btnElement.classList.add('btn-copied-pulse');
+      setTimeout(() => {
+        btnElement.innerHTML = origText;
+        btnElement.classList.remove('btn-copied-pulse');
+      }, 1500);
+    }
+  } catch (err) {
+    alert("Gagal menyalin: " + err.message);
+  }
+}
+
+async function copyModalSelectedItems(btnElement = null) {
+  if (currentModalCheckedItems.size === 0) {
+    alert("Silakan centang minimal 1 item produk yang ingin disalin.");
+    return;
+  }
+
+  const lines = [];
+  Array.from(currentModalCheckedItems).sort((a,b)=>a-b).forEach(idx => {
+    const item = currentModalRows[idx];
+    const auditItem = {
+      doc: currentModalDoc,
+      postingDate: item['Posting Date'],
+      cabang: item['Cabang'],
+      items: currentModalRows,
+      keep: currentModalKeep
+    };
+    lines.push(generateAuditItemTSV(auditItem, item));
+  });
+
+  const fullText = lines.join('\n');
+  try {
+    await writeTextToClipboard(fullText);
+    showSaveToast(`📋 ${lines.length} baris item berhasil disalin! Format 12 kolom siap di-paste ke Excel.`);
+
+    if (btnElement) {
+      const origText = btnElement.innerHTML;
+      btnElement.innerHTML = '✅ Tersalin!';
+      btnElement.classList.add('btn-copied-pulse');
+      setTimeout(() => {
+        btnElement.innerHTML = origText;
+        btnElement.classList.remove('btn-copied-pulse');
+      }, 1500);
+    }
+  } catch (err) {
+    alert("Gagal menyalin: " + err.message);
+  }
 }
 
 // ==========================================================================
@@ -3995,15 +4314,15 @@ function filterTableDate(query) {
 function handleTurnoverFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
+  const fileSizeMb = (file.size / (1024 * 1024)).toFixed(1);
+  showSaveToast(`⏳ Sedang membaca file Excel (${fileSizeMb} MB)... Mohon tunggu beberapa detik.`);
   const reader = new FileReader();
   reader.onload = async (evt) => {
     try {
       const buffer = evt.target.result;
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheet = resolveTurnoverSheet(workbook);
-      const jsonData = XLSX.utils.sheet_to_json(sheet);
+      const jsonData = readTurnoverJsonFromBuffer(buffer);
       if (!jsonData || jsonData.length === 0) {
-        alert("File Excel turnover kosong atau tidak terbaca!");
+        alert("File Excel turnover kosong atau sheet transaksi tidak terbaca!");
         return;
       }
       rawTurnoverRows = jsonData;
@@ -4014,10 +4333,10 @@ function handleTurnoverFileSelect(e) {
       updateTurnoverIndicator(`File turnover terupdate per ${updateTs}`);
       saveExcelToServer(buffer, 'turnover');
       processAllReports();
-      alert(`✅ Berhasil mengunggah file turnover.xlsx (${jsonData.length.toLocaleString('id-ID')} baris transaksi)!\nDashboard & Laporan Pencapaian telah diperbarui dan data tersimpan permanen.`);
+      alert(`✅ Berhasil mengunggah file turnover (${jsonData.length.toLocaleString('id-ID')} baris transaksi)!\nDashboard & Laporan Pencapaian telah diperbarui dan data tersimpan permanen.`);
     } catch (err) {
       console.error("Gagal membaca file turnover:", err);
-      alert("Gagal membaca file Excel turnover. Pastikan format file valid.");
+      alert(`Gagal membaca file Excel turnover: ${err.message || 'Format file atau memori peramban tidak mencukupi'}.`);
     }
   };
   reader.readAsArrayBuffer(file);
