@@ -482,7 +482,11 @@ function processAllReports() {
     // Amounts
     const dpp = Number(row['DPP']) || 0;
     const total = Number(row['Total']) || 0;
-    const gp = Number(row['GrossProfit']) || 0;
+    // GP: Gunakan kolom 'FIX' jika tersedia (karena di Excel kolom FIX = GrossProfit + Cashback - Admin Kredit - Admin Marketplace),
+    // jika kolom 'FIX' tidak ada (misal file turnover mentah standar), gunakan 'GrossProfit'.
+    const fixVal = (row['FIX'] !== undefined && row['FIX'] !== '') ? Number(row['FIX']) : NaN;
+    const rawGP = Number(row['GrossProfit']) || 0;
+    const gp = !isNaN(fixVal) ? fixVal : rawGP;
     const amount = currentCalculationMode === 'DPP' ? dpp : total;
 
     // Accumulate total division sosmed achievement
@@ -736,30 +740,32 @@ function renderReport2Tables(picStats, activePICs) {
     sumGadget += s.gadgetCount;
     sumCross += s.crossCount;
 
+    // Ratio & Status based on Excel formula:
+    // Ratio = (Achievement% / Timegone%) * 100
+    // If Ratio < 80% => ☠️, If Ratio < 90% => 💔, Else => 🖤
+    const tg = (typeof timegonePct === 'number' && timegonePct > 0) ? timegonePct : 100;
+
     // Omzet % and status
     const pctOmzet = s.target > 0 ? (s.pencapaian / s.target) * 100 : 0;
-    let statusOmzet = '☠️';
-    if (pctOmzet >= (timegonePct - 4)) statusOmzet = '🖤';
-    else if (pctOmzet >= (timegonePct - 7)) statusOmzet = '💔';
+    const ratioOmzet = (pctOmzet / tg) * 100;
+    const statusOmzet = ratioOmzet >= 90 ? '🖤' : (ratioOmzet >= 80 ? '💔' : '☠️');
 
     // GP % and status
     const pctGP = s.targetGP > 0 ? (s.acvGP / s.targetGP) * 100 : 0;
-    let statusGP = '☠️';
-    if (pctGP >= (timegonePct - 4)) statusGP = '🖤';
-    else if (pctGP >= (timegonePct - 7)) statusGP = '💔';
+    const ratioGP = (pctGP / tg) * 100;
+    const statusGP = ratioGP >= 90 ? '🖤' : (ratioGP >= 80 ? '💔' : '☠️');
 
     // Cross selling % (target ratio 1/3)
     const ratioActual = s.gadgetCount > 0 ? (s.crossCount / s.gadgetCount) : 0;
     const pctCross = Math.min(100, Math.round(ratioActual * 3 * 100));
 
     // Final Report % (35% Omzet + 35% GP + 30% Cross)
-    const omzetNorm = Math.min(100, pctOmzet);
+    const omzetNorm = Math.min(100, Math.max(0, pctOmzet));
     const gpNorm = Math.min(100, Math.max(0, pctGP));
-    const pctAkhir = Math.round((omzetNorm * 0.35) + (gpNorm * 0.35) + (pctCross * 0.30));
+    const pctAkhir = (omzetNorm * 0.35) + (gpNorm * 0.35) + (pctCross * 0.30);
 
-    let statusAkhir = '☠️';
-    if (pctAkhir >= 40) statusAkhir = '🖤';
-    else if (pctAkhir >= 35) statusAkhir = '💔';
+    const ratioAkhir = (pctAkhir / tg) * 100;
+    const statusAkhir = ratioAkhir >= 90 ? '🖤' : (ratioAkhir >= 80 ? '💔' : '☠️');
 
     // Table 1 Row
     const tr1 = document.createElement('tr');
@@ -799,8 +805,10 @@ function renderReport2Tables(picStats, activePICs) {
 
   const totalPctOmzet = sumTarget > 0 ? (managerAchieve / sumTarget) * 100 : 0;
   const totalPctGP = sumTargetGP > 0 ? (managerGP / sumTargetGP) * 100 : 0;
-  let statusMgrOmzet = totalPctOmzet >= (timegonePct - 4) ? '🖤' : '💔';
-  let statusMgrGP = totalPctGP >= (timegonePct - 4) ? '🖤' : '☠️';
+  const ratioMgrOmzet = (totalPctOmzet / tg) * 100;
+  const statusMgrOmzet = ratioMgrOmzet >= 90 ? '🖤' : (ratioMgrOmzet >= 80 ? '💔' : '☠️');
+  const ratioMgrGP = (totalPctGP / tg) * 100;
+  const statusMgrGP = ratioMgrGP >= 90 ? '🖤' : (ratioMgrGP >= 80 ? '💔' : '☠️');
 
   summaryFoot.innerHTML = `
     <tr class="row-manajer">
@@ -819,7 +827,9 @@ function renderReport2Tables(picStats, activePICs) {
   // Table 2 MANAJER Total Row
   const totalRatio = managerGadget > 0 ? (managerCross / managerGadget) : 0;
   const totalPctCross = Math.min(100, Math.round(totalRatio * 3 * 100));
-  const totalPctAkhir = Math.round((Math.min(100, totalPctOmzet) * 0.35) + (Math.min(100, Math.max(0, totalPctGP)) * 0.35) + (totalPctCross * 0.30));
+  const totalPctAkhir = (Math.min(100, Math.max(0, totalPctOmzet)) * 0.35) + (Math.min(100, Math.max(0, totalPctGP)) * 0.35) + (totalPctCross * 0.30);
+  const ratioMgrAkhir = (totalPctAkhir / tg) * 100;
+  const statusMgrAkhir = ratioMgrAkhir >= 90 ? '🖤' : (ratioMgrAkhir >= 80 ? '💔' : '☠️');
 
   crossFoot.innerHTML = `
     <tr>
@@ -828,7 +838,7 @@ function renderReport2Tables(picStats, activePICs) {
       <td>${managerCross}</td>
       <td class="font-bold">${formatPercent(totalPctCross)}</td>
       <td class="font-bold">${formatPercent(totalPctAkhir)}</td>
-      <td class="text-center status-icon-lg">🖤</td>
+      <td class="text-center status-icon-lg">${statusMgrAkhir}</td>
       <td></td>
     </tr>
   `;
@@ -3433,7 +3443,9 @@ async function handleArchiveExcelUpload() {
 
         const dpp = Number(row['DPP']) || 0;
         const total = Number(row['Total']) || 0;
-        const gp = Number(row['GrossProfit']) || 0;
+        const fixVal = (row['FIX'] !== undefined && row['FIX'] !== '') ? Number(row['FIX']) : NaN;
+        const rawGP = Number(row['GrossProfit']) || 0;
+        const gp = !isNaN(fixVal) ? fixVal : rawGP;
         const amt = currentCalculationMode === 'DPP' ? dpp : total;
 
         totalAchieve += amt;
@@ -4456,7 +4468,9 @@ function applyDashboardFilters() {
 
       const dpp = Number(r['DPP']) || 0;
       const total = Number(r['Total']) || 0;
-      const gp = Number(r['GrossProfit']) || 0;
+      const fixVal = (r['FIX'] !== undefined && r['FIX'] !== '') ? Number(r['FIX']) : NaN;
+      const rawGP = Number(r['GrossProfit']) || 0;
+      const gp = !isNaN(fixVal) ? fixVal : rawGP;
       const amt = isDPP ? dpp : total;
 
       totalRev += amt;
