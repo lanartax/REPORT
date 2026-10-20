@@ -139,9 +139,11 @@ function formatCrosellingDate(pd) {
     }
   }
   if (typeof pd === 'string') {
-    const parts = pd.split(/[\/\-]/);
+    const parts = pd.trim().split(/[\/\-]/);
     if (parts.length >= 3) {
-      return `${String(parts[0]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${parts[2]}`;
+      let y = parts[2].trim().split(' ')[0];
+      if (y.length === 2) y = '20' + y;
+      return `${String(parts[0]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${y}`;
     }
     return pd;
   }
@@ -1871,13 +1873,56 @@ function openARDetailModalFromKeep(keepIndex) {
   openARDetailModal(arDoc, row);
 }
 
+function pickBestKeep(matchedKeeps, postingDate) {
+  if (!matchedKeeps || matchedKeeps.length === 0) return null;
+  if (matchedKeeps.length === 1) return matchedKeeps[0];
+
+  const monthMap = {
+    '01': 'januari', '1': 'januari',
+    '02': 'februari', '2': 'februari',
+    '03': 'maret', '3': 'maret',
+    '04': 'april', '4': 'april',
+    '05': 'mei', '5': 'mei',
+    '06': 'juni', '6': 'juni',
+    '07': 'juli', '7': 'juli',
+    '08': 'agustus', '8': 'agustus',
+    '09': 'september', '9': 'september',
+    '10': 'oktober',
+    '11': 'november',
+    '12': 'desember'
+  };
+
+  let monthName = '';
+  if (typeof postingDate === 'number') {
+    const d = XLSX.SSF.parse_date_code(postingDate);
+    if (d && d.m) monthName = monthMap[String(d.m)] || '';
+  } else if (postingDate instanceof Date) {
+    monthName = monthMap[String(postingDate.getMonth() + 1)] || '';
+  } else if (typeof postingDate === 'string') {
+    const cleanStr = postingDate.trim().split(' ')[0];
+    const parts = cleanStr.split(/[\/\-]/);
+    if (parts.length >= 3) {
+      const mCandidate = parts[0].length === 4 ? parts[1] : parts[1];
+      monthName = monthMap[mCandidate] || monthMap[String(Number(mCandidate))] || '';
+    }
+  }
+
+  if (monthName) {
+    const match = matchedKeeps.find(k => String(k['PERIODE'] || '').toLowerCase().includes(monthName));
+    if (match) return match;
+  }
+
+  // Fallback to the latest/newest keep row in Google Sheets
+  return matchedKeeps[matchedKeeps.length - 1];
+}
+
 // ==================== POP-UP MODAL DETAIL AR & PELAPORAN WHATSAPP AKMAL ====================
 let currentModalDoc = null;
 let currentModalRows = [];
 let currentModalKeep = null;
 let currentModalCheckedItems = new Set();
 
-function openARDetailModal(docNumber, keepContext = null) {
+function openARDetailModal(docNumber, keepContext = null, sourceTitle = '') {
   const digitsOnly = String(docNumber || '').replace(/\D/g, '');
   if (!digitsOnly) {
     alert("Nomor Dokumen AR tidak valid.");
@@ -1907,28 +1952,84 @@ function openARDetailModal(docNumber, keepContext = null) {
     currentModalKeep = rawKeepRows.find(k => String(k['REPORT AR'] || '').replace(/\D/g, '') === digitsOnly);
     if (!currentModalKeep && matchedRows[0]['No HP Customer']) {
       const norm = normalizePhone(matchedRows[0]['No HP Customer']);
-      currentModalKeep = rawKeepRows.find(k => normalizePhone(k['Nomor WA']) === norm);
+      const allPhoneMatches = rawKeepRows.filter(k => normalizePhone(k['Nomor WA']) === norm);
+      currentModalKeep = pickBestKeep(allPhoneMatches, matchedRows[0]['Posting Date']);
     }
   }
 
-  // Populate Title & Metadata
-  document.getElementById('modalDocTitle').innerText = docNumber;
+  // Populate Title & Header (Matching Image 2)
+  const mainTitleEl = document.getElementById('modalDocMainTitle');
+  if (mainTitleEl) {
+    if (sourceTitle === 'REPORT AR') {
+      mainTitleEl.innerText = 'TRACK AR BERDASARKAN REPORT AR';
+    } else if (sourceTitle === 'AR VLOOKUP') {
+      mainTitleEl.innerText = 'TRACK AR BERDASARKAN VLOOKUP';
+    } else {
+      mainTitleEl.innerText = `TRACK AR DOKUMEN ${docNumber}`;
+    }
+  }
+
+  const docTitleEl = document.getElementById('modalDocTitle');
+  if (docTitleEl) docTitleEl.innerText = docNumber;
+
   const first = matchedRows[0];
-  document.getElementById('modalMetaDoc').innerText = first['Document Number'] || docNumber;
-  document.getElementById('modalMetaDate').innerText = formatCrosellingDate(first['Posting Date']) + (first['Waktu'] ? ` ${first['Waktu']}` : '');
-  document.getElementById('modalMetaCabang').innerText = first['Cabang'] || '-';
+  const metaDateEl = document.getElementById('modalMetaDate');
+  if (metaDateEl) metaDateEl.innerText = formatCrosellingDate(first['Posting Date']) + (first['Waktu'] ? ` ${first['Waktu']}` : '');
+  const metaCabangEl = document.getElementById('modalMetaCabang');
+  if (metaCabangEl) metaCabangEl.innerText = first['Cabang'] || '-';
 
+  // Populate Top 5-Column Summary Table (Matching Image 2 Mockup)
   const custName = (currentModalKeep && currentModalKeep['Nama']) ? currentModalKeep['Nama'] : (first['Name'] || first['Customer/Vendor Name'] || '-');
-  document.getElementById('modalMetaCust').innerText = custName;
-
   const rawWA = (currentModalKeep && currentModalKeep['Nomor WA']) ? currentModalKeep['Nomor WA'] : (first['No HP Customer'] || '');
   const displayWA = formatPhoneDisplay(rawWA);
   const normWA = normalizePhone(rawWA);
-  document.getElementById('modalMetaWA').innerHTML = (normWA && normWA.length >= 8)
-    ? `${displayWA} <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:2px 7px;font-size:0.7rem;margin-left:6px;">💬 Chat</a>`
+  const waHtml = (normWA && normWA.length >= 8)
+    ? `<div style="display:flex; align-items:center; gap:6px;">
+        <span class="font-bold">${displayWA}</span>
+        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:2px 8px; font-size:0.72rem; border-radius:4px;" title="Chat customer ini di WhatsApp">
+          💬 WA
+        </a>
+       </div>`
     : (displayWA || '-');
 
-  document.getElementById('modalMetaRemarks').innerText = first['Remarks'] || '-';
+  const sosmedCode = (currentModalKeep && currentModalKeep['Kode Sosmed']) ? currentModalKeep['Kode Sosmed'] : '-';
+  const keepBarang = (currentModalKeep && currentModalKeep['Barang Keep']) ? currentModalKeep['Barang Keep'] : '-';
+
+  const keepCatatan = (currentModalKeep && currentModalKeep['Catatan']) ? String(currentModalKeep['Catatan']).trim() : '';
+  const arRemarks = first['Remarks'] ? String(first['Remarks']).trim() : '';
+  let catatanModalHtml = '-';
+  if (keepCatatan && arRemarks && keepCatatan.toLowerCase() !== arRemarks.toLowerCase() && keepCatatan !== '-' && arRemarks !== '-') {
+    catatanModalHtml = `
+      <div style="font-size:0.76rem; color:#0f172a; margin-bottom:2px; word-break:break-word;">${keepCatatan}</div>
+      <div style="font-size:0.70rem; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>
+    `;
+  } else if (keepCatatan && keepCatatan !== '-') {
+    catatanModalHtml = `<div style="font-size:0.76rem; color:#0f172a; word-break:break-word;">${keepCatatan}</div>`;
+  } else if (arRemarks && arRemarks !== '-') {
+    catatanModalHtml = `<div style="font-size:0.72rem; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
+  }
+
+  const elCust = document.getElementById('modalTrackCust');
+  const elWA = document.getElementById('modalTrackWA');
+  const elSos = document.getElementById('modalTrackSosmed');
+  const elBarang = document.getElementById('modalTrackKeepBarang');
+  const elCat = document.getElementById('modalTrackCatatan');
+
+  if (elCust) elCust.innerText = custName;
+  if (elWA) elWA.innerHTML = waHtml;
+  if (elSos) elSos.innerHTML = `<span class="badge-sosmed-pill">${sosmedCode}</span>`;
+  if (elBarang) elBarang.innerText = keepBarang;
+  if (elCat) elCat.innerHTML = catatanModalHtml;
+
+  // Backward compatibility metadata
+  const metaDocEl = document.getElementById('modalMetaDoc');
+  if (metaDocEl) metaDocEl.innerText = first['Document Number'] || docNumber;
+  const metaCustEl = document.getElementById('modalMetaCust');
+  if (metaCustEl) metaCustEl.innerText = custName;
+  const metaWAEl = document.getElementById('modalMetaWA');
+  if (metaWAEl) metaWAEl.innerHTML = waHtml;
+  const metaRemarksEl = document.getElementById('modalMetaRemarks');
+  if (metaRemarksEl) metaRemarksEl.innerText = first['Remarks'] || '-';
 
   // Check Sosmed Status per Item
   let totalDocVal = 0;
@@ -2236,11 +2337,103 @@ function sendReportToAkmalWhatsApp() {
   window.open(url, '_blank');
 }
 
-// ==================== TAB 5: AUDIT AR BELUM TERINPUT SOSMED ====================
+// ==================== TAB 5: TRACKING AR (AUDIT MISSING SOSMED) ====================
 let rawAuditARList = [];
 let filteredAuditARList = [];
 let auditCurrentPage = 1;
 const AUDIT_PAGE_SIZE = 50;
+
+function parseKeepTimestampToEpoch(ts) {
+  if (!ts) return 0;
+  if (typeof ts === 'number') {
+    return (ts - 25569) * 86400 * 1000;
+  }
+  if (ts instanceof Date) {
+    return ts.getTime();
+  }
+  if (typeof ts === 'string') {
+    const s = ts.trim();
+    if (!s) return 0;
+    const [datePart, timePart] = s.split(/\s+/);
+    let hours = 0, minutes = 0, seconds = 0;
+    if (timePart) {
+      const tPieces = timePart.split(':');
+      if (tPieces.length >= 2) {
+        hours = parseInt(tPieces[0], 10) || 0;
+        minutes = parseInt(tPieces[1], 10) || 0;
+        seconds = parseInt(tPieces[2], 10) || 0;
+      }
+    }
+
+    const dPieces = datePart.split(/[\/\-\.]/);
+    if (dPieces.length === 3) {
+      let y, m, d;
+      if (dPieces[0].length === 4) {
+        y = parseInt(dPieces[0], 10);
+        m = parseInt(dPieces[1], 10) - 1;
+        d = parseInt(dPieces[2], 10);
+      } else {
+        const p0 = parseInt(dPieces[0], 10);
+        const p1 = parseInt(dPieces[1], 10);
+        let p2 = parseInt(dPieces[2], 10);
+        if (p2 < 100) p2 += 2000;
+
+        if (p0 > 12) {
+          d = p0;
+          m = p1 - 1;
+          y = p2;
+        } else if (p1 > 12) {
+          m = p0 - 1;
+          d = p1;
+          y = p2;
+        } else {
+          d = p0;
+          m = p1 - 1;
+          y = p2;
+        }
+      }
+      return new Date(y, m, d, hours, minutes, seconds).getTime();
+    }
+  }
+  return 0;
+}
+
+function parseDateToISO(dateVal) {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'number') {
+    if (typeof XLSX !== 'undefined' && XLSX.SSF && XLSX.SSF.parse_date_code) {
+      const d = XLSX.SSF.parse_date_code(dateVal);
+      if (d) {
+        return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+      }
+    }
+  }
+  if (dateVal instanceof Date) {
+    return `${dateVal.getFullYear()}-${String(dateVal.getMonth() + 1).padStart(2, '0')}-${String(dateVal.getDate()).padStart(2, '0')}`;
+  }
+  if (typeof dateVal === 'string') {
+    const cleanStr = dateVal.trim().split(' ')[0].split('T')[0];
+    const parts = cleanStr.split(/[\/\-\.]/);
+    if (parts.length >= 3) {
+      if (parts[0].length === 4) {
+        return `${parts[0]}-${String(parts[1]).padStart(2, '0')}-${String(parts[2]).padStart(2, '0')}`;
+      } else {
+        let y = parts[2].trim();
+        if (y.length === 2) y = '20' + y;
+        const p0 = Number(parts[0].trim());
+        const p1 = Number(parts[1].trim());
+        if (p0 > 12) {
+          return `${y}-${String(p1).padStart(2, '0')}-${String(p0).padStart(2, '0')}`;
+        }
+        if (p1 > 12) {
+          return `${y}-${String(p0).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+        }
+        return `${y}-${String(p1).padStart(2, '0')}-${String(p0).padStart(2, '0')}`;
+      }
+    }
+  }
+  return '';
+}
 
 function runARMissingSosmedAudit() {
   const pill = document.getElementById('arAuditStatusPill');
@@ -2270,18 +2463,25 @@ function runARMissingSosmedAudit() {
     }
 
     const arRaw = String(k['REPORT AR'] || '').replace(/\D/g, '');
-    if (arRaw && !arDocToKeep.has(arRaw)) {
-      arDocToKeep.set(arRaw, k);
+    if (arRaw) {
+      if (!arDocToKeep.has(arRaw)) arDocToKeep.set(arRaw, []);
+      arDocToKeep.get(arRaw).push(k);
     }
   });
 
   // 2. Group croselling by Document Number
   const docMap = new Map();
+  const phoneToAR = new Map();
   rawCrosellingRows.forEach(r => {
     const doc = String(r['Document Number'] || '').trim();
     if (!doc) return;
     if (!docMap.has(doc)) docMap.set(doc, []);
     docMap.get(doc).push(r);
+
+    const normHp = normalizePhone(r['No HP Customer']);
+    if (normHp && normHp.length >= 8 && !phoneToAR.has(normHp)) {
+      phoneToAR.set(normHp, doc);
+    }
   });
 
   // 3. Match and audit
@@ -2291,20 +2491,24 @@ function runARMissingSosmedAudit() {
     const normHp = normalizePhone(rawHp);
     const cleanDoc = doc.replace(/\D/g, '');
     let matchedKeeps = [];
+    let isVlookupMatch = false;
 
     if (normHp && phoneToKeep.has(normHp)) {
       matchedKeeps = phoneToKeep.get(normHp);
+      isVlookupMatch = true;
     } else if (normHp && normHp.length >= 9 && phoneLast9ToKeep.has(normHp.slice(-9))) {
       matchedKeeps = phoneLast9ToKeep.get(normHp.slice(-9));
+      isVlookupMatch = true;
     }
 
     // Direct match by REPORT AR document number
     if (matchedKeeps.length === 0 && cleanDoc && arDocToKeep.has(cleanDoc)) {
-      matchedKeeps = [arDocToKeep.get(cleanDoc)];
+      matchedKeeps = arDocToKeep.get(cleanDoc);
+      isVlookupMatch = false;
     }
 
     if (matchedKeeps.length > 0) {
-      const bestKeep = matchedKeeps[0];
+      const bestKeep = pickBestKeep(matchedKeeps, items[0]['Posting Date']);
       let totalItems = items.length;
       let sosmedItems = 0;
       let missingItems = 0;
@@ -2324,6 +2528,48 @@ function runARMissingSosmedAudit() {
       });
 
       if (missingItems > 0) {
+        // Resolve VLOOKUP AR info
+        let vlookupARDoc = isVlookupMatch ? doc : '-';
+        let vlookupARDate = isVlookupMatch ? items[0]['Posting Date'] : null;
+        let vlookupARCabang = isVlookupMatch ? items[0]['Cabang'] : '-';
+        let vlookupARItems = isVlookupMatch ? items : [];
+
+        if (!isVlookupMatch) {
+          const keepNormWA = normalizePhone(bestKeep['Nomor WA']);
+          if (keepNormWA && phoneToAR.has(keepNormWA)) {
+            vlookupARDoc = phoneToAR.get(keepNormWA);
+            if (docMap.has(vlookupARDoc)) {
+              vlookupARDate = docMap.get(vlookupARDoc)[0]['Posting Date'];
+              vlookupARCabang = docMap.get(vlookupARDoc)[0]['Cabang'];
+              vlookupARItems = docMap.get(vlookupARDoc);
+            }
+          }
+        }
+
+        // Resolve REPORT AR info
+        const repARRaw = String(bestKeep['REPORT AR'] || '').replace(/\D/g, '');
+        let reportARDoc = repARRaw || (!isVlookupMatch ? doc : '-');
+        let reportARDate = null;
+        let reportARCabang = '-';
+        let reportARItems = [];
+
+        if (reportARDoc && reportARDoc !== '-' && docMap.has(reportARDoc)) {
+          reportARDate = docMap.get(reportARDoc)[0]['Posting Date'];
+          reportARCabang = docMap.get(reportARDoc)[0]['Cabang'];
+          reportARItems = docMap.get(reportARDoc);
+        } else if (!isVlookupMatch) {
+          reportARDate = items[0]['Posting Date'];
+          reportARCabang = items[0]['Cabang'];
+          reportARItems = items;
+        }
+
+        // Parse ISO dates for filtering
+        const vlookupARDateIso = parseDateToISO(vlookupARDate);
+        const reportARDateIso = parseDateToISO(reportARDate);
+
+        // Parse Keep Timestamp for sorting
+        const keepTimestampEpoch = parseKeepTimestampToEpoch(bestKeep['Timestamp']);
+
         rawAuditARList.push({
           doc,
           postingDate: items[0]['Posting Date'],
@@ -2335,17 +2581,32 @@ function runARMissingSosmedAudit() {
           totalDocValue,
           status: sosmedItems === 0 ? 'ALL_MISSING' : 'PARTIAL_MISSING',
           keep: bestKeep,
-          items: items
+          items: items,
+          vlookupARDoc,
+          vlookupARDate,
+          vlookupARCabang,
+          vlookupARItems,
+          vlookupARDateIso,
+          reportARDoc,
+          reportARDate,
+          reportARCabang,
+          reportARItems,
+          reportARDateIso,
+          keepTimestampEpoch
         });
       }
     }
   });
+
+  // Sort descending by Timestamp Format Keep!
+  rawAuditARList.sort((a, b) => (b.keepTimestampEpoch || 0) - (a.keepTimestampEpoch || 0));
 
   if (pill) {
     pill.innerHTML = `<span>📁 ${rawAuditARList.length} AR Ditemukan</span>`;
   }
 
   populateAuditSosmedDropdown();
+  applyAuditColStyles();
   applyAuditFilters();
 }
 
@@ -2372,11 +2633,19 @@ function populateAuditSosmedDropdown() {
 function applyAuditFilters() {
   if (!rawAuditARList) return;
 
-  const periodeVal = document.getElementById('auditFilterPeriode').value;
-  const sosmedVal = document.getElementById('auditFilterSosmed').value;
-  const tanggalARVal = document.getElementById('auditFilterTanggalAR').value;
-  const statusVal = document.getElementById('auditFilterStatus').value;
-  const keyword = (document.getElementById('auditSearchInput').value || '').trim().toLowerCase();
+  const periodeEl = document.getElementById('auditFilterPeriode');
+  const sosmedEl = document.getElementById('auditFilterSosmed');
+  const tglVlookupEl = document.getElementById('auditFilterTanggalVlookup');
+  const tglReportEl = document.getElementById('auditFilterTanggalReport');
+  const statusEl = document.getElementById('auditFilterStatus');
+  const searchEl = document.getElementById('auditSearchInput');
+
+  const periodeVal = periodeEl ? periodeEl.value : 'ALL';
+  const sosmedVal = sosmedEl ? sosmedEl.value : 'ALL';
+  const tanggalVlookupVal = tglVlookupEl ? tglVlookupEl.value : '';
+  const tanggalReportVal = tglReportEl ? tglReportEl.value : '';
+  const statusVal = statusEl ? statusEl.value : 'ALL';
+  const keyword = (searchEl ? searchEl.value : '').trim().toLowerCase();
 
   filteredAuditARList = rawAuditARList.filter(r => {
     // 1. Periode filter
@@ -2391,49 +2660,26 @@ function applyAuditFilters() {
       if (s !== sosmedVal) return false;
     }
 
-    // 3. Tanggal AR filter (YYYY-MM-DD)
-    if (tanggalARVal) {
-      let isoDate = '';
-      if (typeof r.postingDate === 'number') {
-        const d = XLSX.SSF.parse_date_code(r.postingDate);
-        if (d) {
-          isoDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-        }
-      } else if (r.postingDate instanceof Date) {
-        isoDate = `${r.postingDate.getFullYear()}-${String(r.postingDate.getMonth() + 1).padStart(2,'0')}-${String(r.postingDate.getDate()).padStart(2,'0')}`;
-      } else if (r.postingDate) {
-        const cleanStr = String(r.postingDate).trim().split(' ')[0].split('T')[0];
-        const parts = cleanStr.split(/[\/\-]/);
-        if (parts.length >= 3) {
-          if (parts[0].length === 4) {
-            isoDate = `${parts[0]}-${String(parts[1]).padStart(2,'0')}-${String(parts[2]).padStart(2,'0')}`;
-          } else {
-            const y = parts[2];
-            const p0 = String(parts[0]).padStart(2,'0');
-            const p1 = String(parts[1]).padStart(2,'0');
-            const d1 = `${y}-${p1}-${p0}`;
-            const d2 = `${y}-${p0}-${p1}`;
-            if (d1 === tanggalARVal || d2 === tanggalARVal) {
-              isoDate = tanggalARVal;
-            } else {
-              isoDate = d1;
-            }
-          }
-        }
-      }
-      if (isoDate !== tanggalARVal) return false;
+    // 3. Filter Tanggal Faktur AR (VLOOKUP)
+    if (tanggalVlookupVal) {
+      if (r.vlookupARDateIso !== tanggalVlookupVal) return false;
     }
 
-    // 4. Status AR filter
+    // 4. Filter Tanggal Faktur Report AR
+    if (tanggalReportVal) {
+      if (r.reportARDateIso !== tanggalReportVal) return false;
+    }
+
+    // 5. Status AR filter
     if (statusVal !== 'ALL') {
       if (r.status !== statusVal) return false;
     }
 
-    // 5. Keyword search
+    // 6. Keyword search
     if (keyword) {
       const itemsText = r.items.map(it => it['Dscription'] || '').join(' ');
       const arRemarks = (r.items && r.items[0] && r.items[0]['Remarks']) || '';
-      const combined = `${r.doc} ${r.keep['Nama'] || ''} ${r.keep['Nomor WA'] || ''} ${r.keep['Barang Keep'] || ''} ${r.keep['Catatan'] || ''} ${arRemarks} ${r.cabang || ''} ${itemsText}`.toLowerCase();
+      const combined = `${r.doc} ${r.vlookupARDoc || ''} ${r.reportARDoc || ''} ${r.keep['Nama'] || ''} ${r.keep['Nomor WA'] || ''} ${r.keep['Barang Keep'] || ''} ${r.keep['Catatan'] || ''} ${arRemarks} ${r.cabang || ''} ${itemsText}`.toLowerCase();
       if (!combined.includes(keyword)) return false;
     }
 
@@ -2451,21 +2697,35 @@ function applyAuditFilters() {
     totalPotensiRp += (r.missingTotalValue || 0);
   });
 
-  document.getElementById('auditTotalCount').innerText = filteredAuditARList.length.toLocaleString('id-ID');
-  document.getElementById('auditAllMissingCount').innerText = allMissingCount.toLocaleString('id-ID');
-  document.getElementById('auditPartialMissingCount').innerText = partialMissingCount.toLocaleString('id-ID');
-  document.getElementById('auditTotalPotensiRp').innerText = formatRupiah(totalPotensiRp);
+  const totalEl = document.getElementById('auditTotalCount');
+  const allEl = document.getElementById('auditAllMissingCount');
+  const partialEl = document.getElementById('auditPartialMissingCount');
+  const potensiEl = document.getElementById('auditTotalPotensiRp');
+
+  if (totalEl) totalEl.innerText = filteredAuditARList.length.toLocaleString('id-ID');
+  if (allEl) allEl.innerText = allMissingCount.toLocaleString('id-ID');
+  if (partialEl) partialEl.innerText = partialMissingCount.toLocaleString('id-ID');
+  if (potensiEl) potensiEl.innerText = formatRupiah(totalPotensiRp);
 
   auditCurrentPage = 1;
   renderAuditPage();
 }
 
 function resetAuditFilters() {
-  document.getElementById('auditFilterPeriode').value = 'Oktober-26';
-  document.getElementById('auditFilterSosmed').value = 'ALL';
-  document.getElementById('auditFilterTanggalAR').value = '';
-  document.getElementById('auditFilterStatus').value = 'ALL';
-  document.getElementById('auditSearchInput').value = '';
+  const periodeEl = document.getElementById('auditFilterPeriode');
+  const sosmedEl = document.getElementById('auditFilterSosmed');
+  const tglVlookupEl = document.getElementById('auditFilterTanggalVlookup');
+  const tglReportEl = document.getElementById('auditFilterTanggalReport');
+  const statusEl = document.getElementById('auditFilterStatus');
+  const searchEl = document.getElementById('auditSearchInput');
+
+  if (periodeEl) periodeEl.value = 'Oktober-26';
+  if (sosmedEl) sosmedEl.value = 'ALL';
+  if (tglVlookupEl) tglVlookupEl.value = '';
+  if (tglReportEl) tglReportEl.value = '';
+  if (statusEl) statusEl.value = 'ALL';
+  if (searchEl) searchEl.value = '';
+
   applyAuditFilters();
 }
 
@@ -2490,15 +2750,21 @@ function renderAuditPage() {
   const pageRows = filteredAuditARList.slice(startIdx, endIdx);
 
   // Pagination info
-  document.getElementById('auditPaginationInfo').innerText = total > 0
-    ? `Menampilkan ${startIdx + 1} - ${endIdx} dari total ${total.toLocaleString('id-ID')} Dokumen AR`
-    : 'Tidak ada dokumen AR yang sesuai filter';
-  document.getElementById('auditCurrentPageText').innerText = `Halaman ${auditCurrentPage} / ${maxPage}`;
-  document.getElementById('btnAuditPrev').disabled = auditCurrentPage <= 1;
-  document.getElementById('btnAuditNext').disabled = auditCurrentPage >= maxPage;
+  const paginationInfoEl = document.getElementById('auditPaginationInfo');
+  if (paginationInfoEl) {
+    paginationInfoEl.innerText = total > 0
+      ? `Menampilkan ${startIdx + 1} - ${endIdx} dari total ${total.toLocaleString('id-ID')} Dokumen AR`
+      : 'Tidak ada dokumen AR yang sesuai filter';
+  }
+  const curPageTextEl = document.getElementById('auditCurrentPageText');
+  if (curPageTextEl) curPageTextEl.innerText = `Halaman ${auditCurrentPage} / ${maxPage}`;
+  const btnPrev = document.getElementById('btnAuditPrev');
+  if (btnPrev) btnPrev.disabled = auditCurrentPage <= 1;
+  const btnNext = document.getElementById('btnAuditNext');
+  if (btnNext) btnNext.disabled = auditCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data audit AR yang sesuai filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data tracking AR yang sesuai filter.</td></tr>`;
     return;
   }
 
@@ -2511,80 +2777,63 @@ function renderAuditPage() {
     const displayWA = formatPhoneDisplay(rawWA);
 
     const waHtml = (normWA && normWA.length >= 8) ? `
-      <div style="display:flex; align-items:center; gap:4px;">
+      <div style="display:flex; align-items:center; gap:5px;">
         <span class="font-bold">${displayWA}</span>
-        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:1px 5px; font-size:0.68rem;" title="Chat customer ini di WhatsApp">
+        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:1px 6px; font-size:0.68rem; border-radius:4px;" title="Chat customer ini di WhatsApp">
           💬 WA
         </a>
       </div>
     ` : (displayWA || '-');
-
-    // Products breakdown badges with individual item copy button
-    const items = Array.isArray(r.items) ? r.items : [];
-    const itemsBadges = items.map((it, itemIdx) => {
-      const isSos = isItemInputSosmed(it);
-      const desc = it['Dscription'] || it['Item/Service Description'] || '-';
-      const qty = Number(it['Quantity']) || 1;
-      const dendaStatus = getItemPotensiDenda(it);
-      const dendaBadge = dendaStatus === 'DENDA'
-        ? `<span class="kpi-badge badge-crimson font-bold" style="font-size:0.64rem; padding:1px 4px; flex-shrink:0;">🚨 DENDA</span>`
-        : `<span class="kpi-badge badge-ink" style="font-size:0.64rem; padding:1px 4px; flex-shrink:0;">PASS</span>`;
-
-      return `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:3px; font-size:0.71rem; line-height:1.2; background:rgba(0,0,0,0.02); padding:2px 4px; border-radius:4px; border:1px solid rgba(0,0,0,0.04);">
-          <span style="color:${isSos ? '#15803d' : '#b91c1c'}; font-weight:${isSos ? '600' : '700'}; word-break:break-word; flex:1; min-width:0;">
-            ${isSos ? '✅' : '❌'} ${desc} (${qty})
-          </span>
-          <div style="display:flex; align-items:center; gap:3px; flex-shrink:0;">
-            ${dendaBadge}
-            <button class="btn-copy-item-sm" onclick="event.stopPropagation(); copyAuditItemToClipboard(${auditRowIdx}, ${itemIdx}, this)" title="Salin item ini ke format 12 kolom Excel (tanpa header)">
-              📋 Copy
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Status Badge
-    const statusBadge = r.status === 'ALL_MISSING'
-      ? `<span class="status-badge badge-crimson font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">❌ 100% Offline</span>`
-      : `<span class="status-badge badge-gold font-bold" style="font-size:0.68rem; padding:2px 5px; display:inline-block;">⚠️ Sebagian (${r.missingItems}/${r.totalItems})</span>`;
 
     // Notes HTML (Keep Catatan and/or Cashier Remarks)
     const keepCatatan = String(keepObj['Catatan'] || '').trim();
     const arRemarks = String((r.items && r.items[0] && r.items[0]['Remarks']) || '').trim();
 
     let catatanHtml = '-';
-    if (keepCatatan && arRemarks && keepCatatan.toLowerCase() !== arRemarks.toLowerCase()) {
+    if (keepCatatan && arRemarks && keepCatatan.toLowerCase() !== arRemarks.toLowerCase() && keepCatatan !== '-' && arRemarks !== '-') {
       catatanHtml = `
-        <div style="font-size:0.71rem; line-height:1.25; color:var(--ink); word-break:break-word;">${keepCatatan}</div>
-        <div style="font-size:0.66rem; color:var(--text-muted); margin-top:2px; word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>
+        <div style="font-size:0.73rem; line-height:1.25; color:#0f172a; word-break:break-word;">${keepCatatan}</div>
+        <div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px; word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>
       `;
-    } else if (keepCatatan) {
-      catatanHtml = `<div style="font-size:0.71rem; line-height:1.25; color:var(--ink); word-break:break-word;">${keepCatatan}</div>`;
-    } else if (arRemarks) {
+    } else if (keepCatatan && keepCatatan !== '-') {
+      catatanHtml = `<div style="font-size:0.73rem; line-height:1.25; color:#0f172a; word-break:break-word;">${keepCatatan}</div>`;
+    } else if (arRemarks && arRemarks !== '-') {
       catatanHtml = `<div style="font-size:0.70rem; line-height:1.25; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
     }
 
+    // Report AR cell
+    const reportARDocDisplay = (r.reportARDoc && r.reportARDoc !== '-')
+      ? `<span class="cursor-pointer font-bold text-crimson" onclick="openARDetailModal('${r.reportARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'REPORT AR')" title="Klik untuk cek detail Dokumen Report AR">📄 ${r.reportARDoc}</span>`
+      : '-';
+
+    const reportARDateDisplay = r.reportARDate
+      ? `${formatCrosellingDate(r.reportARDate)} ${r.reportARCabang || ''}`.trim()
+      : '-';
+
+    // Vlookup AR cell
+    const vlookupARDocDisplay = (r.vlookupARDoc && r.vlookupARDoc !== '-')
+      ? `<span class="cursor-pointer font-bold text-crimson" onclick="openARDetailModal('${r.vlookupARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'AR VLOOKUP')" title="Klik untuk cek detail Dokumen AR VLOOKUP">📄 ${r.vlookupARDoc}</span>`
+      : '-';
+
+    const vlookupARDateDisplay = r.vlookupARDate
+      ? `${formatCrosellingDate(r.vlookupARDate)} ${r.vlookupARCabang || ''}`.trim()
+      : '-';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="col-sticky audit-col-no">${globalIdx}</td>
-      <td class="text-left audit-col-doc">
-        <span class="font-bold text-crimson cursor-pointer" onclick="openARDetailModalFromAudit(${auditRowIdx})" title="Klik untuk cek detail & lapor Akmal">
-          📄 ${r.doc}
-        </span>
+      <td class="audit-col-no" style="text-align: center;">${globalIdx}</td>
+      <td class="audit-col-keep-date" style="text-align: center; font-weight: 600;">${formatKeepTimestamp(keepObj['Timestamp'])}</td>
+      <td class="audit-col-cust font-bold" style="color: #0f172a;">${keepObj['Nama'] || '-'}</td>
+      <td class="audit-col-wa">${waHtml}</td>
+      <td class="audit-col-sosmed" style="text-align: center;">
+        <span class="badge-sosmed-pill">${keepObj['Kode Sosmed'] || '-'}</span>
       </td>
-      <td class="text-left audit-col-date">
-        <div>${formatCrosellingDate(r.postingDate)}</div>
-        <span class="kpi-badge badge-ink" style="font-size:0.66rem; margin-top:2px; padding:1px 4px;">${r.cabang || '-'}</span>
-      </td>
-      <td class="text-left font-bold audit-col-cust">${keepObj['Nama'] || '-'}</td>
-      <td class="text-left audit-col-wa">${waHtml}</td>
-      <td class="text-left audit-col-sosmed"><span class="kpi-badge badge-crimson font-bold" style="font-size:0.68rem; padding:1px 4px;">${keepObj['Kode Sosmed'] || '-'}</span></td>
-      <td class="text-left font-bold audit-col-keep" style="color:var(--ink);">${keepObj['Barang Keep'] || '-'}</td>
-      <td class="text-left audit-col-notes" style="white-space:normal;">${catatanHtml}</td>
-      <td class="text-left audit-col-items" style="white-space:normal; font-size:0.71rem;">${itemsBadges || '-'}</td>
-      <td class="text-center audit-col-status">${statusBadge}</td>
+      <td class="audit-col-keep font-bold" style="color: #1e293b;">${keepObj['Barang Keep'] || '-'}</td>
+      <td class="audit-col-notes">${catatanHtml}</td>
+      <td class="audit-col-report-ar" style="text-align: center;">${reportARDocDisplay}</td>
+      <td class="audit-col-report-date" style="text-align: center; font-size: 0.73rem;">${reportARDateDisplay}</td>
+      <td class="audit-col-vlookup-ar" style="text-align: center;">${vlookupARDocDisplay}</td>
+      <td class="audit-col-vlookup-date" style="text-align: center; font-size: 0.73rem;">${vlookupARDateDisplay}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2595,6 +2844,68 @@ function openARDetailModalFromAudit(auditIndex) {
   if (!auditItem) return;
   openARDetailModal(auditItem.doc, auditItem.keep);
 }
+
+// ==========================================================================
+// COLUMN HIDING ENGINE (TAMPILKAN / SEMBUNYIKAN KOLOM TRACKING AR)
+// ==========================================================================
+let auditHiddenCols = new Set(JSON.parse(localStorage.getItem('audit_hidden_cols') || '[]'));
+
+function applyAuditColStyles() {
+  let styleEl = document.getElementById('auditDynamicColStyles');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'auditDynamicColStyles';
+    document.head.appendChild(styleEl);
+  }
+  const rules = Array.from(auditHiddenCols).map(col => `.${col} { display: none !important; }`).join('\n');
+  styleEl.textContent = rules;
+
+  const menu = document.getElementById('auditColDropdownMenu');
+  if (menu) {
+    const checkboxes = menu.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+      const col = cb.getAttribute('data-col');
+      if (col) {
+        cb.checked = !auditHiddenCols.has(col);
+      }
+    });
+  }
+}
+
+function toggleAuditColumn(colClass, isVisible) {
+  if (isVisible) {
+    auditHiddenCols.delete(colClass);
+  } else {
+    auditHiddenCols.add(colClass);
+  }
+  localStorage.setItem('audit_hidden_cols', JSON.stringify(Array.from(auditHiddenCols)));
+  applyAuditColStyles();
+}
+
+function resetAuditColumns() {
+  auditHiddenCols.clear();
+  localStorage.setItem('audit_hidden_cols', JSON.stringify([]));
+  applyAuditColStyles();
+}
+
+function toggleAuditColDropdown(event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const menu = document.getElementById('auditColDropdownMenu');
+  if (!menu) return;
+  menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('auditColDropdownMenu');
+  const btn = document.getElementById('btnToggleAuditCols');
+  if (menu && menu.style.display === 'block') {
+    if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+      menu.style.display = 'none';
+    }
+  }
+});
 
 // ==========================================================================
 // AUDIT AR ITEM CLIPBOARD EXPORT ENGINE (12 KOLOM EXCEL TANPA HEADER)
@@ -2859,7 +3170,8 @@ function findKeepForARItem(item, docNumber = null) {
       matched = rawKeepRows.find(k => String(k['REPORT AR'] || '').replace(/\D/g, '') === digitsOnly);
     }
     if (!matched && normWA && normWA.length >= 8) {
-      matched = rawKeepRows.find(k => normalizePhone(k['Nomor WA']) === normWA);
+      const allMatches = rawKeepRows.filter(k => normalizePhone(k['Nomor WA']) === normWA);
+      matched = pickBestKeep(allMatches, item ? item['Posting Date'] : null);
     }
   }
 

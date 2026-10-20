@@ -3498,30 +3498,129 @@ h1, h2, h3, h4, h5, h6,
   border-collapse: collapse;
 }
 
-#auditTable th,
-#auditTable td {
-  padding: 6px 5px !important;
-  font-size: 0.73rem !important;
+/* ==========================================================================
+   TAB 5: TRACKING AR - 11 COLUMNS & MODERN YELLOW HEADER (IMAGE 1 & 2 MOCKUP)
+   ========================================================================== */
+
+#auditTable {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#auditTable thead th {
+  background: #facc15 !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  font-size: 0.74rem !important;
+  letter-spacing: -0.01em;
+  padding: 10px 8px !important;
+  border: 1px solid #eab308 !important;
+  white-space: nowrap !important;
+  text-transform: uppercase;
+}
+
+#auditTable tbody td {
+  padding: 8px 8px !important;
+  font-size: 0.75rem !important;
   vertical-align: middle !important;
+  border: 1px solid #f1f5f9;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
 }
 
-#auditTable th {
-  font-size: 0.70rem !important;
-  letter-spacing: -0.01em;
-  padding: 8px 5px !important;
-  white-space: nowrap !important;
+#auditTable tbody tr:hover {
+  background: rgba(254, 240, 138, 0.15) !important;
 }
 
 #auditTable .audit-col-no { width: 3%; text-align: center; }
-#auditTable .audit-col-doc { width: 8.5%; }
-#auditTable .audit-col-date { width: 8%; }
-#auditTable .audit-col-cust { width: 9.5%; }
-#auditTable .audit-col-wa { width: 10.5%; }
-#auditTable .audit-col-sosmed { width: 7.5%; }
-#auditTable .audit-col-keep { width: 14%; }
-#auditTable .audit-col-notes { width: 14%; }
-#auditTable .audit-col-items { width: 17%; }
-#auditTable .audit-col-status { width: 8%; text-align: center; }
+#auditTable .audit-col-keep-date { width: 8.5%; text-align: center; }
+#auditTable .audit-col-cust { width: 10.5%; }
+#auditTable .audit-col-wa { width: 11.5%; }
+#auditTable .audit-col-sosmed { width: 8.5%; text-align: center; }
+#auditTable .audit-col-keep { width: 14.5%; }
+#auditTable .audit-col-notes { width: 12.5%; }
+#auditTable .audit-col-report-ar { width: 8%; text-align: center; }
+#auditTable .audit-col-report-date { width: 8%; text-align: center; }
+#auditTable .audit-col-vlookup-ar { width: 8%; text-align: center; }
+#auditTable .audit-col-vlookup-date { width: 7.5%; text-align: center; }
+
+/* Column Hiding Engine */
+.col-hidden {
+  display: none !important;
+}
+
+/* Column Toggle Dropdown Menu */
+.audit-col-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1050;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  min-width: 260px;
+  padding: 12px;
+  margin-top: 4px;
+}
+
+.col-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.btn-xs-link {
+  background: none;
+  border: none;
+  color: #c8102e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.col-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.col-menu-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+}
+
+.col-menu-list label:hover {
+  color: #0f172a;
+}
+
+/* Sosmed Pill Badge matching Image 2 */
+.badge-sosmed-pill {
+  display: inline-block;
+  border: 1.5px solid #f43f5e;
+  color: #be123c;
+  background: #fff1f2;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 
