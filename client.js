@@ -2399,14 +2399,20 @@ function applyAuditFilters() {
         if (d) {
           isoDate = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
         }
-      } else if (typeof r.postingDate === 'string') {
-        const parts = r.postingDate.trim().split(/[\/\-]/);
+      } else if (r.postingDate instanceof Date) {
+        isoDate = `${r.postingDate.getFullYear()}-${String(r.postingDate.getMonth() + 1).padStart(2,'0')}-${String(r.postingDate.getDate()).padStart(2,'0')}`;
+      } else if (r.postingDate) {
+        const cleanStr = String(r.postingDate).trim().split(' ')[0].split('T')[0];
+        const parts = cleanStr.split(/[\/\-]/);
         if (parts.length >= 3) {
           if (parts[0].length === 4) {
             isoDate = `${parts[0]}-${String(parts[1]).padStart(2,'0')}-${String(parts[2]).padStart(2,'0')}`;
           } else {
-            const d1 = `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
-            const d2 = `${parts[2]}-${String(parts[0]).padStart(2,'0')}-${String(parts[1]).padStart(2,'0')}`;
+            const y = parts[2];
+            const p0 = String(parts[0]).padStart(2,'0');
+            const p1 = String(parts[1]).padStart(2,'0');
+            const d1 = `${y}-${p1}-${p0}`;
+            const d2 = `${y}-${p0}-${p1}`;
             if (d1 === tanggalARVal || d2 === tanggalARVal) {
               isoDate = tanggalARVal;
             } else {
@@ -4433,10 +4439,16 @@ function filterTableDate(query) {
   }
 }
 
-// 14. SEPARATE FILE UPLOADERS: TURNOVER (DASHBOARD & LAPORAN) VS CROSSELLING (CEK AR)
 function handleTurnoverFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
+
+  const fileNameLower = (file.name || '').toLowerCase();
+  if (fileNameLower.includes('croselling') || fileNameLower.includes('crosselling')) {
+    handleCrosellingFileSelect(e);
+    return;
+  }
+
   const fileSizeMb = (file.size / (1024 * 1024)).toFixed(1);
   showSaveToast(`⏳ Sedang membaca file Excel (${fileSizeMb} MB)... Mohon tunggu beberapa detik.`);
   const reader = new FileReader();
@@ -4448,6 +4460,22 @@ function handleTurnoverFileSelect(e) {
         alert("File Excel turnover kosong atau sheet transaksi tidak terbaca!");
         return;
       }
+      // Check if it's actually croselling data (has 'No HP Customer' and not 'DPP')
+      const firstRow = jsonData[0] || {};
+      if ('No HP Customer' in firstRow && !('DPP' in firstRow)) {
+        rawCrosellingRows = jsonData;
+        const updateTs = getFormattedTimestamp();
+        await saveFileToIndexedDB('croselling_file', buffer);
+        localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
+        updateCrosellingIndicator(`File Cross Selling terupdate per ${updateTs}`);
+        saveExcelToServer(buffer, 'croselling');
+        if (typeof runARMissingSosmedAudit === 'function') {
+          runARMissingSosmedAudit();
+        }
+        alert(`✅ File terdeteksi sebagai data Cross Selling (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase Cek AR & Audit AR telah diperbarui.`);
+        return;
+      }
+
       rawTurnoverRows = jsonData;
       const updateTs = getFormattedTimestamp();
       await saveFileToIndexedDB('turnover_file', buffer);
@@ -4468,6 +4496,8 @@ function handleTurnoverFileSelect(e) {
 function handleCrosellingFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
+  const fileSizeMb = (file.size / (1024 * 1024)).toFixed(1);
+  showSaveToast(`⏳ Sedang membaca file Cross Selling (${fileSizeMb} MB)... Mohon tunggu beberapa detik.`);
   const reader = new FileReader();
   reader.onload = async (evt) => {
     try {
@@ -4486,7 +4516,10 @@ function handleCrosellingFileSelect(e) {
       localStorage.setItem('gadgetmart_croselling_timestamp', updateTs);
       updateCrosellingIndicator(`File Cross Selling terupdate per ${updateTs}`);
       saveExcelToServer(buffer, 'croselling');
-      alert(`✅ Berhasil mengunggah file Cross Selling (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase Cek AR & WhatsApp customer telah diperbarui dan tersimpan.`);
+      if (typeof runARMissingSosmedAudit === 'function') {
+        runARMissingSosmedAudit();
+      }
+      alert(`✅ Berhasil mengunggah file Cross Selling (${jsonData.length.toLocaleString('id-ID')} baris data)!\nDatabase Cek AR & Audit AR telah diperbarui dan tersimpan.`);
       if (document.getElementById('arInputSearch') && document.getElementById('arInputSearch').value.trim()) {
         executeARSearch();
       }

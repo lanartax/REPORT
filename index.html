@@ -877,6 +877,10 @@
                 <p>Mencocokkan nomor WhatsApp di Format Keep (Google Sheets) dengan transaksi kasir. Menemukan nomor AR yang <strong>belum diberi kode sosmed</strong> atau <strong>sebagian item belum terinput</strong>.</p>
               </div>
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="file" id="auditCrosellingFileInput" accept=".xlsx, .xls" style="display:none" onchange="handleCrosellingFileSelect(event)">
+                <button class="btn btn-crimson btn-sm" onclick="document.getElementById('auditCrosellingFileInput').click()" title="Unggah file croselling/Google Sheets terbaru untuk dianalisis di sini">
+                  📁 Unggah File Cross Selling (.xlsx)
+                </button>
                 <button class="btn btn-outline btn-sm" onclick="runARMissingSosmedAudit()">
                   🔄 Refresh Analisis Audit AR
                 </button>
