@@ -55,6 +55,74 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // API Update Keep Status to Google Sheets via Google Apps Script Web App
+  if (reqPath === '/api/update-keep-status') {
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+    
+    let nomorWA = '';
+    let status = '';
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      req.on('data', chunk => chunks.push(chunk));
+      req.on('end', async () => {
+        try {
+          const bodyStr = Buffer.concat(chunks).toString('utf8');
+          const body = JSON.parse(bodyStr || '{}');
+          nomorWA = body.nomorWA || '';
+          status = body.status || '';
+
+          if (!nomorWA || !status) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'nomorWA dan status harus diisi' }));
+            return;
+          }
+
+          console.log(`📤 Mengirim update status ke Google Sheets: WA=${nomorWA}, Status=${status}`);
+          const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status)}`;
+          const gasRes = await fetch(targetUrl, { redirect: 'follow' });
+          const gasJson = await gasRes.json();
+          console.log('📥 Respon Google Apps Script:', gasJson);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(gasJson));
+        } catch (err) {
+          console.error('❌ Gagal update status ke Apps Script:', err);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    } else {
+      // GET method support
+      try {
+        const urlParams = new URL(req.url, `http://${req.headers.host}`);
+        nomorWA = urlParams.searchParams.get('nomorWA') || '';
+        status = urlParams.searchParams.get('status') || '';
+
+        if (!nomorWA || !status) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'nomorWA dan status harus diisi' }));
+          return;
+        }
+
+        console.log(`📤 Mengirim update status (GET) ke Google Sheets: WA=${nomorWA}, Status=${status}`);
+        const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status)}`;
+        const gasRes = await fetch(targetUrl, { redirect: 'follow' });
+        const gasJson = await gasRes.json();
+        console.log('📥 Respon Google Apps Script:', gasJson);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(gasJson));
+      } catch (err) {
+        console.error('❌ Gagal update status ke Apps Script:', err);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+      return;
+    }
+  }
+
   // API Save Excel File for LAN Persistence (Tersimpan permanen untuk semua laptop)
   if (reqPath === '/api/save-excel' && req.method === 'POST') {
     const urlParams = new URL(req.url, `http://${req.headers.host}`);
@@ -149,6 +217,39 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, message: 'Foto sales berhasil disimpan ke server!' }));
         } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+  }
+
+  // API AR Claims Data (Get & Save for LAN & Multi-Device Persistence)
+  if (reqPath === '/api/ar-claims') {
+    const claimsFile = path.join(PUBLIC_DIR, 'ar_claims.json');
+    if (req.method === 'GET') {
+      if (fs.existsSync(claimsFile)) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        fs.createReadStream(claimsFile).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
+      return;
+    }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          fs.writeFileSync(claimsFile, JSON.stringify(parsed, null, 2), 'utf8');
+          console.log(`💾 Data Klaim AR berhasil disimpan (${Array.isArray(parsed) ? parsed.length : 0} item)`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, count: Array.isArray(parsed) ? parsed.length : 0 }));
+        } catch (err) {
+          console.error('❌ Gagal menyimpan data klaim AR:', err);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: err.message }));
         }

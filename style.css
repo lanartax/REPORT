@@ -3560,17 +3560,18 @@ h1, h2, h3, h4, h5, h6,
   background: rgba(254, 240, 138, 0.15) !important;
 }
 
-/* 11 Columns Width Ratios - Generous width for text content so it wraps cleanly without overlap */
+/* 12 Columns Width Ratios - Generous width for text content so it wraps cleanly without overlap */
 #auditTable .audit-col-no { width: 3%; min-width: 36px; text-align: center; }
 #auditTable .audit-col-keep-date { width: 7.5%; min-width: 85px; text-align: center; }
-#auditTable .audit-col-cust { width: 10%; min-width: 120px; text-align: left; }
-#auditTable .audit-col-wa { width: 9.5%; min-width: 125px; text-align: left; }
-#auditTable .audit-col-sosmed { width: 9.5%; min-width: 115px; text-align: center; }
-#auditTable .audit-col-keep { width: 16%; min-width: 180px; text-align: left; }
-#auditTable .audit-col-notes { width: 17.5%; min-width: 200px; text-align: left; }
-#auditTable .audit-col-report-ar { width: 7%; min-width: 90px; text-align: center; }
-#auditTable .audit-col-report-date { width: 7%; min-width: 95px; text-align: center; }
-#auditTable .audit-col-vlookup-ar { width: 6.5%; min-width: 90px; text-align: center; }
+#auditTable .audit-col-cust { width: 9%; min-width: 110px; text-align: left; }
+#auditTable .audit-col-wa { width: 8.5%; min-width: 115px; text-align: left; }
+#auditTable .audit-col-sosmed { width: 8%; min-width: 105px; text-align: center; }
+#auditTable .audit-col-keep { width: 14%; min-width: 160px; text-align: left; }
+#auditTable .audit-col-notes { width: 14%; min-width: 160px; text-align: left; }
+#auditTable .audit-col-status-keep { width: 10%; min-width: 135px; text-align: center; }
+#auditTable .audit-col-report-ar { width: 6.5%; min-width: 85px; text-align: center; }
+#auditTable .audit-col-report-date { width: 6.5%; min-width: 90px; text-align: center; }
+#auditTable .audit-col-vlookup-ar { width: 6.5%; min-width: 85px; text-align: center; }
 #auditTable .audit-col-vlookup-date { width: 6.5%; min-width: 90px; text-align: center; }
 
 /* Ensure elements inside auditTable cells wrap properly */
@@ -3661,6 +3662,114 @@ h1, h2, h3, h4, h5, h6,
    TRACKING AR: STATUS ROW & BADGE COLORS (HIJAU, ORANGE, MERAH)
    ========================================================================== */
 
+/* ==========================================================================
+   STATUS KEEP FULL ROW BLOCKING (TERBLOK TEBAL DARI NOMOR SAMPAI TANGGAL AR VLOOKUP)
+   ========================================================================== */
+
+/* 🟢 1. WIN (Hijau) */
+.audit-row-win {
+  border-left: 6px solid #15803d !important;
+}
+.audit-row-win td {
+  background-color: #bbf7d0 !important;
+  color: #064e3b !important;
+  border-color: #86efac !important;
+}
+.audit-row-win:hover td {
+  background-color: #a7f3d0 !important;
+}
+
+/* 🔴 2. LOSE (Merah) */
+.audit-row-lose {
+  border-left: 6px solid #b91c1c !important;
+}
+.audit-row-lose td {
+  background-color: #fecaca !important;
+  color: #7f1d1d !important;
+  border-color: #fca5a5 !important;
+}
+.audit-row-lose:hover td {
+  background-color: #fca5a5 !important;
+}
+
+/* 🔘 3. BELUM DIINPUT (Abu-abu netral) */
+.audit-row-belum-diinput {
+  border-left: 6px solid #475569 !important;
+}
+.audit-row-belum-diinput td {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #cbd5e1 !important;
+}
+.audit-row-belum-diinput:hover td {
+  background-color: #cbd5e1 !important;
+}
+
+/* 🔵 4. DOUBLE KEEP (Biru) */
+.audit-row-double-keep {
+  border-left: 6px solid #1d4ed8 !important;
+}
+.audit-row-double-keep td {
+  background-color: #bfdbfe !important;
+  color: #1e3a8a !important;
+  border-color: #93c5fd !important;
+}
+.audit-row-double-keep:hover td {
+  background-color: #93c5fd !important;
+}
+
+/* ⚪ 5. ON PROGRESS LOW (Abu-abu terang) */
+.audit-row-on-progress-low {
+  border-left: 6px solid #9ca3af !important;
+}
+.audit-row-on-progress-low td {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border-color: #e5e7eb !important;
+}
+.audit-row-on-progress-low:hover td {
+  background-color: #e5e7eb !important;
+}
+
+/* 🟡 6. ON PROGRESS MEDIUM (Hijau muda / lime) */
+.audit-row-on-progress-medium {
+  border-left: 6px solid #65a30d !important;
+}
+.audit-row-on-progress-medium td {
+  background-color: #d9f99d !important;
+  color: #365314 !important;
+  border-color: #bef264 !important;
+}
+.audit-row-on-progress-medium:hover td {
+  background-color: #bef264 !important;
+}
+
+/* 🟣 7. ON PROGRESS HOT (Ungu) */
+.audit-row-on-progress-hot {
+  border-left: 6px solid #7e22ce !important;
+}
+.audit-row-on-progress-hot td {
+  background-color: #e9d5ff !important;
+  color: #581c87 !important;
+  border-color: #d8b4fe !important;
+}
+.audit-row-on-progress-hot:hover td {
+  background-color: #d8b4fe !important;
+}
+
+/* 🟤 8. TAKE OUT (Merah tua / maroon) */
+.audit-row-take-out {
+  border-left: 6px solid #881337 !important;
+}
+.audit-row-take-out td {
+  background-color: #fecdd3 !important;
+  color: #4c0519 !important;
+  border-color: #fda4af !important;
+}
+.audit-row-take-out:hover td {
+  background-color: #fda4af !important;
+}
+
 /* Hijau: Sudah Terinput Semua (100% Sosmed) */
 .audit-row-sosmed {
   border-left: 5px solid #16a34a !important;
@@ -3734,6 +3843,228 @@ h1, h2, h3, h4, h5, h6,
   background: #fee2e2 !important;
   border-color: #f87171 !important;
   box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+}
+
+/* ==========================================================================
+   DROPDOWN EDIT STATUS KEEP (GOOGLE SHEETS INTEGRATION)
+   ========================================================================== */
+.select-status-keep {
+  font-family: inherit;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  border-radius: 9999px !important;
+  padding: 3px 8px !important;
+  cursor: pointer !important;
+  border: 1.5px solid transparent !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  text-align: center !important;
+  max-width: 100% !important;
+  display: inline-block !important;
+  appearance: auto !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.select-status-keep:focus {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;
+}
+
+.select-status-keep.status-saving {
+  opacity: 0.6 !important;
+  cursor: wait !important;
+  animation: pulse-status 1s infinite alternate;
+}
+
+@keyframes pulse-status {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* 8 Color Themes Matching Google Sheets Dropdown */
+.select-status-keep.status-win {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+.select-status-keep.status-lose {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+}
+.select-status-keep.status-belum-diinput {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
+.select-status-keep.status-double-keep {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+}
+.select-status-keep.status-on-progress-low {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border-color: #d1d5db !important;
+}
+.select-status-keep.status-on-progress-medium {
+  background: #ecfccb !important;
+  color: #4d7c0f !important;
+  border-color: #bef264 !important;
+}
+.select-status-keep.status-on-progress-hot {
+  background: #f3e8ff !important;
+  color: #6b21a8 !important;
+  border-color: #d8b4fe !important;
+}
+.select-status-keep.status-take-out {
+  background: #ffe4e6 !important;
+  color: #881337 !important;
+  border-color: #fda4af !important;
+}
+.select-status-keep.status-empty {
+  background: #ffffff !important;
+  color: #94a3b8 !important;
+  border-color: #cbd5e1 !important;
+}
+.select-status-keep.status-empty:hover {
+  border-color: #94a3b8 !important;
+  color: #475569 !important;
+}
+
+/* ==========================================================================
+   MODUL KLAIM AR: SUB-TABS, COUNTDOWN TIMERS & DENDA BADGES
+   ========================================================================== */
+.btn-subtab {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 8px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-subtab:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.btn-subtab.active {
+  color: #c8102e;
+  border-bottom-color: #c8102e;
+  background: rgba(200, 16, 46, 0.04);
+}
+
+.subtab-badge {
+  display: inline-block;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+}
+
+.btn-subtab.active .subtab-badge {
+  background: #c8102e;
+  color: #ffffff;
+}
+
+.subtab-badge.badge-red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.btn-subtab.active .subtab-badge.badge-red {
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.subtab-badge.badge-green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.btn-subtab.active .subtab-badge.badge-green {
+  background: #15803d;
+  color: #ffffff;
+}
+
+/* Countdown & Denda Badges */
+.badge-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+.badge-countdown.safe {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.badge-countdown.warning {
+  background: #fef9c3;
+  color: #854d0e;
+  border-color: #fde047;
+}
+
+.badge-countdown.expired {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+  animation: pulse-countdown 1.2s infinite alternate;
+}
+
+@keyframes pulse-countdown {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+
+.badge-denda-potensi {
+  display: inline-block;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-denda-real {
+  display: inline-block;
+  background: #ffe4e6;
+  color: #881337;
+  border: 1.5px solid #fda4af;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.badge-denda-pass {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  font-size: 0.70rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 

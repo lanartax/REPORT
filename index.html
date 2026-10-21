@@ -9,8 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <!-- Local SheetJS, html2canvas, and Chart.js libraries -->
+  <!-- Local SheetJS, JSZip, html2canvas, and Chart.js libraries -->
   <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/jszip.min.js"></script>
   <script src="lib/html2canvas.min.js"></script>
   <script src="lib/chart.umd.min.js"></script>
   <link rel="icon" type="image/png" href="logo.png">
@@ -31,7 +32,7 @@
       </div>
 
       <div class="header-right">
-        <button class="header-btn" onclick="switchTab(7)" title="Buka Pengaturan Admin">Setting</button>
+        <button class="header-btn" onclick="switchTab(8)" title="Buka Pengaturan Admin">Setting</button>
         <button class="header-btn" id="headerLoginBtn" onclick="openLoginModal()" title="Login Akun Workspace">Login</button>
         <div class="header-menu-wrapper">
           <button class="header-btn btn-menu-toggle" id="headerMenuBtn" onclick="toggleWorkspaceMenu(event)" title="Buka Menu Navigasi">Menu</button>
@@ -60,13 +61,17 @@
               <span class="dropdown-text">Audit AR Belum Sosmed</span>
             </button>
             <button class="dropdown-item" id="tabBtn6" onclick="switchTab(6); closeWorkspaceMenu();">
+              <span class="dropdown-icon">🏷️</span>
+              <span class="dropdown-text">Klaim AR & Denda Cabang</span>
+            </button>
+            <button class="dropdown-item" id="tabBtn7" onclick="switchTab(7); closeWorkspaceMenu();">
               <span class="dropdown-icon">📁</span>
               <span class="dropdown-text">Arsip Pencapaian Bulanan</span>
             </button>
 
             <div class="dropdown-separator"></div>
             <div class="dropdown-group-title">ADMINISTRASI</div>
-            <button class="dropdown-item" id="tabBtn7" onclick="switchTab(7); closeWorkspaceMenu();">
+            <button class="dropdown-item" id="tabBtn8" onclick="switchTab(8); closeWorkspaceMenu();">
               <span class="dropdown-icon">⚙️</span>
               <span class="dropdown-text">Pengaturan Admin</span>
             </button>
@@ -786,6 +791,16 @@
             </div>
 
             <div class="filter-group">
+              <label for="keepFilterTanggal">Filter Tanggal Format Keep:</label>
+              <input type="date" id="keepFilterTanggal" class="form-input" onchange="applyKeepFilters()" title="Filter berdasarkan tanggal format keep (Timestamp Google Sheets)">
+            </div>
+
+            <div class="filter-group">
+              <label for="keepFilterReportAR">Filter by Report No. AR:</label>
+              <input type="text" id="keepFilterReportAR" class="form-input" placeholder="Ketik No. AR..." oninput="applyKeepFilters()" title="Filter data keep berdasarkan nomor REPORT AR">
+            </div>
+
+            <div class="filter-group">
               <label for="keepFilterStatus">Filter Status:</label>
               <select id="keepFilterStatus" class="form-input" onchange="applyKeepFilters()">
                 <option value="ALL">Semua Status</option>
@@ -799,12 +814,12 @@
               </select>
             </div>
 
-            <div class="filter-group" style="flex: 1.5; min-width: 240px;">
+            <div class="filter-group" style="flex: 1.5; min-width: 200px;">
               <label for="keepSearchInput">Cari Kata Kunci:</label>
-              <input type="text" id="keepSearchInput" class="form-input" placeholder="Cari Nama Customer, No. WA, Barang, AR..." oninput="applyKeepFilters()">
+              <input type="text" id="keepSearchInput" class="form-input" placeholder="Cari Nama Customer, No. WA, Barang..." oninput="applyKeepFilters()">
             </div>
 
-            <div class="filter-group" style="min-width: 120px;">
+            <div class="filter-group" style="min-width: 110px;">
               <button class="btn btn-outline" onclick="resetKeepFilters()" style="height: 42px; width: 100%;">Reset Filter</button>
             </div>
           </div>
@@ -883,6 +898,9 @@
                 <button class="btn btn-crimson btn-sm" onclick="document.getElementById('auditCrosellingFileInput').click()" title="Unggah file croselling/Google Sheets terbaru untuk dianalisis di sini">
                   📁 Unggah File Cross Selling (.xlsx)
                 </button>
+                <button class="btn btn-outline btn-sm" onclick="claimAllFilteredMissingAR()" title="Masukkan semua faktur AR yang berstatus belum/sebagian sosmed ke Modul Klaim AR (Pengumpulan 3 Hari)" style="border-color: #c8102e; color: #c8102e; font-weight: 700;">
+                  🏷️ Klaim Semua AR Belum Sosmed
+                </button>
                 <button class="btn btn-outline btn-sm" onclick="runARMissingSosmedAudit()">
                   🔄 Refresh Analisis Audit AR
                 </button>
@@ -959,6 +977,7 @@
                   <label><input type="checkbox" data-col="audit-col-sosmed" checked onchange="toggleAuditColumn('audit-col-sosmed', this.checked)"> Kode Sosmed</label>
                   <label><input type="checkbox" data-col="audit-col-keep" checked onchange="toggleAuditColumn('audit-col-keep', this.checked)"> Barang Keep</label>
                   <label><input type="checkbox" data-col="audit-col-notes" checked onchange="toggleAuditColumn('audit-col-notes', this.checked)"> Catatan</label>
+                  <label><input type="checkbox" data-col="audit-col-status-keep" checked onchange="toggleAuditColumn('audit-col-status-keep', this.checked)"> Status Keep</label>
                   <label><input type="checkbox" data-col="audit-col-report-ar" checked onchange="toggleAuditColumn('audit-col-report-ar', this.checked)"> Report AR dan Produk</label>
                   <label><input type="checkbox" data-col="audit-col-report-date" checked onchange="toggleAuditColumn('audit-col-report-date', this.checked)"> Tanggal Report AR</label>
                   <label><input type="checkbox" data-col="audit-col-vlookup-ar" checked onchange="toggleAuditColumn('audit-col-vlookup-ar', this.checked)"> AR VLOOKUP</label>
@@ -1009,6 +1028,7 @@
                   <th class="audit-col-sosmed" style="text-align: center;">KODE SOSMED</th>
                   <th class="audit-col-keep">BARANG KEEP</th>
                   <th class="audit-col-notes">CATATAN</th>
+                  <th class="audit-col-status-keep" style="text-align: center;">STATUS KEEP</th>
                   <th class="audit-col-report-ar" style="text-align: center;">REPORT AR DAN PRODUK</th>
                   <th class="audit-col-report-date" style="text-align: center;">TANGGAL REPORT AR</th>
                   <th class="audit-col-vlookup-ar" style="text-align: center;">AR VLOOKUP</th>
@@ -1031,8 +1051,142 @@
         </div>
       </section>
 
-      <!-- ================= TAB 6: ARSIP PENCAPAIAN BULANAN ================= -->
+      <!-- ================= TAB 6: KLAIM AR & PENGAWASAN DENDA CABANG ================= -->
       <section id="tabContent6" class="tab-content">
+        <div class="card-tegas table-card card-accent-left mb-24">
+          <div class="admin-card-header">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                  <h3 style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; margin: 0;">🏷️ KLAIM AR & PENGAWASAN DENDA CABANG</h3>
+                  <span class="kpi-pill-badge badge-crimson" id="claimCycleBadge">Siklus 3 Hari</span>
+                </div>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--text-muted);">
+                  Pengawasan faktur AR belum sosmed: kumpulkan 3 hari sekali, distribusikan hari ke-4, pantau masa tenggang H+1, dan eskalasi denda sungguhan jika tidak direvisi cabang.
+                </p>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-crimson btn-sm" id="btnShareBatchDay4" onclick="shareARClaimsBatchDay4()" title="Unduh paket file Excel per cabang (.zip) dan pindahkan semua item ke antrean 'Cek AR Setelah di Share'">
+                  📦 Unduh Paket Cabang & Share (Hari ke-4)
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="checkARClaimsAutoResolution(true)" title="Cek apakah ada AR yang sudah direvisi cabang di transaksi SAP atau sudah lewat batas H+1">
+                  🔄 Cek Status Revisi & H+1
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="exportClaimsPenaltyReport()" title="Salin atau unduh rekap denda kasir per cabang untuk diserahkan ke Manajemen/HRD">
+                  📋 Rekap Denda Cabang
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary Mini Cards -->
+          <div class="keep-stats-summary" style="padding: 14px 18px 0;">
+            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('COLLECTING')" id="cardStatCollecting">
+              <div class="label">1. Pengumpulan (3 Hari)</div>
+              <div class="val text-ink" id="claimCountCollecting">0</div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">Menunggu Hari ke-4</div>
+            </div>
+            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('SHARED')" id="cardStatShared">
+              <div class="label">2. Setelah di Share (H+1)</div>
+              <div class="val text-gold" id="claimCountShared">0</div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">Masa Tenggang Cabang</div>
+            </div>
+            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('PENALTY')" id="cardStatPenalty">
+              <div class="label">3. Denda Sungguhan</div>
+              <div class="val text-crimson" id="claimCountPenalty">0</div>
+              <div style="font-size: 0.7rem; color: #be123c; margin-top: 3px;" id="claimTotalPenaltyRp">Rp 0 (Lewat H+1)</div>
+            </div>
+            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('RESOLVED')" id="cardStatResolved">
+              <div class="label">4. Selesai Direvisi</div>
+              <div class="val text-accent" id="claimCountResolved">0</div>
+              <div style="font-size: 0.7rem; color: #15803d; margin-top: 3px;">Sudah Jadi BJM.SOS</div>
+            </div>
+          </div>
+
+          <!-- Sub-Tab Navigation Bar -->
+          <div style="padding: 16px 18px 0; display: flex; gap: 8px; border-bottom: 1.5px solid #e2e8f0; overflow-x: auto;">
+            <button class="btn-subtab active" id="subtabBtnCollecting" onclick="setClaimsSubTab('COLLECTING')">
+              📥 1. Pengumpulan AR (Batch 3 Hari) <span class="subtab-badge" id="badgeSubtabCollecting">0</span>
+            </button>
+            <button class="btn-subtab" id="subtabBtnShared" onclick="setClaimsSubTab('SHARED')">
+              📤 2. Cek AR Setelah di Share (Tenggat H+1) <span class="subtab-badge" id="badgeSubtabShared">0</span>
+            </button>
+            <button class="btn-subtab" id="subtabBtnPenalty" onclick="setClaimsSubTab('PENALTY')">
+              🚨 3. Denda Sungguhan & Input Mandiri <span class="subtab-badge badge-red" id="badgeSubtabPenalty">0</span>
+            </button>
+            <button class="btn-subtab" id="subtabBtnResolved" onclick="setClaimsSubTab('RESOLVED')">
+              ✅ 4. Selesai Direvisi Cabang <span class="subtab-badge badge-green" id="badgeSubtabResolved">0</span>
+            </button>
+          </div>
+
+          <!-- Filter Controls -->
+          <div class="keep-filters-grid" style="padding: 14px 18px 0;">
+            <div class="filter-group">
+              <label for="claimsFilterCabang">Filter Cabang Toko:</label>
+              <select id="claimsFilterCabang" class="form-input" onchange="applyClaimsFilters()">
+                <option value="ALL">Semua Cabang Toko</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="claimsFilterSosmed">Filter Target Sosmed:</label>
+              <select id="claimsFilterSosmed" class="form-input" onchange="applyClaimsFilters()">
+                <option value="ALL">Semua Kode Sosmed</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="claimsFilterTanggal">Filter Tanggal Masuk / Share:</label>
+              <input type="date" id="claimsFilterTanggal" class="form-input" onchange="applyClaimsFilters()">
+            </div>
+
+            <div class="filter-group" style="flex: 1.5; min-width: 200px;">
+              <label for="claimsSearchInput">Cari Kata Kunci:</label>
+              <input type="text" id="claimsSearchInput" class="form-input" placeholder="Cari No. AR, Nama Kasir, Cabang, Barang, Customer..." oninput="applyClaimsFilters()">
+            </div>
+
+            <div class="filter-group" style="min-width: 100px;">
+              <button class="btn btn-outline" onclick="resetClaimsFilters()" style="height: 42px; width: 100%;">Reset</button>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="table-responsive" style="margin-top: 14px;">
+            <table class="kpi-matrix-table" id="claimsTable">
+              <thead>
+                <tr>
+                  <th style="width: 3.5%; text-align: center;">NO</th>
+                  <th style="width: 9%; text-align: center;">NO. AR</th>
+                  <th style="width: 8%; text-align: center;">TGL FAKTUR</th>
+                  <th style="width: 6.5%; text-align: center;">CABANG</th>
+                  <th style="width: 13%; text-align: left;">CUSTOMER & WA</th>
+                  <th style="width: 17%; text-align: left;">BARANG & NOMINAL</th>
+                  <th style="width: 12%; text-align: left;">SALES OFFLINE KASIR</th>
+                  <th style="width: 9%; text-align: center;">KODE SOSMED</th>
+                  <th style="width: 11%; text-align: center;">STATUS & TENGGAT</th>
+                  <th style="width: 5.5%; text-align: center;">DENDA</th>
+                  <th style="width: 5.5%; text-align: center;">AKSI</th>
+                </tr>
+              </thead>
+              <tbody id="claimsTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar">
+            <div id="claimsPaginationInfo">Menampilkan 0 dari 0 Data Klaim</div>
+            <div class="pagination-controls">
+              <button class="btn-page" id="btnClaimsPrev" onclick="changeClaimsPage(-1)">&laquo; Sebelumnya</button>
+              <span id="claimsCurrentPageText" style="margin: 0 8px;">Halaman 1 / 1</span>
+              <button class="btn-page" id="btnClaimsNext" onclick="changeClaimsPage(1)">Selanjutnya &raquo;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 7: ARSIP PENCAPAIAN BULANAN ================= -->
+      <section id="tabContent7" class="tab-content">
         <!-- Card Upload File Excel Per Bulan ke Arsip (Permintaan User) -->
         <div class="card-tegas mb-24" style="padding: 22px 26px; border-left: 7px solid #c8102e;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
@@ -1103,8 +1257,8 @@
         </div>
       </section>
 
-      <!-- ================= TAB 7: PENGATURAN ADMIN ================= -->
-      <section id="tabContent7" class="tab-content">
+      <!-- ================= TAB 8: PENGATURAN ADMIN ================= -->
+      <section id="tabContent8" class="tab-content">
         <div class="admin-grid">
           <!-- Card Master Foto & Avatar Profil Sales (Sesuai Permintaan User) -->
           <div class="card-tegas admin-card" style="grid-column: 1 / -1; margin-bottom: 24px;">
@@ -1327,6 +1481,7 @@
                   <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: center;">KODE SOSMED</th>
                   <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase;">BARANG KEEP</th>
                   <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase;">CATATAN</th>
+                  <th style="padding: 10px 14px; font-size: 0.75rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: center;">STATUS KEEP</th>
                 </tr>
               </thead>
               <tbody>
@@ -1336,6 +1491,7 @@
                   <td style="padding: 12px 14px; text-align: center;" id="modalTrackSosmed">-</td>
                   <td style="padding: 12px 14px; font-size: 0.85rem; font-weight: 600; color: #1e293b;" id="modalTrackKeepBarang">-</td>
                   <td style="padding: 12px 14px; font-size: 0.76rem; line-height: 1.35; color: #334155;" id="modalTrackCatatan">-</td>
+                  <td style="padding: 12px 14px; text-align: center;" id="modalTrackStatusKeep">-</td>
                 </tr>
               </tbody>
             </table>
@@ -1389,9 +1545,14 @@
           </div>
 
           <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <button class="btn btn-outline" onclick="copyModalSelectedItems(this)" style="font-weight: 700; border: 1.5px solid #0f172a;" title="Salin semua item yang dicentang ke format 12 kolom Excel (tanpa header)">
-              📋 Salin Item Tercentang (Format Excel)
-            </button>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button class="btn btn-outline" onclick="copyModalSelectedItems(this)" style="font-weight: 700; border: 1.5px solid #0f172a;" title="Salin semua item yang dicentang ke format 12 kolom Excel (tanpa header)">
+                📋 Salin Item Tercentang (Format Excel)
+              </button>
+              <button class="btn btn-outline" onclick="claimModalSelectedItems(this)" style="font-weight: 700; border: 1.5px solid #c8102e; color: #c8102e;" title="Masukkan item tercentang ke Modul Klaim AR (Pengumpulan 3 Hari)">
+                🏷️ Masukkan ke Klaim Cabang
+              </button>
+            </div>
             <button class="btn btn-crimson" onclick="switchModalSubTab(2)">
               🚨 Laporkan Ada yang Belum Terinput / Salah ke Akmal &raquo;
             </button>

@@ -1024,7 +1024,7 @@ function toggleSidebarMobile() {
 
 function switchTab(tabIndex) {
   currentActiveTab = tabIndex;
-  for (let i = 1; i <= 7; i++) {
+  for (let i = 1; i <= 8; i++) {
     const btn = document.getElementById(`tabBtn${i}`);
     const content = document.getElementById(`tabContent${i}`);
     if (btn) btn.classList.toggle('active', i === tabIndex);
@@ -1054,8 +1054,9 @@ function switchTab(tabIndex) {
 
   if (tabIndex === 4 && rawKeepRows.length === 0) loadKeepData();
   if (tabIndex === 5 && rawAuditARList.length === 0) runARMissingSosmedAudit();
-  if (tabIndex === 6) renderArchiveGrid();
-  if (tabIndex === 7) {
+  if (tabIndex === 6) renderARClaimsModule();
+  if (tabIndex === 7) renderArchiveGrid();
+  if (tabIndex === 8) {
     populateAdminPanel(getMasterSales());
     onAdminTargetMonthChange();
     renderAdminPhotoTable();
@@ -1546,6 +1547,7 @@ async function loadKeepData() {
 
     if (!jsonData || jsonData.length === 0) return;
     rawKeepRows = jsonData;
+    rawKeepRows.forEach((r, idx) => { r._gsheetsIndex = idx; });
     console.log(`Keep data loaded: ${rawKeepRows.length} rows`);
 
     if (pill) {
@@ -1623,6 +1625,7 @@ function parseKeepCSV(csvText) {
 
     if (!jsonData || jsonData.length === 0) return;
     rawKeepRows = jsonData;
+    rawKeepRows.forEach((r, idx) => { r._gsheetsIndex = idx; });
     console.log(`Keep CSV parsed successfully: ${rawKeepRows.length} rows`);
     const pill = document.getElementById('keepStatusPill');
     if (pill) {
@@ -1719,10 +1722,12 @@ function populateKeepSosmedDropdown() {
 function applyKeepFilters() {
   if (!rawKeepRows || rawKeepRows.length === 0) return;
 
-  const periodVal = document.getElementById('keepFilterPeriode').value;
-  const sosmedVal = document.getElementById('keepFilterSosmed').value;
-  const statusVal = document.getElementById('keepFilterStatus').value;
-  const keyword = (document.getElementById('keepSearchInput').value || '').trim().toLowerCase();
+  const periodVal = document.getElementById('keepFilterPeriode') ? document.getElementById('keepFilterPeriode').value : 'ALL';
+  const sosmedVal = document.getElementById('keepFilterSosmed') ? document.getElementById('keepFilterSosmed').value : 'ALL';
+  const statusVal = document.getElementById('keepFilterStatus') ? document.getElementById('keepFilterStatus').value : 'ALL';
+  const tanggalVal = document.getElementById('keepFilterTanggal') ? document.getElementById('keepFilterTanggal').value : '';
+  const reportARVal = (document.getElementById('keepFilterReportAR') ? document.getElementById('keepFilterReportAR').value : '').trim().toLowerCase();
+  const keyword = (document.getElementById('keepSearchInput') ? document.getElementById('keepSearchInput').value : '').trim().toLowerCase();
 
   filteredKeepRows = rawKeepRows.filter(r => {
     // 1. Period filter
@@ -1743,7 +1748,19 @@ function applyKeepFilters() {
       if (st !== statusVal.toUpperCase()) return false;
     }
 
-    // 4. Keyword search (Name, Phone, Item, AR, Notes)
+    // 4. Filter Tanggal Format Keep (Timestamp Google Sheets)
+    if (tanggalVal) {
+      const keepDateIso = parseDateToISO(r['Timestamp']);
+      if (keepDateIso !== tanggalVal) return false;
+    }
+
+    // 5. Filter by Report No. AR
+    if (reportARVal) {
+      const repAR = String(r['REPORT AR'] || '').toLowerCase();
+      if (!repAR.includes(reportARVal)) return false;
+    }
+
+    // 6. Keyword search (Name, Phone, Item, AR, Notes)
     if (keyword) {
       const combined = `${r['Nama'] || ''} ${r['Nomor WA'] || ''} ${r['Barang Keep'] || ''} ${r['REPORT AR'] || ''} ${r['Catatan'] || ''} ${r['Feedback Tim FU'] || ''}`.toLowerCase();
       if (!combined.includes(keyword)) return false;
@@ -1778,10 +1795,12 @@ function applyKeepFilters() {
 }
 
 function resetKeepFilters() {
-  document.getElementById('keepFilterPeriode').value = 'Oktober-26';
-  document.getElementById('keepFilterSosmed').value = 'ALL';
-  document.getElementById('keepFilterStatus').value = 'ALL';
-  document.getElementById('keepSearchInput').value = '';
+  if (document.getElementById('keepFilterPeriode')) document.getElementById('keepFilterPeriode').value = 'Oktober-26';
+  if (document.getElementById('keepFilterSosmed')) document.getElementById('keepFilterSosmed').value = 'ALL';
+  if (document.getElementById('keepFilterStatus')) document.getElementById('keepFilterStatus').value = 'ALL';
+  if (document.getElementById('keepFilterTanggal')) document.getElementById('keepFilterTanggal').value = '';
+  if (document.getElementById('keepFilterReportAR')) document.getElementById('keepFilterReportAR').value = '';
+  if (document.getElementById('keepSearchInput')) document.getElementById('keepSearchInput').value = '';
   applyKeepFilters();
 }
 
@@ -2038,12 +2057,35 @@ function openARDetailModal(docNumber, keepContext = null, sourceTitle = '') {
   const elSos = document.getElementById('modalTrackSosmed');
   const elBarang = document.getElementById('modalTrackKeepBarang');
   const elCat = document.getElementById('modalTrackCatatan');
+  const elStatus = document.getElementById('modalTrackStatusKeep');
 
   if (elCust) elCust.innerText = custName;
   if (elWA) elWA.innerHTML = waHtml;
   if (elSos) elSos.innerHTML = `<span class="badge-sosmed-pill">${sosmedCode}</span>`;
   if (elBarang) elBarang.innerText = keepBarang;
   if (elCat) elCat.innerHTML = catatanModalHtml;
+
+  if (elStatus) {
+    const rawModalWA = String(currentModalKeep && currentModalKeep['Nomor WA'] || '').replace(/\D/g, '');
+    const rawModalStatus = currentModalKeep && currentModalKeep['Status'];
+    const currentStatus = (rawModalStatus && String(rawModalStatus).trim() !== '-') ? String(rawModalStatus).trim().toUpperCase() : '';
+    const statusSelectClass = getKeepStatusClass(currentStatus);
+
+    let statusOptionsHtml = '';
+    if (currentStatus && !KEEP_STATUS_OPTIONS.some(o => o.value.toUpperCase() === currentStatus)) {
+      statusOptionsHtml += `<option value="${currentStatus}" selected>${currentStatus}</option>`;
+    }
+    KEEP_STATUS_OPTIONS.forEach(opt => {
+      const isSel = (opt.value.toUpperCase() === currentStatus);
+      statusOptionsHtml += `<option value="${opt.value}" ${isSel ? 'selected' : ''}>${opt.label}</option>`;
+    });
+
+    elStatus.innerHTML = (rawModalWA && rawModalWA.length >= 8) ? `
+      <select class="select-status-keep ${statusSelectClass}" data-prev="${currentStatus}" onchange="handleModalKeepStatusChange(this, '${rawModalWA}')" title="Klik untuk mengubah status follow-up customer ini (otomatis tersimpan ke Google Sheets)">
+        ${statusOptionsHtml}
+      </select>
+    ` : `<span class="kpi-badge badge-ink">-</span>`;
+  }
 
   // Backward compatibility metadata
   const metaDocEl = document.getElementById('modalMetaDoc');
@@ -2486,7 +2528,8 @@ function runARMissingSosmedAudit() {
   const phoneLast9ToKeep = new Map();
   const arDocToKeep = new Map();
 
-  rawKeepRows.forEach(k => {
+  rawKeepRows.forEach((k, idx) => {
+    k._gsheetsIndex = idx;
     const norm = normalizePhone(k['Nomor WA']);
     if (norm && norm.length >= 8) {
       if (!phoneToKeep.has(norm)) phoneToKeep.set(norm, []);
@@ -2642,6 +2685,7 @@ function runARMissingSosmedAudit() {
         totalDocValue,
         status: arStatus,
         keep: bestKeep,
+        keepGSheetsIndex: (bestKeep && typeof bestKeep._gsheetsIndex === 'number') ? bestKeep._gsheetsIndex : 9999999,
         items: items,
         vlookupARDoc,
         vlookupARDate,
@@ -2658,8 +2702,17 @@ function runARMissingSosmedAudit() {
     }
   });
 
-  // Sort descending by Timestamp Format Keep!
-  rawAuditARList.sort((a, b) => (b.keepTimestampEpoch || 0) - (a.keepTimestampEpoch || 0));
+  // Urutkan tanggal format keep dari yang terlama sampai terbaru (persis urutan baris Google Sheets dari atas ke bawah)
+  rawAuditARList.sort((a, b) => {
+    // 1. Urutkan berdasarkan index baris asli Google Sheets (baris terlama di atas, terbaru di bawah)
+    const idxA = (typeof a.keepGSheetsIndex === 'number') ? a.keepGSheetsIndex : 9999999;
+    const idxB = (typeof b.keepGSheetsIndex === 'number') ? b.keepGSheetsIndex : 9999999;
+    if (idxA !== idxB) {
+      return idxA - idxB;
+    }
+    // 2. Fallback berdasarkan timestamp epoch (terlama ke terbaru)
+    return (a.keepTimestampEpoch || 0) - (b.keepTimestampEpoch || 0);
+  });
 
   if (pill) {
     pill.innerHTML = `<span>📁 ${rawAuditARList.length} AR Ditemukan</span>`;
@@ -2806,6 +2859,185 @@ function changeAuditPage(delta) {
   }
 }
 
+// ==========================================================================
+// STATUS KEEP (GOOGLE SHEETS LIVE UPDATE ENGINE)
+// ==========================================================================
+const KEEP_STATUS_OPTIONS = [
+  { value: '', label: '- Kosong -' },
+  { value: 'WIN', label: 'WIN' },
+  { value: 'LOSE', label: 'LOSE' },
+  { value: 'BELUM DIINPUT', label: 'BELUM DIINPUT' },
+  { value: 'DOUBLE KEEP', label: 'DOUBLE KEEP' },
+  { value: 'ON PROGRESS LOW', label: 'ON PROGRESS LOW' },
+  { value: 'ON PROGRESS MEDIUM', label: 'ON PROGRESS MEDIUM' },
+  { value: 'ON PROGRESS HOT', label: 'ON PROGRESS HOT' },
+  { value: 'TAKE OUT', label: 'TAKE OUT' }
+];
+
+function getKeepStatusClass(status) {
+  const s = String(status || '').trim().toUpperCase();
+  if (!s || s === '-' || s === 'KOSONG') return 'status-empty';
+  if (s === 'WIN') return 'status-win';
+  if (s === 'LOSE') return 'status-lose';
+  if (s === 'BELUM DIINPUT' || s === 'BELUM INPUT') return 'status-belum-diinput';
+  if (s === 'DOUBLE KEEP') return 'status-double-keep';
+  if (s === 'ON PROGRESS LOW') return 'status-on-progress-low';
+  if (s === 'ON PROGRESS MEDIUM') return 'status-on-progress-medium';
+  if (s === 'ON PROGRESS HOT') return 'status-on-progress-hot';
+  if (s === 'TAKE OUT') return 'status-take-out';
+  return 'status-empty';
+}
+
+function getAuditRowClassByKeepStatus(keepStatus, arStatus) {
+  const s = String(keepStatus || '').trim().toUpperCase();
+  if (s === 'WIN') return 'audit-row-win';
+  if (s === 'LOSE') return 'audit-row-lose';
+  if (s === 'BELUM DIINPUT' || s === 'BELUM INPUT') return 'audit-row-belum-diinput';
+  if (s === 'DOUBLE KEEP') return 'audit-row-double-keep';
+  if (s === 'ON PROGRESS LOW') return 'audit-row-on-progress-low';
+  if (s === 'ON PROGRESS MEDIUM') return 'audit-row-on-progress-medium';
+  if (s === 'ON PROGRESS HOT') return 'audit-row-on-progress-hot';
+  if (s === 'TAKE OUT') return 'audit-row-take-out';
+
+  // Jika status keep tidak ada / kosong: gunakan indikator outline sosmed AR
+  if (arStatus === 'ALL_SOSMED') return 'audit-row-sosmed';
+  if (arStatus === 'PARTIAL_MISSING') return 'audit-row-partial';
+  return 'audit-row-missing';
+}
+
+async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
+  const normWA = String(rawWA || '').replace(/\D/g, '');
+  if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update status.');
+
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+
+  let result = null;
+  // 1. Coba lewat backend local-server proxy
+  try {
+    const res = await fetch(`/api/update-keep-status?nomorWA=${encodeURIComponent(normWA)}&status=${encodeURIComponent(newStatus)}`);
+    if (res.ok) {
+      result = await res.json();
+    }
+  } catch (e) {
+    console.warn('Backend proxy update-keep-status gagal, mencoba direct fetch:', e);
+  }
+
+  // 2. Fallback direct fetch ke Apps Script Web App
+  if (!result || !result.success) {
+    try {
+      const directUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(normWA)}&status=${encodeURIComponent(newStatus)}`;
+      const directRes = await fetch(directUrl, { redirect: 'follow' });
+      result = await directRes.json();
+    } catch (directErr) {
+      console.error('Direct fetch Apps Script error:', directErr);
+    }
+  }
+
+  if (result && result.success) {
+    return result;
+  }
+  throw new Error((result && result.message) || 'Gagal menyimpan status ke Google Sheets.');
+}
+
+async function handleTableKeepStatusChange(selectEl, rawWA, auditRowIdx) {
+  if (!selectEl) return;
+  const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
+  const newVal = selectEl.value;
+  if (newVal === oldVal) return;
+
+  const originalClass = selectEl.className;
+  selectEl.disabled = true;
+  selectEl.classList.add('status-saving');
+
+  try {
+    await updateKeepStatusInGoogleSheets(rawWA, newVal);
+
+    // Update state di memory (rawAuditARList, filteredAuditARList, dan rawKeepRows)
+    if (filteredAuditARList[auditRowIdx] && filteredAuditARList[auditRowIdx].keep) {
+      filteredAuditARList[auditRowIdx].keep['Status'] = newVal;
+    }
+    const cleanWA = String(rawWA).replace(/\D/g, '');
+    if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+      rawKeepRows.forEach(k => {
+        if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+          k['Status'] = newVal;
+        }
+      });
+    }
+
+    selectEl.setAttribute('data-prev', newVal);
+    selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
+
+    // Update visual baris tabel: terblok sesuai warna status keep, atau outline sosmed jika kosong
+    const tr = selectEl.closest('tr');
+    if (tr) {
+      const arObj = filteredAuditARList[auditRowIdx];
+      const arSt = arObj ? arObj.status : '';
+      tr.className = getAuditRowClassByKeepStatus(newVal, arSt);
+    }
+
+    const toastLabel = newVal ? `ke "${newVal}"` : 'dikosongkan';
+    showSaveToast(`✅ Status keep WA ${formatPhoneDisplay(rawWA)} berhasil ${toastLabel} di Google Sheets!`);
+  } catch (err) {
+    console.error('Update status error:', err);
+    alert(`Gagal menyimpan status ke Google Sheets:\n${err.message}`);
+    selectEl.value = oldVal;
+    selectEl.className = originalClass;
+  } finally {
+    selectEl.disabled = false;
+    selectEl.classList.remove('status-saving');
+  }
+}
+
+async function handleModalKeepStatusChange(selectEl, rawWA) {
+  if (!selectEl) return;
+  const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
+  const newVal = selectEl.value;
+  if (newVal === oldVal) return;
+
+  const originalClass = selectEl.className;
+  selectEl.disabled = true;
+  selectEl.classList.add('status-saving');
+
+  try {
+    await updateKeepStatusInGoogleSheets(rawWA, newVal);
+
+    if (currentModalKeep) {
+      currentModalKeep['Status'] = newVal;
+    }
+    const cleanWA = String(rawWA).replace(/\D/g, '');
+    if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+      rawAuditARList.forEach(a => {
+        if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+          a.keep['Status'] = newVal;
+        }
+      });
+    }
+    if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+      rawKeepRows.forEach(k => {
+        if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+          k['Status'] = newVal;
+        }
+      });
+    }
+
+    selectEl.setAttribute('data-prev', newVal);
+    selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
+    showSaveToast(`✅ Status keep WA ${formatPhoneDisplay(rawWA)} berhasil diubah ke "${newVal}" di Google Sheets!`);
+    if (typeof renderAuditPage === 'function') {
+      renderAuditPage();
+    }
+  } catch (err) {
+    console.error('Update modal status error:', err);
+    alert(`Gagal menyimpan status ke Google Sheets:\n${err.message}`);
+    selectEl.value = oldVal;
+    selectEl.className = originalClass;
+  } finally {
+    selectEl.disabled = false;
+    selectEl.classList.remove('status-saving');
+  }
+}
+
 function renderAuditPage() {
   const tbody = document.getElementById('auditTableBody');
   if (!tbody) return;
@@ -2832,7 +3064,7 @@ function renderAuditPage() {
   if (btnNext) btnNext.disabled = auditCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data tracking AR yang sesuai filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data tracking AR yang sesuai filter.</td></tr>`;
     return;
   }
 
@@ -2869,26 +3101,44 @@ function renderAuditPage() {
       catatanHtml = `<div style="font-size:0.70rem; line-height:1.25; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
     }
 
-    // Klasifikasi Status Warna:
-    // Hijau: Sudah terinput semua (ALL_SOSMED)
-    // Orange: Terinput sebagian (PARTIAL_MISSING)
-    // Merah: Tidak terinput sama sekali (ALL_MISSING)
-    let rowStatusClass = 'audit-row-missing';
+    // Status Keep Dropdown (Sinkronisasi Langsung ke Google Sheets)
+    const rawStatus = keepObj['Status'];
+    const currentStatus = (rawStatus && String(rawStatus).trim() !== '-') ? String(rawStatus).trim().toUpperCase() : '';
+    const statusSelectClass = getKeepStatusClass(currentStatus);
+
+    let statusOptionsHtml = '';
+    if (currentStatus && !KEEP_STATUS_OPTIONS.some(o => o.value.toUpperCase() === currentStatus)) {
+      statusOptionsHtml += `<option value="${currentStatus}" selected>${currentStatus}</option>`;
+    }
+    KEEP_STATUS_OPTIONS.forEach(opt => {
+      const isSel = (opt.value.toUpperCase() === currentStatus);
+      statusOptionsHtml += `<option value="${opt.value}" ${isSel ? 'selected' : ''}>${opt.label}</option>`;
+    });
+
+    const statusDropdownHtml = (rawWA && rawWA.length >= 8) ? `
+      <select class="select-status-keep ${statusSelectClass}" data-prev="${currentStatus}" onchange="handleTableKeepStatusChange(this, '${rawWA}', ${auditRowIdx})" title="Klik untuk mengubah status follow-up customer ini (otomatis tersimpan ke Google Sheets)">
+        ${statusOptionsHtml}
+      </select>
+    ` : `<span class="kpi-badge badge-ink">-</span>`;
+
+    // Klasifikasi Status Warna Baris Tabel:
+    // 1. Status Keep memblok tebal seluruh baris (WIN, LOSE, BELUM DIINPUT, DOUBLE KEEP, ON PROGRESS LOW, ON PROGRESS MEDIUM, ON PROGRESS HOT, TAKE OUT).
+    // 2. Jika status keep kosong, gunakan indikator sosmed AR (Hijau: sudah terinput semua, Orange: terinput sebagian, Merah: tidak terinput sama sekali).
     let badgeClass = 'badge-status-red';
     let badgeIcon = '❌';
     let statusLabel = 'Tidak Terinput Sosmed';
 
     if (r.status === 'ALL_SOSMED') {
-      rowStatusClass = 'audit-row-sosmed';
       badgeClass = 'badge-status-green';
       badgeIcon = '✅';
       statusLabel = 'Sudah Terinput Semua (100% Sosmed)';
     } else if (r.status === 'PARTIAL_MISSING') {
-      rowStatusClass = 'audit-row-partial';
       badgeClass = 'badge-status-orange';
       badgeIcon = '⚠️';
       statusLabel = 'Terinput Sebagian';
     }
+
+    const rowStatusClass = getAuditRowClassByKeepStatus(currentStatus, r.status);
 
     // Report AR cell
     const reportARDocDisplay = (r.reportARDoc && r.reportARDoc !== '-')
@@ -2920,6 +3170,7 @@ function renderAuditPage() {
       </td>
       <td class="audit-col-keep text-left font-bold" style="color: #1e293b; word-break: break-word;">${keepObj['Barang Keep'] || '-'}</td>
       <td class="audit-col-notes text-left" style="word-break: break-word;">${catatanHtml}</td>
+      <td class="audit-col-status-keep" style="text-align: center;">${statusDropdownHtml}</td>
       <td class="audit-col-report-ar" style="text-align: center;">${reportARDocDisplay}</td>
       <td class="audit-col-report-date" style="text-align: center; font-size: 0.73rem;">${reportARDateDisplay}</td>
       <td class="audit-col-vlookup-ar" style="text-align: center;">${vlookupARDocDisplay}</td>
@@ -5756,12 +6007,715 @@ function initLiveClock() {
   setInterval(update, 1000);
 }
 
+// ==========================================================================
+// MODUL KLAIM AR & PENGAWASAN DENDA CABANG (SIKLUS 3 HARI + H+1)
+// ==========================================================================
+let rawARClaimsList = [];
+let filteredARClaimsList = [];
+let currentClaimsSubTab = 'COLLECTING'; // 'COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED'
+let claimsCurrentPage = 1;
+const CLAIMS_PAGE_SIZE = 50;
+
+async function loadARClaimsData() {
+  try {
+    const res = await fetch('/api/ar-claims');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        rawARClaimsList = data;
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal load /api/ar-claims, fallback ke localStorage:', e);
+  }
+  if (!rawARClaimsList || rawARClaimsList.length === 0) {
+    const local = localStorage.getItem('gadgetmart_ar_claims_data');
+    if (local) {
+      try { rawARClaimsList = JSON.parse(local); } catch(err){}
+    }
+  }
+  checkARClaimsAutoResolution(false);
+  renderARClaimsModule();
+}
+
+async function saveARClaimsData() {
+  localStorage.setItem('gadgetmart_ar_claims_data', JSON.stringify(rawARClaimsList));
+  try {
+    await fetch('/api/ar-claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rawARClaimsList)
+    });
+  } catch (e) {
+    console.warn('Gagal simpan ke backend /api/ar-claims:', e);
+  }
+}
+
+function addSingleARToClaims(auditItem, customItems = null) {
+  if (!auditItem) return;
+  const docNum = String(auditItem.doc || auditItem.reportARDoc || auditItem.vlookupARDoc || '').trim();
+  if (!docNum || docNum === '-') {
+    alert('Dokumen AR tidak valid untuk diklaim.');
+    return;
+  }
+
+  const itemsToClaim = (customItems && customItems.length > 0) ? customItems : (auditItem.items || []);
+  const missingOnly = itemsToClaim.filter(it => !isItemExemptFromSosmed(it) && !isItemInputSosmed(it));
+  const finalItems = missingOnly.length > 0 ? missingOnly : itemsToClaim;
+
+  let addedCount = 0;
+  finalItems.forEach((it, idx) => {
+    const desc = it['Dscription'] || it['Item/Service Description'] || '-';
+    const isHP = isHandphoneProduct(it);
+    const harga = Number(it['Harga Jual']) || 0;
+    const offlineSales = it['SlpName'] || it['Sales Employee Name'] || it['User Input'] || it['SC/HL Code'] || '-';
+    const targetSosmed = (auditItem.keep && auditItem.keep['Kode Sosmed']) ? auditItem.keep['Kode Sosmed'] : 'BJM.SOS.xxx';
+    const picSos = (auditItem.keep && auditItem.keep['Sender']) ? auditItem.keep['Sender'] : '-';
+    const cust = (auditItem.keep && auditItem.keep['Nama']) ? auditItem.keep['Nama'] : (it['Name'] || '-');
+    const wa = (auditItem.keep && auditItem.keep['Nomor WA']) ? auditItem.keep['Nomor WA'] : (it['No HP Customer'] || '-');
+    const cabang = it['Cabang'] || auditItem.cabang || '-';
+
+    const exists = rawARClaimsList.some(c => c.docNumber === docNum && c.productName === desc && c.status !== 'RESOLVED_BY_STORE');
+    if (!exists) {
+      rawARClaimsList.unshift({
+        id: `CLM-${docNum}-${idx + 1}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        docNumber: docNum,
+        postingDate: it['Posting Date'] || auditItem.postingDate || '',
+        cabang: cabang,
+        productName: desc,
+        hargaJual: harga,
+        currentSalesCode: offlineSales,
+        targetSosmedCode: targetSosmed,
+        picSosmed: picSos,
+        customerName: cust,
+        customerPhone: wa,
+        isHandphone: isHP,
+        collectDate: new Date().toISOString(),
+        collectTimestamp: Date.now(),
+        status: 'COLLECTING',
+        shareTimestamp: null,
+        deadlineH1Timestamp: null,
+        penaltyAmount: isHP ? 50000 : 0,
+        penaltyStatus: isHP ? 'POTENSI' : 'PASS',
+        manualResolvedBy: '',
+        manualResolvedAt: null
+      });
+      addedCount++;
+    }
+  });
+
+  if (addedCount > 0) {
+    saveARClaimsData();
+    showSaveToast(`🏷️ ${addedCount} item dari AR ${docNum} berhasil dimasukkan ke Keranjang Klaim (Batch 3 Hari)!`);
+    renderARClaimsModule();
+  } else {
+    showSaveToast(`ℹ️ Item AR ${docNum} sudah ada di daftar klaim sebelumnya.`);
+  }
+}
+
+function claimAllFilteredMissingAR() {
+  if (!filteredAuditARList || filteredAuditARList.length === 0) {
+    alert('Tidak ada data AR yang terfilter saat ini.');
+    return;
+  }
+
+  const missingARs = filteredAuditARList.filter(r => r.status === 'ALL_MISSING' || r.status === 'PARTIAL_MISSING');
+  if (missingARs.length === 0) {
+    alert('Semua AR yang terfilter saat ini sudah berstatus 100% sosmed (Hijau).');
+    return;
+  }
+
+  if (!confirm(`Apakah Anda yakin ingin memasukkan seluruh ${missingARs.length} dokumen AR yang belum sosmed ke Modul Klaim AR (Pengumpulan 3 Hari)?`)) {
+    return;
+  }
+
+  let totalAdded = 0;
+  missingARs.forEach(auditItem => {
+    const docNum = String(auditItem.doc || auditItem.reportARDoc || auditItem.vlookupARDoc || '').trim();
+    const itemsToClaim = (auditItem.items || []).filter(it => !isItemExemptFromSosmed(it) && !isItemInputSosmed(it));
+    itemsToClaim.forEach((it, idx) => {
+      const desc = it['Dscription'] || it['Item/Service Description'] || '-';
+      const exists = rawARClaimsList.some(c => c.docNumber === docNum && c.productName === desc && c.status !== 'RESOLVED_BY_STORE');
+      if (!exists) {
+        const isHP = isHandphoneProduct(it);
+        rawARClaimsList.unshift({
+          id: `CLM-${docNum}-${idx + 1}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          docNumber: docNum,
+          postingDate: it['Posting Date'] || auditItem.postingDate || '',
+          cabang: it['Cabang'] || auditItem.cabang || '-',
+          productName: desc,
+          hargaJual: Number(it['Harga Jual']) || 0,
+          currentSalesCode: it['SlpName'] || it['Sales Employee Name'] || it['User Input'] || it['SC/HL Code'] || '-',
+          targetSosmedCode: (auditItem.keep && auditItem.keep['Kode Sosmed']) ? auditItem.keep['Kode Sosmed'] : 'BJM.SOS.xxx',
+          picSosmed: (auditItem.keep && auditItem.keep['Sender']) ? auditItem.keep['Sender'] : '-',
+          customerName: (auditItem.keep && auditItem.keep['Nama']) ? auditItem.keep['Nama'] : (it['Name'] || '-'),
+          customerPhone: (auditItem.keep && auditItem.keep['Nomor WA']) ? auditItem.keep['Nomor WA'] : (it['No HP Customer'] || '-'),
+          isHandphone: isHP,
+          collectDate: new Date().toISOString(),
+          collectTimestamp: Date.now(),
+          status: 'COLLECTING',
+          shareTimestamp: null,
+          deadlineH1Timestamp: null,
+          penaltyAmount: isHP ? 50000 : 0,
+          penaltyStatus: isHP ? 'POTENSI' : 'PASS',
+          manualResolvedBy: '',
+          manualResolvedAt: null
+        });
+        totalAdded++;
+      }
+    });
+  });
+
+  saveARClaimsData();
+  showSaveToast(`🏷️ Berhasil menambahkan ${totalAdded} item belum sosmed ke Modul Klaim AR!`);
+  renderARClaimsModule();
+}
+
+function claimModalSelectedItems(btnElement = null) {
+  if (currentModalCheckedItems.size === 0) {
+    alert('Silakan centang minimal 1 item produk yang ingin dimasukkan ke Klaim Cabang.');
+    return;
+  }
+
+  const items = Array.from(currentModalCheckedItems).map(idx => currentModalRows[idx]).filter(Boolean);
+  const auditItem = {
+    doc: currentModalDoc,
+    items: currentModalRows,
+    keep: currentModalKeep
+  };
+  addSingleARToClaims(auditItem, items);
+  closeARDetailModal();
+}
+
+async function shareARClaimsBatchDay4() {
+  const collectingItems = rawARClaimsList.filter(c => c.status === 'COLLECTING');
+  if (collectingItems.length === 0) {
+    alert('Tidak ada item dalam antrean "1. Pengumpulan (Batch 3 Hari)".\nSilakan kumpulkan AR belum sosmed dari Tab 5 (Tracking AR) terlebih dahulu.');
+    return;
+  }
+
+  const branchCount = new Set(collectingItems.map(c => c.cabang)).size;
+  const msg = `📦 KONFIRMASI DISTRIBUSI HARI KE-4:\n\n` +
+              `Total: ${collectingItems.length} item AR dari ${branchCount} cabang toko siap didistribusikan.\n\n` +
+              `Setelah diunduh:\n` +
+              `1. Sistem akan men-generate paket file Excel per cabang (.zip).\n` +
+              `2. Seluruh data ini OTOMATIS BERPINDAH ke tab '2. Cek AR Setelah di Share'.\n` +
+              `3. Batas waktu H+1 (24 jam) cabang merevisi kode sosmed akan mulai berjalan.\n\n` +
+              `Lanjutkan proses unduh & pindah status?`;
+
+  if (!confirm(msg)) return;
+
+  const byBranch = {};
+  collectingItems.forEach(c => {
+    const cab = c.cabang || 'LAINNYA';
+    if (!byBranch[cab]) byBranch[cab] = [];
+    byBranch[cab].push(c);
+  });
+
+  const nowStr = new Date().toISOString().split('T')[0];
+  const zip = (typeof JSZip !== 'undefined') ? new JSZip() : null;
+
+  Object.keys(byBranch).forEach(cab => {
+    const rows = byBranch[cab];
+    const excelData = [
+      ['REKAP KLAIM AR BELUM SOSMED - GADGETMART', '', '', '', '', '', '', ''],
+      [`Cabang: ${cab}`, `Tanggal Distribusi: ${formatCrosellingDate(nowStr)}`, '', '', '', '', '', ''],
+      ['Masa Tenggang Revisi: H+1 (Mohon ubah Sales Code di SAP menjadi Kode Sosmed sebelum batas waktu H+1)', '', '', '', '', '', '', ''],
+      [''],
+      ['NO', 'NO. AR / FAKTUR', 'TANGGAL BELI', 'CUSTOMER', 'NO. WHATSAPP', 'NAMA BARANG', 'SALES OFFLINE TERINPUT', 'SEHARUSNYA KODE SOSMED', 'KETERANGAN']
+    ];
+
+    rows.forEach((r, idx) => {
+      excelData.push([
+        idx + 1,
+        r.docNumber,
+        formatCrosellingDate(r.postingDate),
+        r.customerName,
+        r.customerPhone,
+        r.productName,
+        r.currentSalesCode,
+        r.targetSosmedCode,
+        r.isHandphone ? 'Potensi Denda Handphone jika tidak direvisi H+1' : 'Item Aksesoris'
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, cab.slice(0, 31));
+
+    if (zip) {
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      zip.file(`Klaim_AR_${cab}_${nowStr}.xlsx`, wbout);
+    }
+  });
+
+  if (zip) {
+    try {
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = `Paket_Evidence_Klaim_AR_Semua_Cabang_${nowStr}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (zipErr) {
+      console.error('Gagal generate zip:', zipErr);
+    }
+  }
+
+  const shareTime = Date.now();
+  const deadlineH1 = shareTime + (24 * 60 * 60 * 1000);
+  collectingItems.forEach(c => {
+    c.status = 'SHARED';
+    c.shareTimestamp = shareTime;
+    c.deadlineH1Timestamp = deadlineH1;
+  });
+
+  await saveARClaimsData();
+  showSaveToast(`🚀 ${collectingItems.length} item AR berhasil diunduh dan otomatis dipindahkan ke "Cek AR Setelah di Share" (Tenggat H+1 aktif)!`);
+  setClaimsSubTab('SHARED');
+}
+
+function checkARClaimsAutoResolution(manualTrigger = false) {
+  if (!rawARClaimsList || rawARClaimsList.length === 0) return;
+
+  const now = Date.now();
+  let resolvedCount = 0;
+  let escalatedPenaltyCount = 0;
+
+  const currentSalesMap = new Map();
+  const allTx = (typeof rawTurnoverRows !== 'undefined' && rawTurnoverRows.length > 0)
+    ? rawTurnoverRows
+    : ((typeof rawCrosellingRows !== 'undefined' && rawCrosellingRows.length > 0) ? rawCrosellingRows : []);
+
+  allTx.forEach(t => {
+    const doc = String(t['Document Number'] || '').replace(/\D/g, '');
+    const slp = String(t['SlpName'] || t['Sales Employee Name'] || t['User Input'] || t['SC/HL Code'] || '').toUpperCase();
+    if (doc) {
+      if (!currentSalesMap.has(doc)) currentSalesMap.set(doc, []);
+      currentSalesMap.get(doc).push(slp);
+    }
+  });
+
+  rawARClaimsList.forEach(c => {
+    const cleanDoc = String(c.docNumber).replace(/\D/g, '');
+
+    // Check if store already resolved it (changed code to BJM.SOS)
+    if (currentSalesMap.has(cleanDoc)) {
+      const slpList = currentSalesMap.get(cleanDoc);
+      const isNowSosmed = slpList.some(s => s.includes('BJM.SOS') || s.includes('SOSMED'));
+      if (isNowSosmed && c.status !== 'RESOLVED_BY_STORE') {
+        c.status = 'RESOLVED_BY_STORE';
+        c.penaltyStatus = 'PASS';
+        c.resolvedTimestamp = now;
+        resolvedCount++;
+        return;
+      }
+    }
+
+    // Check if SHARED and passed H+1 deadline!
+    if (c.status === 'SHARED' && c.deadlineH1Timestamp && now > c.deadlineH1Timestamp) {
+      c.status = 'PENALTY_REAL';
+      c.penaltyStatus = c.isHandphone ? 'REAL_DENDA' : 'PASS';
+      c.penaltyAmount = c.isHandphone ? 50000 : 0;
+      escalatedPenaltyCount++;
+    }
+  });
+
+  if (resolvedCount > 0 || escalatedPenaltyCount > 0) {
+    saveARClaimsData();
+    if (manualTrigger) {
+      alert(`Pengecekan Selesai:\n\n✅ ${resolvedCount} item berhasil direvisi oleh cabang (Selesai).\n🚨 ${escalatedPenaltyCount} item telah lewat batas H+1 dan dieksekusi menjadi Denda Sungguhan.`);
+    }
+  } else if (manualTrigger) {
+    alert('Pengecekan Selesai:\nBelum ada perubahan status baru pada data klaim.');
+  }
+
+  renderARClaimsModule();
+}
+
+function getH1CountdownBadge(deadlineTimestamp) {
+  if (!deadlineTimestamp) return '-';
+  const diff = deadlineTimestamp - Date.now();
+  if (diff <= 0) {
+    return `<span class="badge-countdown expired">🚨 Lewat H+1 (Jatuh Tempo)</span>`;
+  }
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours < 4) {
+    return `<span class="badge-countdown warning">⚠️ Sisa ${hours}j ${mins}m</span>`;
+  }
+  return `<span class="badge-countdown safe">⏳ Sisa ${hours}j ${mins}m</span>`;
+}
+
+function markClaimResolvedManually(claimId) {
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item) return;
+
+  const note = prompt(`Masukkan catatan pengubahan mandiri untuk AR ${item.docNumber}:`, 'Sudah diubah sendiri oleh tim sosmed di SAP');
+  if (note === null) return;
+
+  item.status = 'RESOLVED_MANUAL_SOSMED';
+  item.manualResolvedBy = 'Tim Sosmed';
+  item.manualResolvedAt = Date.now();
+  item.manualInputNote = note;
+  saveARClaimsData();
+  showSaveToast(`✅ Status AR ${item.docNumber} ditandai sudah diubah sendiri oleh Tim Sosmed!`);
+  renderARClaimsModule();
+}
+
+function deleteARClaimItem(claimId) {
+  const idx = rawARClaimsList.findIndex(c => c.id === claimId);
+  if (idx === -1) return;
+  if (!confirm(`Hapus item AR ${rawARClaimsList[idx].docNumber} dari daftar klaim?`)) return;
+  rawARClaimsList.splice(idx, 1);
+  saveARClaimsData();
+  showSaveToast('🗑️ Item berhasil dihapus dari daftar klaim.');
+  renderARClaimsModule();
+}
+
+function copyBranchWAFollowupMessage(cabangCode) {
+  const branchItems = rawARClaimsList.filter(c => c.cabang === cabangCode && (c.status === 'SHARED' || c.status === 'PENALTY_REAL'));
+  if (branchItems.length === 0) {
+    alert(`Tidak ada klaim aktif yang sedang menunggu revisi untuk cabang ${cabangCode}.`);
+    return;
+  }
+
+  const lines = [
+    `*PEMBERITAHUAN KLAIM AR BELUM SOSMED - CABANG ${cabangCode}*`,
+    `Halo tim toko/kasir cabang ${cabangCode}, mohon segera mengubah sales code di SAP untuk faktur sosmed berikut sebelum batas H+1:`,
+    ''
+  ];
+
+  branchItems.forEach((it, idx) => {
+    lines.push(`${idx + 1}. No. AR: *${it.docNumber}*`);
+    lines.push(`   - Barang: ${it.productName}`);
+    lines.push(`   - Sales Terinput: ${it.currentSalesCode}`);
+    lines.push(`   - Seharusnya: *${it.targetSosmedCode}*`);
+    if (it.status === 'PENALTY_REAL') {
+      lines.push(`   - 🚨 *STATUS: LEWAT H+1 (DENDA SUNGGUHAN Rp 50.000)*`);
+    } else {
+      lines.push(`   - ⏳ *Tenggat: H+1*`);
+    }
+    lines.push('');
+  });
+
+  lines.push('Harap konfirmasi jika sales code sudah diubah di SAP. Terima kasih!');
+  writeTextToClipboard(lines.join('\n'));
+  showSaveToast(`📋 Format pesan follow-up WA untuk cabang ${cabangCode} berhasil disalin!`);
+}
+
+function exportClaimsPenaltyReport() {
+  const penaltyItems = rawARClaimsList.filter(c => c.status === 'PENALTY_REAL' || c.status === 'RESOLVED_MANUAL_SOSMED');
+  if (penaltyItems.length === 0) {
+    alert('Belum ada item AR yang terkena Denda Sungguhan (semua cabang masih dalam masa tenggang atau sudah direvisi tepat waktu).');
+    return;
+  }
+
+  const byCab = {};
+  let grandTotal = 0;
+  penaltyItems.forEach(p => {
+    const cab = p.cabang || 'LAINNYA';
+    if (!byCab[cab]) byCab[cab] = { count: 0, totalDenda: 0, items: [] };
+    byCab[cab].count++;
+    byCab[cab].totalDenda += (p.penaltyAmount || 0);
+    byCab[cab].items.push(p);
+    grandTotal += (p.penaltyAmount || 0);
+  });
+
+  const nowStr = new Date().toISOString().split('T')[0];
+  const excelData = [
+    ['LAPORAN DENDA KASIR CABANG - FAKTUR AR LEWAT H+1', '', '', '', '', '', ''],
+    [`Tanggal Rekap: ${formatCrosellingDate(nowStr)}`, '', '', '', '', '', ''],
+    [`Total Denda Keseluruhan: ${formatRupiah(grandTotal)} (${penaltyItems.length} Kasus)`, '', '', '', '', '', ''],
+    [''],
+    ['NO', 'CABANG', 'NO. AR', 'TANGGAL FAKTUR', 'NAMA BARANG', 'KASIR / SALES OFFLINE', 'KODE SOSMED', 'STATUS PENANGANAN', 'NOMINAL DENDA']
+  ];
+
+  penaltyItems.forEach((r, idx) => {
+    excelData.push([
+      idx + 1,
+      r.cabang,
+      r.docNumber,
+      formatCrosellingDate(r.postingDate),
+      r.productName,
+      r.currentSalesCode,
+      r.targetSosmedCode,
+      r.status === 'RESOLVED_MANUAL_SOSMED' ? 'Sudah Diubah Mandiri oleh Tim Sosmed' : 'Belum Diubah (Denda Aktif)',
+      r.penaltyAmount || 0
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(excelData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap_Denda_Cabang');
+  XLSX.writeFile(wb, `Rekap_Denda_Cabang_GadgetMart_${nowStr}.xlsx`);
+  showSaveToast(`📋 Laporan Rekap Denda Cabang berhasil diunduh (${penaltyItems.length} kasus)!`);
+}
+
+function setClaimsSubTab(subTabName) {
+  currentClaimsSubTab = subTabName;
+  ['COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED'].forEach(st => {
+    const btn = document.getElementById(`subtabBtn${st.charAt(0) + st.slice(1).toLowerCase()}`);
+    if (btn) btn.classList.toggle('active', st === subTabName);
+  });
+  claimsCurrentPage = 1;
+  applyClaimsFilters();
+}
+
+function applyClaimsFilters() {
+  const cabEl = document.getElementById('claimsFilterCabang');
+  const sosEl = document.getElementById('claimsFilterSosmed');
+  const tglEl = document.getElementById('claimsFilterTanggal');
+  const searchEl = document.getElementById('claimsSearchInput');
+
+  const cabVal = cabEl ? cabEl.value : 'ALL';
+  const sosVal = sosEl ? sosEl.value : 'ALL';
+  const tglVal = tglEl ? tglEl.value : '';
+  const keyword = (searchEl ? searchEl.value : '').trim().toLowerCase();
+
+  filteredARClaimsList = rawARClaimsList.filter(c => {
+    if (currentClaimsSubTab === 'COLLECTING') {
+      if (c.status !== 'COLLECTING') return false;
+    } else if (currentClaimsSubTab === 'SHARED') {
+      if (c.status !== 'SHARED') return false;
+    } else if (currentClaimsSubTab === 'PENALTY') {
+      if (c.status !== 'PENALTY_REAL' && c.status !== 'RESOLVED_MANUAL_SOSMED') return false;
+    } else if (currentClaimsSubTab === 'RESOLVED') {
+      if (c.status !== 'RESOLVED_BY_STORE') return false;
+    }
+
+    if (cabVal !== 'ALL' && c.cabang !== cabVal) return false;
+    if (sosVal !== 'ALL' && c.targetSosmedCode !== sosVal) return false;
+
+    if (tglVal) {
+      const itemDate = parseDateToISO(c.collectDate || c.postingDate);
+      if (itemDate !== tglVal) return false;
+    }
+
+    if (keyword) {
+      const comb = `${c.docNumber} ${c.productName} ${c.cabang} ${c.currentSalesCode} ${c.targetSosmedCode} ${c.customerName} ${c.customerPhone}`.toLowerCase();
+      if (!comb.includes(keyword)) return false;
+    }
+
+    return true;
+  });
+
+  renderARClaimsTable();
+}
+
+function renderARClaimsModule() {
+  populateClaimsDropdowns();
+
+  let countCollecting = 0;
+  let countShared = 0;
+  let countPenalty = 0;
+  let countResolved = 0;
+  let totalPenaltyRp = 0;
+
+  rawARClaimsList.forEach(c => {
+    if (c.status === 'COLLECTING') countCollecting++;
+    else if (c.status === 'SHARED') countShared++;
+    else if (c.status === 'PENALTY_REAL' || c.status === 'RESOLVED_MANUAL_SOSMED') {
+      countPenalty++;
+      totalPenaltyRp += (c.penaltyAmount || 0);
+    } else if (c.status === 'RESOLVED_BY_STORE') countResolved++;
+  });
+
+  const elColl = document.getElementById('claimCountCollecting');
+  const elShar = document.getElementById('claimCountShared');
+  const elPen = document.getElementById('claimCountPenalty');
+  const elPenRp = document.getElementById('claimTotalPenaltyRp');
+  const elRes = document.getElementById('claimCountResolved');
+
+  if (elColl) elColl.innerText = countCollecting.toLocaleString('id-ID');
+  if (elShar) elShar.innerText = countShared.toLocaleString('id-ID');
+  if (elPen) elPen.innerText = countPenalty.toLocaleString('id-ID');
+  if (elPenRp) elPenRp.innerText = `${formatRupiah(totalPenaltyRp)} (${countPenalty} Item)`;
+  if (elRes) elRes.innerText = countResolved.toLocaleString('id-ID');
+
+  const bColl = document.getElementById('badgeSubtabCollecting');
+  const bShar = document.getElementById('badgeSubtabShared');
+  const bPen = document.getElementById('badgeSubtabPenalty');
+  const bRes = document.getElementById('badgeSubtabResolved');
+
+  if (bColl) bColl.innerText = countCollecting;
+  if (bShar) bShar.innerText = countShared;
+  if (bPen) bPen.innerText = countPenalty;
+  if (bRes) bRes.innerText = countResolved;
+
+  const btnShare = document.getElementById('btnShareBatchDay4');
+  if (btnShare) {
+    btnShare.style.display = (currentClaimsSubTab === 'COLLECTING') ? 'inline-flex' : 'none';
+    btnShare.innerText = `📦 Unduh Paket Cabang & Share (${countCollecting} Item)`;
+  }
+
+  applyClaimsFilters();
+}
+
+function renderARClaimsTable() {
+  const tbody = document.getElementById('claimsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const total = filteredARClaimsList.length;
+  const maxPage = Math.max(1, Math.ceil(total / CLAIMS_PAGE_SIZE));
+  const startIdx = (claimsCurrentPage - 1) * CLAIMS_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + CLAIMS_PAGE_SIZE, total);
+  const pageRows = filteredARClaimsList.slice(startIdx, endIdx);
+
+  const infoEl = document.getElementById('claimsPaginationInfo');
+  if (infoEl) {
+    infoEl.innerText = total > 0 
+      ? `Menampilkan ${startIdx + 1} - ${endIdx} dari total ${total.toLocaleString('id-ID')} Data Klaim`
+      : 'Tidak ada data klaim untuk filter ini';
+  }
+  const curPageText = document.getElementById('claimsCurrentPageText');
+  if (curPageText) curPageText.innerText = `Halaman ${claimsCurrentPage} / ${maxPage}`;
+  const btnPrev = document.getElementById('btnClaimsPrev');
+  if (btnPrev) btnPrev.disabled = claimsCurrentPage <= 1;
+  const btnNext = document.getElementById('btnClaimsNext');
+  if (btnNext) btnNext.disabled = claimsCurrentPage >= maxPage;
+
+  if (pageRows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data klaim AR pada status ini.</td></tr>`;
+    return;
+  }
+
+  pageRows.forEach((r, i) => {
+    const globalIdx = startIdx + i + 1;
+    const rawWA = String(r.customerPhone || '').replace(/\D/g, '');
+    const normWA = normalizePhone(rawWA);
+    const displayWA = formatPhoneDisplay(rawWA);
+
+    const waHtml = (normWA && normWA.length >= 8) ? `
+      <div style="font-size:0.75rem; color: #475569; margin-top: 2px;">
+        ${displayWA}
+        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:1px 5px; font-size:0.65rem; border-radius:3px; margin-left:4px;">💬</a>
+      </div>
+    ` : '';
+
+    let statusDisplay = '';
+    let dendaDisplay = '';
+
+    if (r.status === 'COLLECTING') {
+      statusDisplay = `<span class="badge-status-link badge-status-orange" style="font-size: 0.72rem;">📥 Pengumpulan</span><div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Menunggu H-4</div>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">Potensi Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+    } else if (r.status === 'SHARED') {
+      const countdownHtml = getH1CountdownBadge(r.deadlineH1Timestamp);
+      statusDisplay = `<div><span class="badge-status-link badge-status-blue" style="font-size:0.72rem;">📤 Di Share</span></div><div style="margin-top:3px;">${countdownHtml}</div>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">Potensi Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+    } else if (r.status === 'PENALTY_REAL') {
+      statusDisplay = `<div><span class="badge-status-link badge-status-red" style="font-size:0.72rem;">🚨 Lewat H+1</span></div><div style="font-size:0.68rem; color:#be123c; font-weight:700; margin-top:2px;">Cabang Belum Ubah</div>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA REAL Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+    } else if (r.status === 'RESOLVED_MANUAL_SOSMED') {
+      statusDisplay = `<div><span class="badge-status-link badge-status-blue" style="font-size:0.72rem;">🛠️ Diubah Sosmed</span></div><div style="font-size:0.68rem; color:#0284c7; margin-top:2px;">Input Mandiri</div>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">Denda Tetap Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+    } else if (r.status === 'RESOLVED_BY_STORE') {
+      statusDisplay = `<span class="badge-status-link badge-status-green" style="font-size:0.72rem;">✅ Sukses Direvisi</span><div style="font-size:0.68rem; color:#15803d; margin-top:2px;">Sesuai H+1</div>`;
+      dendaDisplay = `<span class="badge-denda-pass">Gugur (Pass)</span>`;
+    }
+
+    let actionBtn = '';
+    if (r.status === 'COLLECTING') {
+      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus dari antrean pengumpulan" style="color:#e11d48; border-color:#fda4af;">✕ Batal</button>`;
+    } else if (r.status === 'SHARED') {
+      actionBtn = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <button class="btn btn-outline btn-xs" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Salin chat follow-up WA untuk cabang ini" style="font-size:0.65rem; padding:2px 4px;">💬 Chat WA</button>
+          <button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus" style="color:#64748b; font-size:0.65rem; padding:1px 4px;">✕</button>
+        </div>
+      `;
+    } else if (r.status === 'PENALTY_REAL') {
+      actionBtn = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <button class="btn btn-crimson btn-xs" onclick="markClaimResolvedManually('${r.id}')" title="Tandai bahwa tim sosmed sudah mengubah AR ini sendiri di SAP" style="font-size:0.65rem; padding:2px 6px;">✍️ Ubah Sendiri</button>
+          <button class="btn btn-outline btn-xs" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Kirim teguran denda ke cabang" style="font-size:0.65rem; padding:1px 4px;">🚨 Tegur</button>
+        </div>
+      `;
+    } else {
+      actionBtn = `<span style="font-size:0.7rem; color:var(--text-muted);">-</span>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="text-align: center;">${globalIdx}</td>
+      <td style="text-align: center; font-weight: 700; color: #0f172a;">
+        <span class="badge-status-link badge-status-blue" onclick="openARDetailModal('${r.docNumber}')" title="Klik untuk cek detail faktur ini">${r.docNumber}</span>
+      </td>
+      <td style="text-align: center; font-size: 0.73rem;">${formatCrosellingDate(r.postingDate)}</td>
+      <td style="text-align: center; font-weight: 800; color: #c8102e;">${r.cabang}</td>
+      <td class="text-left">
+        <div class="font-bold" style="color: #0f172a; font-size: 0.78rem;">${r.customerName || '-'}</div>
+        ${waHtml}
+      </td>
+      <td class="text-left">
+        <div style="font-size: 0.76rem; font-weight: 700; color: #1e293b;">${r.productName}</div>
+        <div style="font-size: 0.70rem; color: #64748b; margin-top: 2px;">${formatRupiah(r.hargaJual)}</div>
+      </td>
+      <td class="text-left" style="font-size: 0.74rem; color: #475569;">${r.currentSalesCode}</td>
+      <td style="text-align: center;">
+        <span class="badge-sosmed-pill" style="font-size: 0.68rem; padding: 2px 7px;">${r.targetSosmedCode}</span>
+        <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">${r.picSosmed || ''}</div>
+      </td>
+      <td style="text-align: center;">${statusDisplay}</td>
+      <td style="text-align: center;">${dendaDisplay}</td>
+      <td style="text-align: center;">${actionBtn}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function populateClaimsDropdowns() {
+  const cabSelect = document.getElementById('claimsFilterCabang');
+  const sosSelect = document.getElementById('claimsFilterSosmed');
+
+  if (cabSelect) {
+    const curCab = cabSelect.value;
+    const branches = Array.from(new Set(rawARClaimsList.map(c => c.cabang).filter(Boolean))).sort();
+    let cabOpts = '<option value="ALL">Semua Cabang Toko</option>';
+    branches.forEach(b => {
+      cabOpts += `<option value="${b}" ${b === curCab ? 'selected' : ''}>${b}</option>`;
+    });
+    cabSelect.innerHTML = cabOpts;
+  }
+
+  if (sosSelect) {
+    const curSos = sosSelect.value;
+    const sosList = Array.from(new Set(rawARClaimsList.map(c => c.targetSosmedCode).filter(Boolean))).sort();
+    let sosOpts = '<option value="ALL">Semua Kode Sosmed</option>';
+    sosList.forEach(s => {
+      sosOpts += `<option value="${s}" ${s === curSos ? 'selected' : ''}>${s}</option>`;
+    });
+    sosSelect.innerHTML = sosOpts;
+  }
+}
+
+function resetClaimsFilters() {
+  if (document.getElementById('claimsFilterCabang')) document.getElementById('claimsFilterCabang').value = 'ALL';
+  if (document.getElementById('claimsFilterSosmed')) document.getElementById('claimsFilterSosmed').value = 'ALL';
+  if (document.getElementById('claimsFilterTanggal')) document.getElementById('claimsFilterTanggal').value = '';
+  if (document.getElementById('claimsSearchInput')) document.getElementById('claimsSearchInput').value = '';
+  claimsCurrentPage = 1;
+  applyClaimsFilters();
+}
+
+function changeClaimsPage(delta) {
+  const maxPage = Math.max(1, Math.ceil(filteredARClaimsList.length / CLAIMS_PAGE_SIZE));
+  const newPage = claimsCurrentPage + delta;
+  if (newPage >= 1 && newPage <= maxPage) {
+    claimsCurrentPage = newPage;
+    renderARClaimsTable();
+  }
+}
+
 // Auto init on page load
 window.addEventListener('DOMContentLoaded', async () => {
   initLiveClock();
   await loadMonthlyTargets();
   await loadSalesPhotos();
   await loadMonthlyArchives();
+  await loadARClaimsData();
   populateAdminPanel(getMasterSales());
   onAdminTargetMonthChange();
   renderArchiveGrid();
