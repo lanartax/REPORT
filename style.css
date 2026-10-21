@@ -4067,5 +4067,175 @@ h1, h2, h3, h4, h5, h6,
   border-radius: 4px;
 }
 
+.subtab-badge.badge-gray {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.btn-subtab.active .subtab-badge.badge-gray {
+  background: #475569;
+  color: #ffffff;
+}
+
+/* Evidence Format Keep Thumbnail & Upload */
+.evidence-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.evidence-thumb-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 54px;
+  height: 54px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.evidence-thumb-wrapper:hover {
+  transform: scale(1.06);
+  border-color: #c8102e;
+}
+
+.evidence-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.evidence-zoom-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 23, 42, 0.75);
+  color: #ffffff;
+  font-size: 0.6rem;
+  text-align: center;
+  padding: 1px 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.evidence-thumb-wrapper:hover .evidence-zoom-hint {
+  opacity: 1;
+}
+
+.btn-upload-evidence {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  color: #475569;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 90px;
+}
+
+.btn-upload-evidence:hover {
+  background: #f1f5f9;
+  border-color: #c8102e;
+  color: #c8102e;
+}
+
+.btn-remove-evidence {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: color 0.15s ease;
+}
+
+.btn-remove-evidence:hover {
+  color: #e11d48;
+}
+
+/* Validation Select and Reason Input */
+.select-claim-validity {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.73rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 110px;
+}
+
+.select-claim-validity.valid {
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  border-color: #86efac !important;
+}
+
+.select-claim-validity.valid:hover {
+  border-color: #22c55e !important;
+}
+
+.select-claim-validity.invalid {
+  background: #fef2f2 !important;
+  color: #991b1b !important;
+  border-color: #fca5a5 !important;
+}
+
+.select-claim-validity.invalid:hover {
+  border-color: #ef4444 !important;
+}
+
+.input-claim-reason {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1.5px solid #fca5a5;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  color: #991b1b;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input-claim-reason:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+
+.claim-keep-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.70rem;
+  line-height: 1.35;
+  color: #334155;
+  white-space: pre-line;
+  max-height: 80px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+
 
 

@@ -6012,9 +6012,10 @@ function initLiveClock() {
 // ==========================================================================
 let rawARClaimsList = [];
 let filteredARClaimsList = [];
-let currentClaimsSubTab = 'COLLECTING'; // 'COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED'
+let currentClaimsSubTab = 'COLLECTING'; // 'COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED', 'INVALID'
 let claimsCurrentPage = 1;
 const CLAIMS_PAGE_SIZE = 50;
+let currentEvidenceTargetClaimId = null;
 
 async function loadARClaimsData() {
   try {
@@ -6034,6 +6035,16 @@ async function loadARClaimsData() {
       try { rawARClaimsList = JSON.parse(local); } catch(err){}
     }
   }
+
+  // Normalize properties
+  rawARClaimsList.forEach(c => {
+    c.validationStatus = c.validationStatus || 'VALID';
+    c.invalidReason = c.invalidReason || '';
+    c.evidenceImage = c.evidenceImage || null;
+    c.periode = c.periode || 'Oktober-26';
+    c.keepText = c.keepText || '';
+  });
+
   checkARClaimsAutoResolution(false);
   renderARClaimsModule();
 }
@@ -6063,6 +6074,13 @@ function addSingleARToClaims(auditItem, customItems = null) {
   const missingOnly = itemsToClaim.filter(it => !isItemExemptFromSosmed(it) && !isItemInputSosmed(it));
   const finalItems = missingOnly.length > 0 ? missingOnly : itemsToClaim;
 
+  const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
+    ? String(auditItem.keep['PERIODE']).trim() 
+    : 'Oktober-26';
+  const keepFormatted = (typeof formatKeepTextForClipboard === 'function') 
+    ? formatKeepTextForClipboard(auditItem.keep) 
+    : '';
+
   let addedCount = 0;
   finalItems.forEach((it, idx) => {
     const desc = it['Dscription'] || it['Item/Service Description'] || '-';
@@ -6081,6 +6099,7 @@ function addSingleARToClaims(auditItem, customItems = null) {
         id: `CLM-${docNum}-${idx + 1}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         docNumber: docNum,
         postingDate: it['Posting Date'] || auditItem.postingDate || '',
+        periode: periode,
         cabang: cabang,
         productName: desc,
         hargaJual: harga,
@@ -6089,6 +6108,10 @@ function addSingleARToClaims(auditItem, customItems = null) {
         picSosmed: picSos,
         customerName: cust,
         customerPhone: wa,
+        keepText: keepFormatted,
+        evidenceImage: null,
+        validationStatus: 'VALID',
+        invalidReason: '',
         isHandphone: isHP,
         collectDate: new Date().toISOString(),
         collectTimestamp: Date.now(),
@@ -6133,6 +6156,13 @@ function claimAllFilteredMissingAR() {
   missingARs.forEach(auditItem => {
     const docNum = String(auditItem.doc || auditItem.reportARDoc || auditItem.vlookupARDoc || '').trim();
     const itemsToClaim = (auditItem.items || []).filter(it => !isItemExemptFromSosmed(it) && !isItemInputSosmed(it));
+    const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
+      ? String(auditItem.keep['PERIODE']).trim() 
+      : 'Oktober-26';
+    const keepFormatted = (typeof formatKeepTextForClipboard === 'function') 
+      ? formatKeepTextForClipboard(auditItem.keep) 
+      : '';
+
     itemsToClaim.forEach((it, idx) => {
       const desc = it['Dscription'] || it['Item/Service Description'] || '-';
       const exists = rawARClaimsList.some(c => c.docNumber === docNum && c.productName === desc && c.status !== 'RESOLVED_BY_STORE');
@@ -6142,6 +6172,7 @@ function claimAllFilteredMissingAR() {
           id: `CLM-${docNum}-${idx + 1}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           docNumber: docNum,
           postingDate: it['Posting Date'] || auditItem.postingDate || '',
+          periode: periode,
           cabang: it['Cabang'] || auditItem.cabang || '-',
           productName: desc,
           hargaJual: Number(it['Harga Jual']) || 0,
@@ -6150,6 +6181,10 @@ function claimAllFilteredMissingAR() {
           picSosmed: (auditItem.keep && auditItem.keep['Sender']) ? auditItem.keep['Sender'] : '-',
           customerName: (auditItem.keep && auditItem.keep['Nama']) ? auditItem.keep['Nama'] : (it['Name'] || '-'),
           customerPhone: (auditItem.keep && auditItem.keep['Nomor WA']) ? auditItem.keep['Nomor WA'] : (it['No HP Customer'] || '-'),
+          keepText: keepFormatted,
+          evidenceImage: null,
+          validationStatus: 'VALID',
+          invalidReason: '',
           isHandphone: isHP,
           collectDate: new Date().toISOString(),
           collectTimestamp: Date.now(),
@@ -6187,10 +6222,142 @@ function claimModalSelectedItems(btnElement = null) {
   closeARDetailModal();
 }
 
+// Evidence Image Handlers
+function triggerEvidenceUpload(claimId) {
+  currentEvidenceTargetClaimId = claimId;
+  const input = document.getElementById('evidenceFileInput');
+  if (input) {
+    input.value = '';
+    input.click();
+  }
+}
+
+function triggerEvidenceUploadFromModal() {
+  const claimId = currentEvidenceTargetClaimId;
+  if (!claimId) return;
+  closeEvidenceImageModal();
+  triggerEvidenceUpload(claimId);
+}
+
+function handleEvidenceFileSelected(fileInput) {
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+  const file = fileInput.files[0];
+  if (!file.type.startsWith('image/')) {
+    alert('File yang dipilih harus berupa gambar (JPG, PNG, WEBP).');
+    return;
+  }
+
+  const claimId = currentEvidenceTargetClaimId;
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      // Compress to max 1200x1200 to keep JSON storage light and Excel fast
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const maxDim = 1200;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      item.evidenceImage = compressedDataUrl;
+      saveARClaimsData();
+      showSaveToast(`📷 Bukti gambar format keep untuk AR ${item.docNumber} berhasil diunggah!`);
+      renderARClaimsTable();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeEvidenceImage(claimId) {
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item) return;
+  if (!confirm(`Hapus bukti gambar untuk AR ${item.docNumber}?`)) return;
+  item.evidenceImage = null;
+  saveARClaimsData();
+  showSaveToast('🗑️ Bukti gambar berhasil dihapus.');
+  renderARClaimsTable();
+}
+
+function openEvidenceImageModal(claimId) {
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item || !item.evidenceImage) return;
+
+  currentEvidenceTargetClaimId = claimId;
+  const modal = document.getElementById('evidenceImageModal');
+  const fullImg = document.getElementById('evidenceFullImg');
+  const titleEl = document.getElementById('evidenceModalTitle');
+  const subEl = document.getElementById('evidenceModalSub');
+  const btnDownload = document.getElementById('btnDownloadEvidence');
+
+  if (fullImg) fullImg.src = item.evidenceImage;
+  if (titleEl) titleEl.innerText = `📷 Bukti Format Keep: AR ${item.docNumber}`;
+  if (subEl) subEl.innerText = `Customer: ${item.customerName || '-'} (${item.customerPhone || '-'}) | Cabang: ${item.cabang} | Barang: ${item.productName}`;
+  if (btnDownload) {
+    btnDownload.href = item.evidenceImage;
+    btnDownload.download = `Evidence_Keep_AR_${item.docNumber}.jpg`;
+  }
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeEvidenceImageModal(e = null) {
+  const modal = document.getElementById('evidenceImageModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Validation Handlers
+function handleClaimValidityChange(claimId, newStatus) {
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item) return;
+
+  if (newStatus === 'TIDAK VALID') {
+    const reason = prompt(`Item AR ${item.docNumber} ditandai TIDAK VALID.\nMasukkan alasannya:`, item.invalidReason || 'Salah tag / Bukan nomor keep');
+    if (reason === null) {
+      renderARClaimsTable();
+      return;
+    }
+    item.validationStatus = 'TIDAK VALID';
+    item.invalidReason = reason.trim() || 'Tidak Valid';
+    showSaveToast(`🚫 AR ${item.docNumber} ditandai TIDAK VALID dan dipindahkan ke sub-tab "5. Tidak Valid".`);
+  } else {
+    item.validationStatus = 'VALID';
+    item.invalidReason = '';
+    showSaveToast(`✅ AR ${item.docNumber} dikembalikan ke status VALID.`);
+  }
+
+  saveARClaimsData();
+  renderARClaimsModule();
+}
+
+function handleClaimInvalidReasonChange(claimId, newReason) {
+  const item = rawARClaimsList.find(c => c.id === claimId);
+  if (!item) return;
+  item.invalidReason = newReason.trim();
+  saveARClaimsData();
+}
+
 async function shareARClaimsBatchDay4() {
-  const collectingItems = rawARClaimsList.filter(c => c.status === 'COLLECTING');
+  // Hanya proses item yang statusnya COLLECTING dan VALID (TIDAK VALID dikecualikan)
+  const collectingItems = rawARClaimsList.filter(c => c.status === 'COLLECTING' && c.validationStatus !== 'TIDAK VALID');
   if (collectingItems.length === 0) {
-    alert('Tidak ada item dalam antrean "1. Pengumpulan (Batch 3 Hari)".\nSilakan kumpulkan AR belum sosmed dari Tab 5 (Tracking AR) terlebih dahulu.');
+    alert('Tidak ada item valid dalam antrean "1. Pengumpulan (Batch 3 Hari)".\nSilakan kumpulkan AR belum sosmed dari Tab 5 (Tracking AR) terlebih dahulu.');
     return;
   }
 
@@ -6198,7 +6365,7 @@ async function shareARClaimsBatchDay4() {
   const msg = `📦 KONFIRMASI DISTRIBUSI HARI KE-4:\n\n` +
               `Total: ${collectingItems.length} item AR dari ${branchCount} cabang toko siap didistribusikan.\n\n` +
               `Setelah diunduh:\n` +
-              `1. Sistem akan men-generate paket file Excel per cabang (.zip).\n` +
+              `1. Sistem akan men-generate paket file Excel per cabang (.zip) lengkap dengan gambar bukti Format Keep.\n` +
               `2. Seluruh data ini OTOMATIS BERPINDAH ke tab '2. Cek AR Setelah di Share'.\n` +
               `3. Batas waktu H+1 (24 jam) cabang merevisi kode sosmed akan mulai berjalan.\n\n` +
               `Lanjutkan proses unduh & pindah status?`;
@@ -6215,46 +6382,153 @@ async function shareARClaimsBatchDay4() {
   const nowStr = new Date().toISOString().split('T')[0];
   const zip = (typeof JSZip !== 'undefined') ? new JSZip() : null;
 
-  Object.keys(byBranch).forEach(cab => {
+  for (const cab of Object.keys(byBranch)) {
     const rows = byBranch[cab];
-    const excelData = [
-      ['REKAP KLAIM AR BELUM SOSMED - GADGETMART', '', '', '', '', '', '', ''],
-      [`Cabang: ${cab}`, `Tanggal Distribusi: ${formatCrosellingDate(nowStr)}`, '', '', '', '', '', ''],
-      ['Masa Tenggang Revisi: H+1 (Mohon ubah Sales Code di SAP menjadi Kode Sosmed sebelum batas waktu H+1)', '', '', '', '', '', '', ''],
-      [''],
-      ['NO', 'NO. AR / FAKTUR', 'TANGGAL BELI', 'CUSTOMER', 'NO. WHATSAPP', 'NAMA BARANG', 'SALES OFFLINE TERINPUT', 'SEHARUSNYA KODE SOSMED', 'KETERANGAN']
-    ];
 
+    // Gunakan ExcelJS jika tersedia agar gambar bukti ter-embed langsung ke file Excel
+    if (typeof ExcelJS !== 'undefined') {
+      try {
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'GadgetMart Sosmed System';
+        const ws = wb.addWorksheet(cab.slice(0, 31));
+
+        ws.columns = [
+          { header: 'NO', key: 'no', width: 6 },
+          { header: 'TANGGAL', key: 'tanggal', width: 14 },
+          { header: 'PERIODE', key: 'periode', width: 14 },
+          { header: 'NO AR', key: 'noAR', width: 16 },
+          { header: 'NO.HP USER', key: 'noHP', width: 18 },
+          { header: 'KODE SOSMED', key: 'kodeSosmed', width: 16 },
+          { header: 'PIC SOSMED', key: 'picSosmed', width: 16 },
+          { header: 'CABANG', key: 'cabang', width: 14 },
+          { header: 'POTENSI DENDA', key: 'potensiDenda', width: 16 },
+          { header: 'BARANG', key: 'barang', width: 32 },
+          { header: 'KEEP', key: 'keep', width: 35 },
+          { header: 'EVIDENCE FORMAT KEEP', key: 'evidence', width: 24 },
+          { header: 'AR SALES EMPLOYEE', key: 'salesEmployee', width: 22 },
+          { header: 'STATUS VALIDASI', key: 'statusValidasi', width: 16 },
+          { header: 'ALASAN TIDAK VALID', key: 'alasanTidakValid', width: 24 }
+        ];
+
+        const headerRow = ws.getRow(1);
+        headerRow.height = 28;
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF991B1B' } // Crimson / Red
+          };
+          cell.font = {
+            name: 'Arial',
+            size: 10,
+            bold: true,
+            color: { argb: 'FFFFFFFF' }
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        });
+
+        for (let idx = 0; idx < rows.length; idx++) {
+          const r = rows[idx];
+          const rowNumber = idx + 2;
+          const row = ws.addRow({
+            no: idx + 1,
+            tanggal: formatCrosellingDate(r.postingDate),
+            periode: r.periode || 'Oktober-26',
+            noAR: r.docNumber,
+            noHP: r.customerPhone || '-',
+            kodeSosmed: r.targetSosmedCode,
+            picSosmed: r.picSosmed || '-',
+            cabang: r.cabang,
+            potensiDenda: r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
+            barang: r.productName,
+            keep: r.keepText || '-',
+            evidence: r.evidenceImage ? '' : '-',
+            salesEmployee: r.currentSalesCode || '-',
+            statusValidasi: r.validationStatus || 'VALID',
+            alasanTidakValid: r.invalidReason || '-'
+          });
+
+          row.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+          row.getCell('no').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('tanggal').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('periode').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('noAR').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('noHP').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('kodeSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('picSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('cabang').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('potensiDenda').alignment = { vertical: 'middle', horizontal: 'center' };
+          row.getCell('statusValidasi').alignment = { vertical: 'middle', horizontal: 'center' };
+
+          if (r.evidenceImage && typeof r.evidenceImage === 'string') {
+            try {
+              const isPng = r.evidenceImage.includes('image/png');
+              const base64Data = r.evidenceImage.includes(',') ? r.evidenceImage.split(',')[1] : r.evidenceImage;
+              const imgId = wb.addImage({
+                base64: base64Data,
+                extension: isPng ? 'png' : 'jpeg'
+              });
+              ws.addImage(imgId, {
+                tl: { col: 11, row: rowNumber - 1 },
+                ext: { width: 130, height: 75 },
+                editAs: 'oneCell'
+              });
+              row.height = 70;
+            } catch (imgErr) {
+              console.warn('Gagal embed image ExcelJS:', imgErr);
+              row.getCell('evidence').value = '(Bukti Foto Terlampir)';
+            }
+          }
+        }
+
+        const buffer = await wb.xlsx.writeBuffer();
+        if (zip) {
+          zip.file(`Klaim_AR_${cab}_${nowStr}.xlsx`, buffer);
+        }
+        continue;
+      } catch (excelJsErr) {
+        console.warn('ExcelJS error, fallback ke SheetJS:', excelJsErr);
+      }
+    }
+
+    // Fallback SheetJS
+    const excelData = [
+      ['NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP', 'EVIDENCE FORMAT KEEP', 'AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID']
+    ];
     rows.forEach((r, idx) => {
       excelData.push([
         idx + 1,
-        r.docNumber,
         formatCrosellingDate(r.postingDate),
-        r.customerName,
-        r.customerPhone,
-        r.productName,
-        r.currentSalesCode,
+        r.periode || 'Oktober-26',
+        r.docNumber,
+        r.customerPhone || '-',
         r.targetSosmedCode,
-        r.isHandphone ? 'Potensi Denda Handphone jika tidak direvisi H+1' : 'Item Aksesoris'
+        r.picSosmed || '-',
+        r.cabang,
+        r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
+        r.productName,
+        r.keepText || '-',
+        r.evidenceImage ? '(Bukti Foto Terlampir)' : '-',
+        r.currentSalesCode || '-',
+        r.validationStatus || 'VALID',
+        r.invalidReason || '-'
       ]);
     });
-
     const ws = XLSX.utils.aoa_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, cab.slice(0, 31));
-
     if (zip) {
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       zip.file(`Klaim_AR_${cab}_${nowStr}.xlsx`, wbout);
     }
-  });
+  }
 
   if (zip) {
     try {
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(zipBlob);
-      a.download = `Paket_Evidence_Klaim_AR_Semua_Cabang_${nowStr}.zip`;
+      a.download = `Paket_Klaim_AR_Semua_Cabang_${nowStr}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -6272,7 +6546,7 @@ async function shareARClaimsBatchDay4() {
   });
 
   await saveARClaimsData();
-  showSaveToast(`🚀 ${collectingItems.length} item AR berhasil diunduh dan otomatis dipindahkan ke "Cek AR Setelah di Share" (Tenggat H+1 aktif)!`);
+  showSaveToast(`🚀 ${collectingItems.length} item AR berhasil diunduh dan dipindahkan ke "Cek AR Setelah di Share" (Tenggat H+1 aktif)!`);
   setClaimsSubTab('SHARED');
 }
 
@@ -6298,6 +6572,9 @@ function checkARClaimsAutoResolution(manualTrigger = false) {
   });
 
   rawARClaimsList.forEach(c => {
+    // Abaikan item yang tidak valid
+    if (c.validationStatus === 'TIDAK VALID') return;
+
     const cleanDoc = String(c.docNumber).replace(/\D/g, '');
 
     // Check if store already resolved it (changed code to BJM.SOS)
@@ -6375,7 +6652,7 @@ function deleteARClaimItem(claimId) {
 }
 
 function copyBranchWAFollowupMessage(cabangCode) {
-  const branchItems = rawARClaimsList.filter(c => c.cabang === cabangCode && (c.status === 'SHARED' || c.status === 'PENALTY_REAL'));
+  const branchItems = rawARClaimsList.filter(c => c.cabang === cabangCode && c.validationStatus !== 'TIDAK VALID' && (c.status === 'SHARED' || c.status === 'PENALTY_REAL'));
   if (branchItems.length === 0) {
     alert(`Tidak ada klaim aktif yang sedang menunggu revisi untuk cabang ${cabangCode}.`);
     return;
@@ -6406,7 +6683,7 @@ function copyBranchWAFollowupMessage(cabangCode) {
 }
 
 function exportClaimsPenaltyReport() {
-  const penaltyItems = rawARClaimsList.filter(c => c.status === 'PENALTY_REAL' || c.status === 'RESOLVED_MANUAL_SOSMED');
+  const penaltyItems = rawARClaimsList.filter(c => c.validationStatus !== 'TIDAK VALID' && (c.status === 'PENALTY_REAL' || c.status === 'RESOLVED_MANUAL_SOSMED'));
   if (penaltyItems.length === 0) {
     alert('Belum ada item AR yang terkena Denda Sungguhan (semua cabang masih dalam masa tenggang atau sudah direvisi tepat waktu).');
     return;
@@ -6425,21 +6702,23 @@ function exportClaimsPenaltyReport() {
 
   const nowStr = new Date().toISOString().split('T')[0];
   const excelData = [
-    ['LAPORAN DENDA KASIR CABANG - FAKTUR AR LEWAT H+1', '', '', '', '', '', ''],
-    [`Tanggal Rekap: ${formatCrosellingDate(nowStr)}`, '', '', '', '', '', ''],
-    [`Total Denda Keseluruhan: ${formatRupiah(grandTotal)} (${penaltyItems.length} Kasus)`, '', '', '', '', '', ''],
+    ['LAPORAN DENDA KASIR CABANG - FAKTUR AR LEWAT H+1', '', '', '', '', '', '', '', ''],
+    [`Tanggal Rekap: ${formatCrosellingDate(nowStr)}`, '', '', '', '', '', '', '', ''],
+    [`Total Denda Keseluruhan: ${formatRupiah(grandTotal)} (${penaltyItems.length} Kasus)`, '', '', '', '', '', '', '', ''],
     [''],
-    ['NO', 'CABANG', 'NO. AR', 'TANGGAL FAKTUR', 'NAMA BARANG', 'KASIR / SALES OFFLINE', 'KODE SOSMED', 'STATUS PENANGANAN', 'NOMINAL DENDA']
+    ['NO', 'TANGGAL', 'PERIODE', 'NO. AR', 'CABANG', 'CUSTOMER & WA', 'NAMA BARANG', 'KASIR / SALES OFFLINE', 'KODE SOSMED', 'STATUS PENANGANAN', 'NOMINAL DENDA']
   ];
 
   penaltyItems.forEach((r, idx) => {
     excelData.push([
       idx + 1,
-      r.cabang,
-      r.docNumber,
       formatCrosellingDate(r.postingDate),
+      r.periode || 'Oktober-26',
+      r.docNumber,
+      r.cabang,
+      `${r.customerName || '-'} (${r.customerPhone || '-'})`,
       r.productName,
-      r.currentSalesCode,
+      r.currentSalesCode || '-',
       r.targetSosmedCode,
       r.status === 'RESOLVED_MANUAL_SOSMED' ? 'Sudah Diubah Mandiri oleh Tim Sosmed' : 'Belum Diubah (Denda Aktif)',
       r.penaltyAmount || 0
@@ -6455,7 +6734,7 @@ function exportClaimsPenaltyReport() {
 
 function setClaimsSubTab(subTabName) {
   currentClaimsSubTab = subTabName;
-  ['COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED'].forEach(st => {
+  ['COLLECTING', 'SHARED', 'PENALTY', 'RESOLVED', 'INVALID'].forEach(st => {
     const btn = document.getElementById(`subtabBtn${st.charAt(0) + st.slice(1).toLowerCase()}`);
     if (btn) btn.classList.toggle('active', st === subTabName);
   });
@@ -6475,14 +6754,21 @@ function applyClaimsFilters() {
   const keyword = (searchEl ? searchEl.value : '').trim().toLowerCase();
 
   filteredARClaimsList = rawARClaimsList.filter(c => {
-    if (currentClaimsSubTab === 'COLLECTING') {
-      if (c.status !== 'COLLECTING') return false;
-    } else if (currentClaimsSubTab === 'SHARED') {
-      if (c.status !== 'SHARED') return false;
-    } else if (currentClaimsSubTab === 'PENALTY') {
-      if (c.status !== 'PENALTY_REAL' && c.status !== 'RESOLVED_MANUAL_SOSMED') return false;
-    } else if (currentClaimsSubTab === 'RESOLVED') {
-      if (c.status !== 'RESOLVED_BY_STORE') return false;
+    if (currentClaimsSubTab === 'INVALID') {
+      if (c.validationStatus !== 'TIDAK VALID') return false;
+    } else {
+      // Sub-tab lain hanya menampilkan yang VALID
+      if (c.validationStatus === 'TIDAK VALID') return false;
+
+      if (currentClaimsSubTab === 'COLLECTING') {
+        if (c.status !== 'COLLECTING') return false;
+      } else if (currentClaimsSubTab === 'SHARED') {
+        if (c.status !== 'SHARED') return false;
+      } else if (currentClaimsSubTab === 'PENALTY') {
+        if (c.status !== 'PENALTY_REAL' && c.status !== 'RESOLVED_MANUAL_SOSMED') return false;
+      } else if (currentClaimsSubTab === 'RESOLVED') {
+        if (c.status !== 'RESOLVED_BY_STORE') return false;
+      }
     }
 
     if (cabVal !== 'ALL' && c.cabang !== cabVal) return false;
@@ -6494,7 +6780,7 @@ function applyClaimsFilters() {
     }
 
     if (keyword) {
-      const comb = `${c.docNumber} ${c.productName} ${c.cabang} ${c.currentSalesCode} ${c.targetSosmedCode} ${c.customerName} ${c.customerPhone}`.toLowerCase();
+      const comb = `${c.docNumber} ${c.productName} ${c.cabang} ${c.currentSalesCode} ${c.targetSosmedCode} ${c.customerName} ${c.customerPhone} ${c.invalidReason || ''}`.toLowerCase();
       if (!comb.includes(keyword)) return false;
     }
 
@@ -6511,9 +6797,14 @@ function renderARClaimsModule() {
   let countShared = 0;
   let countPenalty = 0;
   let countResolved = 0;
+  let countInvalid = 0;
   let totalPenaltyRp = 0;
 
   rawARClaimsList.forEach(c => {
+    if (c.validationStatus === 'TIDAK VALID') {
+      countInvalid++;
+      return;
+    }
     if (c.status === 'COLLECTING') countCollecting++;
     else if (c.status === 'SHARED') countShared++;
     else if (c.status === 'PENALTY_REAL' || c.status === 'RESOLVED_MANUAL_SOSMED') {
@@ -6527,22 +6818,26 @@ function renderARClaimsModule() {
   const elPen = document.getElementById('claimCountPenalty');
   const elPenRp = document.getElementById('claimTotalPenaltyRp');
   const elRes = document.getElementById('claimCountResolved');
+  const elInv = document.getElementById('claimCountInvalid');
 
   if (elColl) elColl.innerText = countCollecting.toLocaleString('id-ID');
   if (elShar) elShar.innerText = countShared.toLocaleString('id-ID');
   if (elPen) elPen.innerText = countPenalty.toLocaleString('id-ID');
   if (elPenRp) elPenRp.innerText = `${formatRupiah(totalPenaltyRp)} (${countPenalty} Item)`;
   if (elRes) elRes.innerText = countResolved.toLocaleString('id-ID');
+  if (elInv) elInv.innerText = countInvalid.toLocaleString('id-ID');
 
   const bColl = document.getElementById('badgeSubtabCollecting');
   const bShar = document.getElementById('badgeSubtabShared');
   const bPen = document.getElementById('badgeSubtabPenalty');
   const bRes = document.getElementById('badgeSubtabResolved');
+  const bInv = document.getElementById('badgeSubtabInvalid');
 
   if (bColl) bColl.innerText = countCollecting;
   if (bShar) bShar.innerText = countShared;
   if (bPen) bPen.innerText = countPenalty;
   if (bRes) bRes.innerText = countResolved;
+  if (bInv) bInv.innerText = countInvalid;
 
   const btnShare = document.getElementById('btnShareBatchDay4');
   if (btnShare) {
@@ -6578,7 +6873,7 @@ function renderARClaimsTable() {
   if (btnNext) btnNext.disabled = claimsCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data klaim AR pada status ini.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data klaim AR pada status ini.</td></tr>`;
     return;
   }
 
@@ -6595,30 +6890,46 @@ function renderARClaimsTable() {
       </div>
     ` : '';
 
-    let statusDisplay = '';
     let dendaDisplay = '';
-
     if (r.status === 'COLLECTING') {
-      statusDisplay = `<span class="badge-status-link badge-status-orange" style="font-size: 0.72rem;">📥 Pengumpulan</span><div style="font-size:0.68rem; color:var(--text-muted); margin-top:2px;">Menunggu H-4</div>`;
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">Potensi Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
     } else if (r.status === 'SHARED') {
-      const countdownHtml = getH1CountdownBadge(r.deadlineH1Timestamp);
-      statusDisplay = `<div><span class="badge-status-link badge-status-blue" style="font-size:0.72rem;">📤 Di Share</span></div><div style="margin-top:3px;">${countdownHtml}</div>`;
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">Potensi Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
     } else if (r.status === 'PENALTY_REAL') {
-      statusDisplay = `<div><span class="badge-status-link badge-status-red" style="font-size:0.72rem;">🚨 Lewat H+1</span></div><div style="font-size:0.68rem; color:#be123c; font-weight:700; margin-top:2px;">Cabang Belum Ubah</div>`;
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA REAL Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA REAL Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
     } else if (r.status === 'RESOLVED_MANUAL_SOSMED') {
-      statusDisplay = `<div><span class="badge-status-link badge-status-blue" style="font-size:0.72rem;">🛠️ Diubah Sosmed</span></div><div style="font-size:0.68rem; color:#0284c7; margin-top:2px;">Input Mandiri</div>`;
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">Denda Tetap Rp 50k</span>` : `<span class="badge-denda-pass">Pass</span>`;
+      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
     } else if (r.status === 'RESOLVED_BY_STORE') {
-      statusDisplay = `<span class="badge-status-link badge-status-green" style="font-size:0.72rem;">✅ Sukses Direvisi</span><div style="font-size:0.68rem; color:#15803d; margin-top:2px;">Sesuai H+1</div>`;
-      dendaDisplay = `<span class="badge-denda-pass">Gugur (Pass)</span>`;
+      dendaDisplay = `<span class="badge-denda-pass">GUGUR (PASS)</span>`;
     }
 
+    // Evidence cell (Thumbnail or Upload button)
+    let evidenceHtml = '';
+    if (r.evidenceImage) {
+      evidenceHtml = `
+        <div class="evidence-cell">
+          <div class="evidence-thumb-wrapper" onclick="openEvidenceImageModal('${r.id}')" title="Klik untuk perbesar bukti format keep">
+            <img src="${r.evidenceImage}" class="evidence-thumb-img" alt="Bukti">
+            <div class="evidence-zoom-hint">🔍 Zoom</div>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:3px;">
+            <button class="btn-remove-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Ganti foto bukti">🔄 Ganti</button>
+            <button class="btn-remove-evidence" onclick="removeEvidenceImage('${r.id}')" title="Hapus foto bukti">🗑️ Hapus</button>
+          </div>
+        </div>
+      `;
+    } else {
+      evidenceHtml = `
+        <button class="btn-upload-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Klik untuk mengunggah screenshot / foto bukti format keep">
+          📷 Unggah Bukti
+        </button>
+      `;
+    }
+
+    // Action buttons
     let actionBtn = '';
     if (r.status === 'COLLECTING') {
-      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus dari antrean pengumpulan" style="color:#e11d48; border-color:#fda4af;">✕ Batal</button>`;
+      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus dari antrean klaim" style="color:#e11d48; border-color:#fda4af;">✕ Hapus</button>`;
     } else if (r.status === 'SHARED') {
       actionBtn = `
         <div style="display:flex; flex-direction:column; gap:4px;">
@@ -6634,32 +6945,49 @@ function renderARClaimsTable() {
         </div>
       `;
     } else {
-      actionBtn = `<span style="font-size:0.7rem; color:var(--text-muted);">-</span>`;
+      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus" style="color:#64748b; font-size:0.65rem; padding:1px 4px;">✕</button>`;
     }
+
+    const isInvalid = (r.validationStatus === 'TIDAK VALID');
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="text-align: center;">${globalIdx}</td>
-      <td style="text-align: center; font-weight: 700; color: #0f172a;">
+      <td style="text-align: center; font-size: 0.73rem;">${formatCrosellingDate(r.postingDate)}</td>
+      <td style="text-align: center; font-size: 0.73rem; color: #64748b;">${r.periode || 'Oktober-26'}</td>
+      <td style="text-align: center; font-weight: 700;">
         <span class="badge-status-link badge-status-blue" onclick="openARDetailModal('${r.docNumber}')" title="Klik untuk cek detail faktur ini">${r.docNumber}</span>
       </td>
-      <td style="text-align: center; font-size: 0.73rem;">${formatCrosellingDate(r.postingDate)}</td>
-      <td style="text-align: center; font-weight: 800; color: #c8102e;">${r.cabang}</td>
-      <td class="text-left">
+      <td style="text-align: center;">
         <div class="font-bold" style="color: #0f172a; font-size: 0.78rem;">${r.customerName || '-'}</div>
         ${waHtml}
       </td>
-      <td class="text-left">
-        <div style="font-size: 0.76rem; font-weight: 700; color: #1e293b;">${r.productName}</div>
-        <div style="font-size: 0.70rem; color: #64748b; margin-top: 2px;">${formatRupiah(r.hargaJual)}</div>
-      </td>
-      <td class="text-left" style="font-size: 0.74rem; color: #475569;">${r.currentSalesCode}</td>
       <td style="text-align: center;">
         <span class="badge-sosmed-pill" style="font-size: 0.68rem; padding: 2px 7px;">${r.targetSosmedCode}</span>
-        <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">${r.picSosmed || ''}</div>
       </td>
-      <td style="text-align: center;">${statusDisplay}</td>
+      <td style="text-align: center; font-size: 0.72rem; color: #475569;">${r.picSosmed || '-'}</td>
+      <td style="text-align: center; font-weight: 800; color: #c8102e;">${r.cabang}</td>
       <td style="text-align: center;">${dendaDisplay}</td>
+      <td class="text-left">
+        <div style="font-size: 0.76rem; font-weight: 700; color: #1e293b;">${r.productName}</div>
+        <div style="font-size: 0.70rem; color: #64748b; margin-top: 1px;">${formatRupiah(r.hargaJual)}</div>
+      </td>
+      <td class="text-left">
+        ${r.keepText ? `<div class="claim-keep-box" title="Format Keep WhatsApp">${r.keepText}</div>` : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>'}
+      </td>
+      <td style="text-align: center;">${evidenceHtml}</td>
+      <td class="text-left" style="font-size: 0.74rem; color: #475569;">${r.currentSalesCode || '-'}</td>
+      <td style="text-align: center;">
+        <select class="select-claim-validity ${isInvalid ? 'invalid' : 'valid'}" onchange="handleClaimValidityChange('${r.id}', this.value)" title="Ubah status validasi klaim ini">
+          <option value="VALID" ${!isInvalid ? 'selected' : ''}>🟢 VALID</option>
+          <option value="TIDAK VALID" ${isInvalid ? 'selected' : ''}>🔴 TIDAK VALID</option>
+        </select>
+      </td>
+      <td class="text-left">
+        ${isInvalid ? `
+          <input type="text" class="input-claim-reason" value="${r.invalidReason || ''}" placeholder="Alasan tidak valid..." onchange="handleClaimInvalidReasonChange('${r.id}', this.value)" title="Klik untuk mengedit alasan tidak valid">
+        ` : `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`}
+      </td>
       <td style="text-align: center;">${actionBtn}</td>
     `;
     tbody.appendChild(tr);

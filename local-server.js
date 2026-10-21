@@ -320,6 +320,38 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // API Klaim AR (Get & Save)
+  if (reqPath === '/api/ar-claims') {
+    const claimsFile = path.join(PUBLIC_DIR, 'ar_claims.json');
+    if (req.method === 'GET') {
+      if (fs.existsSync(claimsFile)) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        fs.createReadStream(claimsFile).pipe(res);
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify([]));
+      }
+      return;
+    }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          fs.writeFileSync(claimsFile, JSON.stringify(parsed, null, 2), 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, count: Array.isArray(parsed) ? parsed.length : 0 }));
+        } catch (err) {
+          console.error('❌ Gagal menyimpan ar_claims.json:', err);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+  }
+
   // API Database Status Check (Untuk Realtime Cross-Device Sync)
   if (reqPath === '/api/database-status') {
     const checkFile = (f) => {
