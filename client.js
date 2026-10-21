@@ -283,6 +283,30 @@ function isItemInputSosmed(row) {
   return false;
 }
 
+// Barang yang bebas dari kewajiban input sosmed (misal TAS GADGETMART 25x25 / kantong belanja)
+// Jika customer beli HP + Tas Gadgetmart, dan HP-nya sudah sosmed, faktur tetap dihitung 100% SUDAH SOSMED
+function isItemExemptFromSosmed(row) {
+  if (!row) return false;
+  const desc = String(row['Dscription'] || row['Item/Service Description'] || '').trim().toUpperCase();
+  const code = String(row['Item No.'] || row['Item Code'] || '').trim().toUpperCase();
+
+  if (desc.includes('TAS GADGETMART') || 
+      desc.includes('TAS GADGET MART') || 
+      desc.includes('TAS 25X25') || 
+      desc.includes('TAS 25 X 25') || 
+      desc.includes('KANTONG GADGETMART') ||
+      desc.includes('KANTONG 25X25') ||
+      desc.includes('KANTONG 25 X 25')) {
+    return true;
+  }
+
+  if ((code.includes('TAS') || desc.includes('TAS')) && (code.includes('25X25') || desc.includes('25X25') || desc.includes('25 X 25'))) {
+    return true;
+  }
+
+  return false;
+}
+
 // Helper untuk memilih sheet transaksi turnover yang tepat (misal TARIKKAN pada file KPI SOSMED)
 function resolveTurnoverSheet(workbook) {
   if (workbook.SheetNames.includes('TARIKKAN')) return workbook.Sheets['TARIKKAN'];
@@ -2042,7 +2066,14 @@ function openARDetailModal(docNumber, keepContext = null, sourceTitle = '') {
     const subtotal = Number(r['Harga Jual']) || 0;
     totalDocVal += subtotal;
 
+    const isExempt = isItemExemptFromSosmed(r);
     const isSosmed = isItemInputSosmed(r);
+
+    if (isExempt) {
+      // Tas Gadgetmart 25x25 dll tidak perlu diinput sosmed (dianggap pass / exempt)
+      return;
+    }
+
     if (isSosmed) {
       allMissing = false;
     } else {
@@ -2065,7 +2096,7 @@ function openARDetailModal(docNumber, keepContext = null, sourceTitle = '') {
     banner.className = 'ar-status-banner banner-danger';
     icon.innerHTML = '❌';
     title.innerText = 'BELUM DIINPUT KODE SOSMED (100% OFFLINE)';
-    subtitle.innerText = `Seluruh ${matchedRows.length} item dalam AR ini tercatat dengan kode sales toko fisik/kasir, belum ada kode sosmed.`;
+    subtitle.innerText = `Seluruh item dalam AR ini tercatat dengan kode sales toko fisik/kasir, belum ada kode sosmed.`;
   } else if (missingCount > 0) {
     banner.className = 'ar-status-banner banner-warning';
     icon.innerHTML = '⚠️';
@@ -2074,8 +2105,8 @@ function openARDetailModal(docNumber, keepContext = null, sourceTitle = '') {
   } else {
     banner.className = 'ar-status-banner banner-success';
     icon.innerHTML = '✅';
-    title.innerText = 'SEMUA ITEM SUDAH TERINPUT SOSMED';
-    subtitle.innerText = `Semua ${matchedRows.length} item dalam dokumen ini sudah valid terinput kode sales sosmed.`;
+    title.innerText = 'SEMUA ITEM SUDAH TERINPUT SOSMED (100%)';
+    subtitle.innerText = `Semua item dalam dokumen ini sudah valid terinput kode sales sosmed (termasuk item tas yang bebas sosmed).`;
   }
 
   // Render Table Items with Checkbox
@@ -2136,6 +2167,7 @@ function renderModalItemsTable() {
     totalQty += qty;
     totalVal += subtotal;
 
+    const isExempt = isItemExemptFromSosmed(r);
     const isSosmed = isItemInputSosmed(r);
     const schl = String(r['SC/HL Code'] || '').trim();
     const slp = String(r['SlpName'] || '').trim();
@@ -2144,11 +2176,20 @@ function renderModalItemsTable() {
 
     const isChecked = currentModalCheckedItems.has(idx);
 
-    // Potensi Denda: Handphone = DENDA, Aksesoris/lainnya = PASS
-    const dendaStatus = getItemPotensiDenda(r);
+    // Potensi Denda: Handphone = DENDA, Aksesoris/Tas/lainnya = PASS
+    const dendaStatus = isExempt ? 'PASS' : getItemPotensiDenda(r);
     const dendaBadge = dendaStatus === 'DENDA'
       ? '<span class="kpi-badge badge-crimson font-bold">🚨 DENDA</span>'
       : '<span class="kpi-badge badge-ink">PASS</span>';
+
+    let statusSosmedBadge = '';
+    if (isExempt) {
+      statusSosmedBadge = '<span class="status-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-weight:700;">🛍️ Bebas Sosmed</span>';
+    } else if (isSosmed) {
+      statusSosmedBadge = '<span class="status-badge badge-accent">✅ Sudah Sosmed</span>';
+    } else {
+      statusSosmedBadge = '<span class="status-badge badge-crimson font-bold">❌ Belum Sosmed</span>';
+    }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2161,11 +2202,7 @@ function renderModalItemsTable() {
       <td>${formatRupiah(price)}</td>
       <td class="font-bold">${formatRupiah(subtotal)}</td>
       <td class="text-left">${empDisplay}</td>
-      <td class="text-center">
-        ${isSosmed
-          ? '<span class="status-badge badge-accent">✅ Sudah Sosmed</span>'
-          : '<span class="status-badge badge-crimson font-bold">❌ Belum Sosmed</span>'}
-      </td>
+      <td class="text-center">${statusSosmedBadge}</td>
       <td class="text-center">${dendaBadge}</td>
       <td class="text-center">
         <button class="btn btn-outline btn-xs" onclick="copyModalSingleItem(${idx}, this)" style="padding: 3px 8px; font-size: 0.74rem; font-weight:700;" title="Salin baris item ini ke format 12 kolom Excel (tanpa header)">
@@ -2510,6 +2547,7 @@ function runARMissingSosmedAudit() {
     if (matchedKeeps.length > 0) {
       const bestKeep = pickBestKeep(matchedKeeps, items[0]['Posting Date']);
       let totalItems = items.length;
+      let auditedItemsCount = 0;
       let sosmedItems = 0;
       let missingItems = 0;
       let missingTotalValue = 0;
@@ -2519,7 +2557,20 @@ function runARMissingSosmedAudit() {
         const lineTotal = Number(it['Harga Jual']) || 0;
         totalDocValue += lineTotal;
 
-        if (isItemInputSosmed(it)) {
+        const isExempt = isItemExemptFromSosmed(it);
+        const hasSosmed = isItemInputSosmed(it);
+
+        if (isExempt) {
+          // TAS GADGETMART 25x25 tidak perlu diinput sosmed.
+          // Jangan dianggap sebagai missing/wajib sosmed!
+          if (hasSosmed) {
+            sosmedItems++;
+          }
+          return;
+        }
+
+        auditedItemsCount++;
+        if (hasSosmed) {
           sosmedItems++;
         } else {
           missingItems++;
@@ -2527,74 +2578,83 @@ function runARMissingSosmedAudit() {
         }
       });
 
+      // Status AR:
+      // Hijau (ALL_SOSMED): Sudah terinput semua (100% sosmed)
+      // Orange (PARTIAL_MISSING): Terinput sebagian
+      // Merah (ALL_MISSING): Tidak terinput sama sekali
+      let arStatus = 'ALL_SOSMED';
       if (missingItems > 0) {
-        // Resolve VLOOKUP AR info
-        let vlookupARDoc = isVlookupMatch ? doc : '-';
-        let vlookupARDate = isVlookupMatch ? items[0]['Posting Date'] : null;
-        let vlookupARCabang = isVlookupMatch ? items[0]['Cabang'] : '-';
-        let vlookupARItems = isVlookupMatch ? items : [];
+        arStatus = (sosmedItems > 0) ? 'PARTIAL_MISSING' : 'ALL_MISSING';
+      } else {
+        arStatus = 'ALL_SOSMED';
+      }
 
-        if (!isVlookupMatch) {
-          const keepNormWA = normalizePhone(bestKeep['Nomor WA']);
-          if (keepNormWA && phoneToAR.has(keepNormWA)) {
-            vlookupARDoc = phoneToAR.get(keepNormWA);
-            if (docMap.has(vlookupARDoc)) {
-              vlookupARDate = docMap.get(vlookupARDoc)[0]['Posting Date'];
-              vlookupARCabang = docMap.get(vlookupARDoc)[0]['Cabang'];
-              vlookupARItems = docMap.get(vlookupARDoc);
-            }
+      // Resolve VLOOKUP AR info
+      let vlookupARDoc = isVlookupMatch ? doc : '-';
+      let vlookupARDate = isVlookupMatch ? items[0]['Posting Date'] : null;
+      let vlookupARCabang = isVlookupMatch ? items[0]['Cabang'] : '-';
+      let vlookupARItems = isVlookupMatch ? items : [];
+
+      if (!isVlookupMatch) {
+        const keepNormWA = normalizePhone(bestKeep['Nomor WA']);
+        if (keepNormWA && phoneToAR.has(keepNormWA)) {
+          vlookupARDoc = phoneToAR.get(keepNormWA);
+          if (docMap.has(vlookupARDoc)) {
+            vlookupARDate = docMap.get(vlookupARDoc)[0]['Posting Date'];
+            vlookupARCabang = docMap.get(vlookupARDoc)[0]['Cabang'];
+            vlookupARItems = docMap.get(vlookupARDoc);
           }
         }
-
-        // Resolve REPORT AR info
-        const repARRaw = String(bestKeep['REPORT AR'] || '').replace(/\D/g, '');
-        let reportARDoc = repARRaw || (!isVlookupMatch ? doc : '-');
-        let reportARDate = null;
-        let reportARCabang = '-';
-        let reportARItems = [];
-
-        if (reportARDoc && reportARDoc !== '-' && docMap.has(reportARDoc)) {
-          reportARDate = docMap.get(reportARDoc)[0]['Posting Date'];
-          reportARCabang = docMap.get(reportARDoc)[0]['Cabang'];
-          reportARItems = docMap.get(reportARDoc);
-        } else if (!isVlookupMatch) {
-          reportARDate = items[0]['Posting Date'];
-          reportARCabang = items[0]['Cabang'];
-          reportARItems = items;
-        }
-
-        // Parse ISO dates for filtering
-        const vlookupARDateIso = parseDateToISO(vlookupARDate);
-        const reportARDateIso = parseDateToISO(reportARDate);
-
-        // Parse Keep Timestamp for sorting
-        const keepTimestampEpoch = parseKeepTimestampToEpoch(bestKeep['Timestamp']);
-
-        rawAuditARList.push({
-          doc,
-          postingDate: items[0]['Posting Date'],
-          cabang: items[0]['Cabang'],
-          totalItems,
-          sosmedItems,
-          missingItems,
-          missingTotalValue,
-          totalDocValue,
-          status: sosmedItems === 0 ? 'ALL_MISSING' : 'PARTIAL_MISSING',
-          keep: bestKeep,
-          items: items,
-          vlookupARDoc,
-          vlookupARDate,
-          vlookupARCabang,
-          vlookupARItems,
-          vlookupARDateIso,
-          reportARDoc,
-          reportARDate,
-          reportARCabang,
-          reportARItems,
-          reportARDateIso,
-          keepTimestampEpoch
-        });
       }
+
+      // Resolve REPORT AR info
+      const repARRaw = String(bestKeep['REPORT AR'] || '').replace(/\D/g, '');
+      let reportARDoc = repARRaw || (!isVlookupMatch ? doc : '-');
+      let reportARDate = null;
+      let reportARCabang = '-';
+      let reportARItems = [];
+
+      if (reportARDoc && reportARDoc !== '-' && docMap.has(reportARDoc)) {
+        reportARDate = docMap.get(reportARDoc)[0]['Posting Date'];
+        reportARCabang = docMap.get(reportARDoc)[0]['Cabang'];
+        reportARItems = docMap.get(reportARDoc);
+      } else if (!isVlookupMatch) {
+        reportARDate = items[0]['Posting Date'];
+        reportARCabang = items[0]['Cabang'];
+        reportARItems = items;
+      }
+
+      // Parse ISO dates for filtering
+      const vlookupARDateIso = parseDateToISO(vlookupARDate);
+      const reportARDateIso = parseDateToISO(reportARDate);
+
+      // Parse Keep Timestamp for sorting
+      const keepTimestampEpoch = parseKeepTimestampToEpoch(bestKeep['Timestamp']);
+
+      rawAuditARList.push({
+        doc,
+        postingDate: items[0]['Posting Date'],
+        cabang: items[0]['Cabang'],
+        totalItems,
+        sosmedItems,
+        missingItems,
+        missingTotalValue,
+        totalDocValue,
+        status: arStatus,
+        keep: bestKeep,
+        items: items,
+        vlookupARDoc,
+        vlookupARDate,
+        vlookupARCabang,
+        vlookupARItems,
+        vlookupARDateIso,
+        reportARDoc,
+        reportARDate,
+        reportARCabang,
+        reportARItems,
+        reportARDateIso,
+        keepTimestampEpoch
+      });
     }
   });
 
@@ -2672,7 +2732,11 @@ function applyAuditFilters() {
 
     // 5. Status AR filter
     if (statusVal !== 'ALL') {
-      if (r.status !== statusVal) return false;
+      if (statusVal === 'ANY_MISSING') {
+        if (r.status !== 'PARTIAL_MISSING' && r.status !== 'ALL_MISSING') return false;
+      } else if (r.status !== statusVal) {
+        return false;
+      }
     }
 
     // 6. Keyword search
@@ -2686,25 +2750,29 @@ function applyAuditFilters() {
     return true;
   });
 
-  // Calculate KPI counters
-  let allMissingCount = 0;
+  // Calculate KPI counters (Hijau: Sudah Terinput, Orange: Sebagian, Merah: Tidak Terinput)
+  let allSosmedCount = 0;
   let partialMissingCount = 0;
+  let allMissingCount = 0;
   let totalPotensiRp = 0;
 
   filteredAuditARList.forEach(r => {
-    if (r.status === 'ALL_MISSING') allMissingCount++;
+    if (r.status === 'ALL_SOSMED') allSosmedCount++;
     else if (r.status === 'PARTIAL_MISSING') partialMissingCount++;
+    else if (r.status === 'ALL_MISSING') allMissingCount++;
     totalPotensiRp += (r.missingTotalValue || 0);
   });
 
   const totalEl = document.getElementById('auditTotalCount');
-  const allEl = document.getElementById('auditAllMissingCount');
+  const allSosmedEl = document.getElementById('auditAllSosmedCount');
   const partialEl = document.getElementById('auditPartialMissingCount');
+  const allMissingEl = document.getElementById('auditAllMissingCount');
   const potensiEl = document.getElementById('auditTotalPotensiRp');
 
   if (totalEl) totalEl.innerText = filteredAuditARList.length.toLocaleString('id-ID');
-  if (allEl) allEl.innerText = allMissingCount.toLocaleString('id-ID');
+  if (allSosmedEl) allSosmedEl.innerText = allSosmedCount.toLocaleString('id-ID');
   if (partialEl) partialEl.innerText = partialMissingCount.toLocaleString('id-ID');
+  if (allMissingEl) allMissingEl.innerText = allMissingCount.toLocaleString('id-ID');
   if (potensiEl) potensiEl.innerText = formatRupiah(totalPotensiRp);
 
   auditCurrentPage = 1;
@@ -2801,9 +2869,30 @@ function renderAuditPage() {
       catatanHtml = `<div style="font-size:0.70rem; line-height:1.25; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
     }
 
+    // Klasifikasi Status Warna:
+    // Hijau: Sudah terinput semua (ALL_SOSMED)
+    // Orange: Terinput sebagian (PARTIAL_MISSING)
+    // Merah: Tidak terinput sama sekali (ALL_MISSING)
+    let rowStatusClass = 'audit-row-missing';
+    let badgeClass = 'badge-status-red';
+    let badgeIcon = '❌';
+    let statusLabel = 'Tidak Terinput Sosmed';
+
+    if (r.status === 'ALL_SOSMED') {
+      rowStatusClass = 'audit-row-sosmed';
+      badgeClass = 'badge-status-green';
+      badgeIcon = '✅';
+      statusLabel = 'Sudah Terinput Semua (100% Sosmed)';
+    } else if (r.status === 'PARTIAL_MISSING') {
+      rowStatusClass = 'audit-row-partial';
+      badgeClass = 'badge-status-orange';
+      badgeIcon = '⚠️';
+      statusLabel = 'Terinput Sebagian';
+    }
+
     // Report AR cell
     const reportARDocDisplay = (r.reportARDoc && r.reportARDoc !== '-')
-      ? `<span class="cursor-pointer font-bold text-crimson" onclick="openARDetailModal('${r.reportARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'REPORT AR')" title="Klik untuk cek detail Dokumen Report AR">📄 ${r.reportARDoc}</span>`
+      ? `<span class="badge-status-link ${badgeClass}" onclick="openARDetailModal('${r.reportARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'REPORT AR')" title="Status: ${statusLabel}. Klik untuk cek detail Dokumen Report AR"><span>${badgeIcon}</span> ${r.reportARDoc}</span>`
       : '-';
 
     const reportARDateDisplay = r.reportARDate
@@ -2812,7 +2901,7 @@ function renderAuditPage() {
 
     // Vlookup AR cell
     const vlookupARDocDisplay = (r.vlookupARDoc && r.vlookupARDoc !== '-')
-      ? `<span class="cursor-pointer font-bold text-crimson" onclick="openARDetailModal('${r.vlookupARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'AR VLOOKUP')" title="Klik untuk cek detail Dokumen AR VLOOKUP">📄 ${r.vlookupARDoc}</span>`
+      ? `<span class="badge-status-link ${badgeClass}" onclick="openARDetailModal('${r.vlookupARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'AR VLOOKUP')" title="Status: ${statusLabel}. Klik untuk cek detail Dokumen AR VLOOKUP"><span>${badgeIcon}</span> ${r.vlookupARDoc}</span>`
       : '-';
 
     const vlookupARDateDisplay = r.vlookupARDate
@@ -2820,16 +2909,17 @@ function renderAuditPage() {
       : '-';
 
     const tr = document.createElement('tr');
+    tr.className = rowStatusClass;
     tr.innerHTML = `
       <td class="audit-col-no" style="text-align: center;">${globalIdx}</td>
       <td class="audit-col-keep-date" style="text-align: center; font-weight: 600;">${formatKeepTimestamp(keepObj['Timestamp'])}</td>
-      <td class="audit-col-cust font-bold" style="color: #0f172a;">${keepObj['Nama'] || '-'}</td>
-      <td class="audit-col-wa">${waHtml}</td>
+      <td class="audit-col-cust text-left font-bold" style="color: #0f172a; word-break: break-word;">${keepObj['Nama'] || '-'}</td>
+      <td class="audit-col-wa text-left" style="word-break: break-word;">${waHtml}</td>
       <td class="audit-col-sosmed" style="text-align: center;">
         <span class="badge-sosmed-pill">${keepObj['Kode Sosmed'] || '-'}</span>
       </td>
-      <td class="audit-col-keep font-bold" style="color: #1e293b;">${keepObj['Barang Keep'] || '-'}</td>
-      <td class="audit-col-notes">${catatanHtml}</td>
+      <td class="audit-col-keep text-left font-bold" style="color: #1e293b; word-break: break-word;">${keepObj['Barang Keep'] || '-'}</td>
+      <td class="audit-col-notes text-left" style="word-break: break-word;">${catatanHtml}</td>
       <td class="audit-col-report-ar" style="text-align: center;">${reportARDocDisplay}</td>
       <td class="audit-col-report-date" style="text-align: center; font-size: 0.73rem;">${reportARDateDisplay}</td>
       <td class="audit-col-vlookup-ar" style="text-align: center;">${vlookupARDocDisplay}</td>

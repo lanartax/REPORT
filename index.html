@@ -927,9 +927,11 @@
             <div class="filter-group">
               <label for="auditFilterStatus">Status AR:</label>
               <select id="auditFilterStatus" class="form-input" onchange="applyAuditFilters()">
-                <option value="ALL">Semua (Belum & Sebagian)</option>
-                <option value="ALL_MISSING">Belum Diinput Sama Sekali (Offline Toko)</option>
-                <option value="PARTIAL_MISSING">Sebagian Item Belum Diinput</option>
+                <option value="ALL">Semua Status (Lengkap, Sebagian & Belum)</option>
+                <option value="ALL_SOSMED">✅ Sudah Terinput Semua (Hijau)</option>
+                <option value="PARTIAL_MISSING">⚠️ Terinput Sebagian (Orange)</option>
+                <option value="ALL_MISSING">❌ Tidak Terinput Sama Sekali (Merah)</option>
+                <option value="ANY_MISSING">🚨 Belum & Sebagian Terinput</option>
               </select>
             </div>
 
@@ -974,20 +976,24 @@
           <!-- Summary KPI Mini-Grid -->
           <div class="keep-stats-summary" style="padding: 0 18px;">
             <div class="keep-stat-card">
-              <div class="label">Total AR Belum / Sebagian Belum</div>
-              <div class="val text-crimson" id="auditTotalCount">0</div>
+              <div class="label">Total Dokumen AR</div>
+              <div class="val font-bold text-accent" id="auditTotalCount">0</div>
             </div>
-            <div class="keep-stat-card">
-              <div class="label">Belum Terinput Sama Sekali</div>
-              <div class="val text-crimson" id="auditAllMissingCount">0</div>
+            <div class="keep-stat-card" style="border-left: 4px solid #16a34a;">
+              <div class="label">Sudah Terinput (Hijau)</div>
+              <div class="val font-bold" style="color: #16a34a;" id="auditAllSosmedCount">0</div>
             </div>
-            <div class="keep-stat-card">
-              <div class="label">Sebagian Item Belum Terinput</div>
-              <div class="val text-gold" id="auditPartialMissingCount">0</div>
+            <div class="keep-stat-card" style="border-left: 4px solid #ea580c;">
+              <div class="label">Terinput Sebagian (Orange)</div>
+              <div class="val font-bold" style="color: #ea580c;" id="auditPartialMissingCount">0</div>
+            </div>
+            <div class="keep-stat-card" style="border-left: 4px solid #dc2626;">
+              <div class="label">Tidak Terinput (Merah)</div>
+              <div class="val font-bold" style="color: #dc2626;" id="auditAllMissingCount">0</div>
             </div>
             <div class="keep-stat-card">
               <div class="label">Potensi Omzet Belum Terklaim</div>
-              <div class="val font-bold text-accent" id="auditTotalPotensiRp">Rp 0</div>
+              <div class="val font-bold text-crimson" id="auditTotalPotensiRp">Rp 0</div>
             </div>
           </div>
 
