@@ -55,6 +55,115 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+// Helper update local keep-data.csv immediately (0ms delay)
+function updateLocalKeepCsvStatus(nomorWA, newStatus) {
+  try {
+    const cachePath = path.join(PUBLIC_DIR, 'keep-data.csv');
+    if (!fs.existsSync(cachePath)) return false;
+
+    const raw = fs.readFileSync(cachePath, 'utf8');
+    const cleanWA = String(nomorWA).replace(/\D/g, '');
+    if (!cleanWA) return false;
+
+    const arr = [];
+    let quote = false;
+    let row = [''];
+    for (let c = 0; c < raw.length; c++) {
+      const cc = raw[c], nc = raw[c+1];
+      if (cc === '"') {
+        if (quote && nc === '"') { row[row.length - 1] += '""'; c++; }
+        else { quote = !quote; row[row.length - 1] += '"'; }
+      } else if (cc === ',' && !quote) {
+        row.push('');
+      } else if ((cc === '\r' || cc === '\n') && !quote) {
+        if (cc === '\r' && nc === '\n') { c++; }
+        arr.push(row);
+        row = [''];
+      } else {
+        row[row.length - 1] += cc;
+      }
+    }
+    if (row.length > 1 || row[0] !== '') arr.push(row);
+
+    if (arr.length < 2) return false;
+
+    const headers = arr[0];
+    let waCol = headers.findIndex(h => h.trim().toLowerCase() === 'nomor wa');
+    let statusCol = headers.findIndex(h => h.trim().toLowerCase() === 'status');
+    if (waCol === -1) waCol = 7;
+    if (statusCol === -1) statusCol = 21;
+
+    let modified = false;
+    for (let i = 1; i < arr.length; i++) {
+      const r = arr[i];
+      if (r[waCol]) {
+        const rowWA = r[waCol].replace(/\D/g, '');
+        if (rowWA === cleanWA || (rowWA.length >= 9 && cleanWA.endsWith(rowWA)) || (cleanWA.length >= 9 && rowWA.endsWith(cleanWA))) {
+          r[statusCol] = newStatus;
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      const csvOut = arr.map(row => row.map(val => {
+        const s = String(val === undefined ? '' : val);
+        if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      }).join(',')).join('\r\n');
+
+      fs.writeFileSync(cachePath, csvOut, 'utf8');
+      console.log(`⚡ [Cache Lokal] keep-data.csv berhasil diupdate untuk WA: ${nomorWA} -> ${newStatus}`);
+      return true;
+    }
+  } catch (err) {
+    console.warn('⚠️ Gagal update cache lokal keep-data.csv:', err.message);
+  }
+  return false;
+}
+
+// Background Auto-Sync Google Sheets Keep Data (Polling setiap 60 detik)
+let isAutoSyncing = false;
+let lastKnownSheetLength = 0;
+
+async function autoSyncGoogleSheetsKeep() {
+  if (isAutoSyncing) return;
+  isAutoSyncing = true;
+  try {
+    const response = await fetch(GOOGLE_SHEET_CSV_URL, { redirect: 'follow' });
+    if (response.ok) {
+      const text = await response.text();
+      const cachePath = path.join(PUBLIC_DIR, 'keep-data.csv');
+      
+      let shouldWrite = true;
+      if (fs.existsSync(cachePath)) {
+        const existingSize = fs.statSync(cachePath).size;
+        const newSize = Buffer.byteLength(text, 'utf8');
+        if (existingSize === newSize && text.length === lastKnownSheetLength) {
+          shouldWrite = false;
+        }
+      }
+      
+      if (shouldWrite) {
+        fs.writeFileSync(cachePath, text, 'utf8');
+        lastKnownSheetLength = text.length;
+        console.log(`📡 [Auto-Sync] Data Keep Google Sheets berhasil diperbarui otomatis! (${(text.length / 1024 / 1024).toFixed(2)} MB)`);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [Auto-Sync] Gagal sinkronisasi otomatis Google Sheets:', err.message);
+  } finally {
+    isAutoSyncing = false;
+  }
+}
+
+// Jalankan auto-sync setiap 60 detik di background
+setInterval(autoSyncGoogleSheetsKeep, 60000);
+// Jalankan sinkronisasi pertama 5 detik setelah startup
+setTimeout(autoSyncGoogleSheetsKeep, 5000);
+
   // API Update Keep Status to Google Sheets via Google Apps Script Web App
   if (reqPath === '/api/update-keep-status') {
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
@@ -77,6 +186,9 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify({ success: false, error: 'nomorWA dan status harus diisi' }));
             return;
           }
+
+          // Perbarui file lokal keep-data.csv seketika agar LAN cache langsung up-to-date!
+          updateLocalKeepCsvStatus(nomorWA, status);
 
           console.log(`📤 Mengirim update status ke Google Sheets: WA=${nomorWA}, Status=${status}`);
           const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status)}`;
@@ -105,6 +217,9 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ success: false, error: 'nomorWA dan status harus diisi' }));
           return;
         }
+
+        // Perbarui file lokal keep-data.csv seketika agar LAN cache langsung up-to-date!
+        updateLocalKeepCsvStatus(nomorWA, status);
 
         console.log(`📤 Mengirim update status (GET) ke Google Sheets: WA=${nomorWA}, Status=${status}`);
         const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status)}`;

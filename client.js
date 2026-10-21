@@ -1132,8 +1132,144 @@ function showSaveToast(message) {
   toast.style.display = 'flex';
   setTimeout(() => {
     if (toast) toast.style.display = 'none';
-  }, 5000);
+  }, 4000);
 }
+
+// ==========================================================================
+// FLOATING ANIMATED PERCENTAGE PROGRESS NOTIFICATION ENGINE
+// ==========================================================================
+function getProgressToastContainer() {
+  let container = document.getElementById('progressToastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'progressToastContainer';
+    container.className = 'progress-toast-container';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showProgressNotification({ id = `prog-${Date.now()}`, title = 'Memproses Data...', detail = '', initialPct = 0 }) {
+  const container = getProgressToastContainer();
+  let toast = document.getElementById(id);
+
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = id;
+    toast.className = 'progress-toast';
+    toast.innerHTML = `
+      <div class="progress-toast-header">
+        <div class="progress-toast-title-wrap">
+          <span class="progress-toast-spinner" id="${id}-spinner"></span>
+          <span class="progress-toast-title" id="${id}-title">${title}</span>
+        </div>
+        <span class="progress-toast-pct" id="${id}-pct">${Math.round(initialPct)}%</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="${id}-fill" style="width: ${initialPct}%;"></div>
+      </div>
+      <div class="progress-toast-detail" id="${id}-detail">${detail}</div>
+    `;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+  }
+
+  const titleEl = document.getElementById(`${id}-title`);
+  const pctEl = document.getElementById(`${id}-pct`);
+  const fillEl = document.getElementById(`${id}-fill`);
+  const detailEl = document.getElementById(`${id}-detail`);
+
+  let currentPercent = initialPct;
+
+  const controller = {
+    id,
+    update({ pct, title: newTitle, detail: newDetail }) {
+      if (typeof pct === 'number') {
+        currentPercent = Math.max(0, Math.min(100, pct));
+        if (pctEl) pctEl.innerText = `${Math.round(currentPercent)}%`;
+        if (fillEl) fillEl.style.width = `${currentPercent}%`;
+      }
+      if (newTitle && titleEl) titleEl.innerText = newTitle;
+      if (newDetail !== undefined && detailEl) detailEl.innerText = newDetail;
+    },
+    complete({ title: compTitle = '✅ Selesai (100%)', detail: compDetail = 'Data berhasil diproses' } = {}) {
+      if (pctEl) pctEl.innerText = '100%';
+      if (fillEl) fillEl.style.width = '100%';
+      if (titleEl) titleEl.innerHTML = compTitle;
+      if (detailEl) detailEl.innerText = compDetail;
+      toast.classList.remove('error');
+      toast.classList.add('success');
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+      }, 2500);
+    },
+    fail({ title: errTitle = '❌ Gagal', detail: errDetail = 'Terjadi kesalahan saat memproses data' } = {}) {
+      if (titleEl) titleEl.innerHTML = errTitle;
+      if (detailEl) detailEl.innerText = errDetail;
+      toast.classList.remove('success');
+      toast.classList.add('error');
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+      }, 4000);
+    },
+    dismiss() {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+      setTimeout(() => toast.remove(), 400);
+    }
+  };
+
+  return controller;
+}
+window.showProgressNotification = showProgressNotification;
+
+function startSmoothProgress({ id = `smooth-${Date.now()}`, title = 'Menyimpan ke Google Sheets...', detail = 'Menghubungkan ke server...' }) {
+  const ctrl = showProgressNotification({ id, title, detail, initialPct: 10 });
+  let current = 10;
+  let isDone = false;
+
+  const interval = setInterval(() => {
+    if (isDone) {
+      clearInterval(interval);
+      return;
+    }
+    // Naik dinamis di awal, melambat di atas 85% menunggu respon jaringan
+    if (current < 45) current += Math.floor(Math.random() * 8) + 6;
+    else if (current < 75) current += Math.floor(Math.random() * 5) + 3;
+    else if (current < 92) current += Math.floor(Math.random() * 3) + 1;
+    
+    current = Math.min(92, current);
+    ctrl.update({ pct: current });
+  }, 130);
+
+  return {
+    id: ctrl.id,
+    update: ctrl.update,
+    complete(opts) {
+      isDone = true;
+      clearInterval(interval);
+      ctrl.update({ pct: 100 });
+      ctrl.complete(opts);
+    },
+    fail(opts) {
+      isDone = true;
+      clearInterval(interval);
+      ctrl.fail(opts);
+    },
+    dismiss() {
+      isDone = true;
+      clearInterval(interval);
+      ctrl.dismiss();
+    }
+  };
+}
+window.startSmoothProgress = startSmoothProgress;
 
 function updateDatabaseBadge(isOk) {
   const text = document.getElementById('dbSyncStatusText');
@@ -1533,106 +1669,61 @@ let filteredKeepRows = [];
 let keepCurrentPage = 1;
 const KEEP_PAGE_SIZE = 50;
 
-async function loadKeepData() {
-  const pill = document.getElementById('keepStatusPill');
-  if (pill) pill.innerHTML = '<span>⏳ Membaca Data Keep Google Sheets...</span>';
-
-  try {
-    const res = await fetch(`keep-data.csv?t=${Date.now()}`);
-    if (!res.ok) throw new Error("File keep-data.csv tidak ditemukan");
-    const csvText = await res.text();
-    const wb = XLSX.read(csvText, { type: 'string' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(ws);
-
-    if (!jsonData || jsonData.length === 0) return;
-    rawKeepRows = jsonData;
-    rawKeepRows.forEach((r, idx) => { r._gsheetsIndex = idx; });
-    console.log(`Keep data loaded: ${rawKeepRows.length} rows`);
-
-    if (pill) {
-      pill.innerHTML = `<span>📁 Sumber: Google Sheets (${rawKeepRows.length.toLocaleString('id-ID')} Baris Data)</span>`;
-    }
-
-    // Populate Sosmed filter dropdown
-    populateKeepSosmedDropdown();
-    // Apply default filters (Oktober-26)
-    applyKeepFilters();
-
-    // Trigger Audit if Croselling data is already loaded
-    if (typeof rawCrosellingRows !== 'undefined' && rawCrosellingRows.length > 0 && typeof runARMissingSosmedAudit === 'function') {
-      runARMissingSosmedAudit();
-    }
-  } catch (err) {
-    console.warn("Gagal memuat keep-data.csv:", err);
-    if (pill) pill.innerHTML = '<span style="color:#e11d48;">❌ Gagal memuat data keep</span>';
-  }
-}
-
-function parseCSVLine(text) {
-  const result = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') {
-      if (inQuotes && text[i+1] === '"') {
-        cur += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (c === ',' && !inQuotes) {
-      result.push(cur.trim());
-      cur = '';
+function parseRFC4180CSV(str) {
+  const arr = [];
+  let quote = false;
+  let row = [''];
+  for (let c = 0; c < str.length; c++) {
+    const cc = str[c], nc = str[c+1];
+    if (cc === '"') {
+      if (quote && nc === '"') { row[row.length - 1] += '"'; c++; }
+      else { quote = !quote; }
+    } else if (cc === ',' && !quote) {
+      row.push('');
+    } else if ((cc === '\r' || cc === '\n') && !quote) {
+      if (cc === '\r' && nc === '\n') { c++; }
+      arr.push(row);
+      row = [''];
     } else {
-      cur += c;
+      row[row.length - 1] += cc;
     }
   }
-  result.push(cur.trim());
-  return result;
+  if (row.length > 1 || row[0] !== '') arr.push(row);
+  return arr;
 }
-window.parseCSVLine = parseCSVLine;
+window.parseRFC4180CSV = parseRFC4180CSV;
 
-function parseKeepCSV(csvText) {
+function parseKeepCSV(csvText, isSilent = false) {
   try {
     if (!csvText || typeof csvText !== 'string') return;
-    let jsonData = [];
-    if (typeof XLSX !== 'undefined' && XLSX.read) {
-      try {
-        const wb = XLSX.read(csvText, { type: 'string' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        jsonData = XLSX.utils.sheet_to_json(ws);
-      } catch (xlsxErr) {
-        console.warn("SheetJS parse warning, using fallback CSV parser:", xlsxErr);
+    const table = parseRFC4180CSV(csvText);
+    if (!table || table.length < 2) return;
+
+    const headers = table[0].map(h => h.trim());
+    const jsonData = [];
+    for (let i = 1; i < table.length; i++) {
+      const rowArr = table[i];
+      if (rowArr.length === 1 && !rowArr[0]) continue;
+      const rowObj = {};
+      for (let j = 0; j < headers.length; j++) {
+        rowObj[headers[j]] = rowArr[j] !== undefined ? rowArr[j] : '';
       }
+      rowObj._gsheetsIndex = i - 1;
+      jsonData.push(rowObj);
     }
 
-    if (!jsonData || jsonData.length === 0) {
-      const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-      if (lines.length > 1) {
-        const headers = parseCSVLine(lines[0]);
-        for (let i = 1; i < lines.length; i++) {
-          const vals = parseCSVLine(lines[i]);
-          const row = {};
-          headers.forEach((h, idx) => {
-            row[h] = vals[idx] !== undefined ? vals[idx] : '';
-          });
-          jsonData.push(row);
-        }
-      }
-    }
-
-    if (!jsonData || jsonData.length === 0) return;
+    if (jsonData.length === 0) return;
     rawKeepRows = jsonData;
-    rawKeepRows.forEach((r, idx) => { r._gsheetsIndex = idx; });
-    console.log(`Keep CSV parsed successfully: ${rawKeepRows.length} rows`);
+    console.log(`Keep CSV parsed successfully (Fast RFC4180): ${rawKeepRows.length} rows`);
+
     const pill = document.getElementById('keepStatusPill');
     if (pill) {
       pill.innerHTML = `<span>📁 Sumber: Google Sheets Live (${rawKeepRows.length.toLocaleString('id-ID')} Baris Data)</span>`;
     }
+
     populateKeepSosmedDropdown();
     applyKeepFilters();
+
     if (typeof rawCrosellingRows !== 'undefined' && rawCrosellingRows.length > 0 && typeof runARMissingSosmedAudit === 'function') {
       runARMissingSosmedAudit();
     }
@@ -1642,6 +1733,21 @@ function parseKeepCSV(csvText) {
 }
 window.parseKeepCSV = parseKeepCSV;
 
+async function loadKeepData(isSilent = false) {
+  const pill = document.getElementById('keepStatusPill');
+  if (pill && !isSilent) pill.innerHTML = '<span>⏳ Membaca Data Keep Google Sheets...</span>';
+
+  try {
+    const res = await fetch(`keep-data.csv?t=${Date.now()}`);
+    if (!res.ok) throw new Error("File keep-data.csv tidak ditemukan");
+    const csvText = await res.text();
+    parseKeepCSV(csvText, isSilent);
+  } catch (err) {
+    console.warn("Gagal memuat keep-data.csv:", err);
+    if (pill && !isSilent) pill.innerHTML = '<span style="color:#e11d48;">❌ Gagal memuat data keep</span>';
+  }
+}
+
 function renderKeepTable() {
   applyKeepFilters();
 }
@@ -1650,7 +1756,13 @@ window.renderKeepTable = renderKeepTable;
 async function syncLiveKeepData() {
   const btn = document.getElementById('btnSyncKeepData');
   const originalText = btn ? btn.innerHTML : '';
-  if (btn) btn.innerHTML = '⏳ Menghubungi Google Sheets...';
+  if (btn) btn.innerHTML = '⏳ Menyinkronkan...';
+
+  const prog = startSmoothProgress({
+    id: 'sync-live-keep-progress',
+    title: '🔄 Sinkronisasi Data Google Sheets',
+    detail: 'Menghubungkan & mengunduh data keep terbaru...'
+  });
 
   try {
     let csvData = null;
@@ -1669,7 +1781,7 @@ async function syncLiveKeepData() {
 
     // Direct browser fallback to Google Sheets CSV export
     if (!csvData) {
-      console.log("Fetching Google Sheets directly from browser...");
+      prog.update({ pct: 45, detail: 'Mengunduh langsung dari server Google Sheets...' });
       const directRes = await fetch('https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310');
       if (directRes.ok) {
         csvData = await directRes.text();
@@ -1677,6 +1789,7 @@ async function syncLiveKeepData() {
     }
 
     if (csvData) {
+      prog.update({ pct: 80, detail: 'Memproses baris data keep ke memori...' });
       parseKeepCSV(csvData);
       try {
         localStorage.setItem('gadgetmart_sosmed_keep_cache', csvData);
@@ -1684,14 +1797,23 @@ async function syncLiveKeepData() {
         console.warn("Storage quota exceeded for localStorage keep cache:", storageErr);
       }
       applyKeepFilters();
-      alert(`✅ Data Keep berhasil disinkronisasi langsung dari Google Sheets!\nTotal ${rawKeepRows.length.toLocaleString('id-ID')} baris data berhasil dimuat.`);
+      prog.complete({
+        title: '✅ Sinkronisasi Google Sheets Berhasil!',
+        detail: `Total ${rawKeepRows.length.toLocaleString('id-ID')} baris data berhasil dimuat`
+      });
     } else {
       await loadKeepData();
-      alert("✅ Sinkronisasi selesai, memuat data keep terbaru.");
+      prog.complete({
+        title: '✅ Sinkronisasi Selesai!',
+        detail: 'Data keep terbaru berhasil dimuat'
+      });
     }
   } catch (err) {
     console.error("Sync error:", err);
-    alert(`Sinkronisasi Google Sheets gagal: ${err.message}. Mencoba membaca data cache lokal.`);
+    prog.fail({
+      title: '❌ Gagal Sinkronisasi Google Sheets',
+      detail: err.message
+    });
     await loadKeepData();
   } finally {
     if (btn) btn.innerHTML = originalText;
@@ -2939,103 +3061,149 @@ async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
   throw new Error((result && result.message) || 'Gagal menyimpan status ke Google Sheets.');
 }
 
-async function handleTableKeepStatusChange(selectEl, rawWA, auditRowIdx) {
-  if (!selectEl) return;
-  const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
-  const newVal = selectEl.value;
-  if (newVal === oldVal) return;
+// Antrean update status Google Sheets di background (non-blocking)
+const pendingKeepStatusUpdates = new Map();
 
-  const originalClass = selectEl.className;
-  selectEl.disabled = true;
-  selectEl.classList.add('status-saving');
+async function triggerBackgroundKeepStatusSync(rawWA, newVal, oldVal, onRollback) {
+  const normWA = String(rawWA || '').replace(/\D/g, '');
+  if (!normWA) return;
+
+  pendingKeepStatusUpdates.set(normWA, newVal);
+  const phoneDisplay = formatPhoneDisplay(rawWA);
+
+  // Tampilkan notifikasi persentase bergerak aktif
+  const prog = startSmoothProgress({
+    id: `prog-keep-${normWA}`,
+    title: `⚡ Simpan Status WA ${phoneDisplay}`,
+    detail: `Mengirim status "${newVal || 'KOSONG'}" ke Google Sheets...`
+  });
 
   try {
     await updateKeepStatusInGoogleSheets(rawWA, newVal);
-
-    // Update state di memory (rawAuditARList, filteredAuditARList, dan rawKeepRows)
-    if (filteredAuditARList[auditRowIdx] && filteredAuditARList[auditRowIdx].keep) {
-      filteredAuditARList[auditRowIdx].keep['Status'] = newVal;
-    }
-    const cleanWA = String(rawWA).replace(/\D/g, '');
-    if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
-      rawKeepRows.forEach(k => {
-        if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
-          k['Status'] = newVal;
-        }
-      });
-    }
-
-    selectEl.setAttribute('data-prev', newVal);
-    selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
-
-    // Update visual baris tabel: terblok sesuai warna status keep, atau outline sosmed jika kosong
-    const tr = selectEl.closest('tr');
-    if (tr) {
-      const arObj = filteredAuditARList[auditRowIdx];
-      const arSt = arObj ? arObj.status : '';
-      tr.className = getAuditRowClassByKeepStatus(newVal, arSt);
-    }
-
-    const toastLabel = newVal ? `ke "${newVal}"` : 'dikosongkan';
-    showSaveToast(`✅ Status keep WA ${formatPhoneDisplay(rawWA)} berhasil ${toastLabel} di Google Sheets!`);
+    pendingKeepStatusUpdates.delete(normWA);
+    prog.complete({
+      title: `✅ Status WA ${phoneDisplay} Berhasil Disimpan!`,
+      detail: `Status "${newVal || 'KOSONG'}" sukses tersinkronisasi di Google Sheets`
+    });
   } catch (err) {
-    console.error('Update status error:', err);
-    alert(`Gagal menyimpan status ke Google Sheets:\n${err.message}`);
-    selectEl.value = oldVal;
-    selectEl.className = originalClass;
-  } finally {
-    selectEl.disabled = false;
-    selectEl.classList.remove('status-saving');
+    console.error('Background sync status keep gagal:', err);
+    prog.fail({
+      title: `❌ Gagal Simpan WA ${phoneDisplay}`,
+      detail: err.message || 'Koneksi ke Google Sheets terganggu'
+    });
+    if (pendingKeepStatusUpdates.get(normWA) === newVal) {
+      pendingKeepStatusUpdates.delete(normWA);
+      if (typeof onRollback === 'function') {
+        onRollback(err);
+      }
+    }
   }
 }
 
-async function handleModalKeepStatusChange(selectEl, rawWA) {
+function handleTableKeepStatusChange(selectEl, rawWA, auditRowIdx) {
   if (!selectEl) return;
   const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
   const newVal = selectEl.value;
   if (newVal === oldVal) return;
 
   const originalClass = selectEl.className;
-  selectEl.disabled = true;
-  selectEl.classList.add('status-saving');
+  const tr = selectEl.closest('tr');
+  const arObj = filteredAuditARList[auditRowIdx];
+  const arSt = arObj ? arObj.status : '';
+  const originalRowClass = tr ? tr.className : '';
 
-  try {
-    await updateKeepStatusInGoogleSheets(rawWA, newVal);
+  // 1. OPTIMISTIC UI UPDATE (0ms) - Seketika ubah dropdown & warna blok baris tabel tanpa freeze
+  selectEl.setAttribute('data-prev', newVal);
+  selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
+  if (tr) {
+    tr.className = getAuditRowClassByKeepStatus(newVal, arSt);
+  }
 
+  // 2. Perbarui state memori seketika (0ms)
+  if (filteredAuditARList[auditRowIdx] && filteredAuditARList[auditRowIdx].keep) {
+    filteredAuditARList[auditRowIdx].keep['Status'] = newVal;
+  }
+  const cleanWA = String(rawWA).replace(/\D/g, '');
+  if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+    rawKeepRows.forEach(k => {
+      if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        k['Status'] = newVal;
+      }
+    });
+  }
+  if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+    rawAuditARList.forEach(a => {
+      if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        a.keep['Status'] = newVal;
+      }
+    });
+  }
+
+  const toastLabel = newVal ? `ke "${newVal}"` : 'dikosongkan';
+  showSaveToast(`⚡ Status keep WA ${formatPhoneDisplay(rawWA)} diubah ${toastLabel}! (Tersimpan di background)`);
+
+  // 3. Kirim ke Google Sheets di background (Rollback otomatis jika gagal)
+  triggerBackgroundKeepStatusSync(rawWA, newVal, oldVal, (err) => {
+    alert(`⚠️ Gagal menyimpan status ke Google Sheets:\n${err.message}\nStatus dikembalikan ke sebelumnya.`);
+    selectEl.value = oldVal;
+    selectEl.setAttribute('data-prev', oldVal);
+    selectEl.className = originalClass;
+    if (tr) tr.className = originalRowClass;
+    if (filteredAuditARList[auditRowIdx] && filteredAuditARList[auditRowIdx].keep) {
+      filteredAuditARList[auditRowIdx].keep['Status'] = oldVal;
+    }
+  });
+}
+
+function handleModalKeepStatusChange(selectEl, rawWA) {
+  if (!selectEl) return;
+  const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
+  const newVal = selectEl.value;
+  if (newVal === oldVal) return;
+
+  const originalClass = selectEl.className;
+
+  // 1. OPTIMISTIC UI UPDATE (0ms)
+  selectEl.setAttribute('data-prev', newVal);
+  selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
+
+  if (currentModalKeep) {
+    currentModalKeep['Status'] = newVal;
+  }
+  const cleanWA = String(rawWA).replace(/\D/g, '');
+  if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+    rawAuditARList.forEach(a => {
+      if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        a.keep['Status'] = newVal;
+      }
+    });
+  }
+  if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+    rawKeepRows.forEach(k => {
+      if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        k['Status'] = newVal;
+      }
+    });
+  }
+
+  showSaveToast(`⚡ Status keep WA ${formatPhoneDisplay(rawWA)} diubah ke "${newVal}"! (Tersimpan di background)`);
+  if (typeof renderAuditPage === 'function') {
+    renderAuditPage();
+  }
+
+  // 2. Kirim ke Google Sheets di background
+  triggerBackgroundKeepStatusSync(rawWA, newVal, oldVal, (err) => {
+    alert(`⚠️ Gagal menyimpan status ke Google Sheets:\n${err.message}\nStatus dikembalikan ke sebelumnya.`);
+    selectEl.value = oldVal;
+    selectEl.setAttribute('data-prev', oldVal);
+    selectEl.className = originalClass;
     if (currentModalKeep) {
-      currentModalKeep['Status'] = newVal;
+      currentModalKeep['Status'] = oldVal;
     }
-    const cleanWA = String(rawWA).replace(/\D/g, '');
-    if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
-      rawAuditARList.forEach(a => {
-        if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
-          a.keep['Status'] = newVal;
-        }
-      });
-    }
-    if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
-      rawKeepRows.forEach(k => {
-        if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
-          k['Status'] = newVal;
-        }
-      });
-    }
-
-    selectEl.setAttribute('data-prev', newVal);
-    selectEl.className = `select-status-keep ${getKeepStatusClass(newVal)}`;
-    showSaveToast(`✅ Status keep WA ${formatPhoneDisplay(rawWA)} berhasil diubah ke "${newVal}" di Google Sheets!`);
     if (typeof renderAuditPage === 'function') {
       renderAuditPage();
     }
-  } catch (err) {
-    console.error('Update modal status error:', err);
-    alert(`Gagal menyimpan status ke Google Sheets:\n${err.message}`);
-    selectEl.value = oldVal;
-    selectEl.className = originalClass;
-  } finally {
-    selectEl.disabled = false;
-    selectEl.classList.remove('status-saving');
-  }
+  });
 }
 
 function renderAuditPage() {
@@ -5371,6 +5539,7 @@ async function loadAllDefaultFiles() {
       if (s.croselling && s.croselling.mtimeMs) lastKnownSyncStatus.crosellingMtime = s.croselling.mtimeMs;
       if (s.targets && s.targets.mtimeMs) lastKnownSyncStatus.targetsMtime = s.targets.mtimeMs;
       if (s.photos && s.photos.mtimeMs) lastKnownSyncStatus.photosMtime = s.photos.mtimeMs;
+      if (s.keep && s.keep.mtimeMs) lastKnownSyncStatus.keepMtime = s.keep.mtimeMs;
     }
   } catch(e) {}
 }
@@ -5455,6 +5624,26 @@ async function pollServerSyncStatus() {
         renderSalesLeaderboard('omzet');
       } else if (!lastKnownSyncStatus.photosMtime) {
         lastKnownSyncStatus.photosMtime = status.photos.mtimeMs;
+      }
+    }
+
+    // F. Deteksi jika Data Keep Google Sheets diperbarui otomatis dari server
+    if (status.keep && status.keep.exists && status.keep.mtimeMs) {
+      if (lastKnownSyncStatus.keepMtime && status.keep.mtimeMs > lastKnownSyncStatus.keepMtime) {
+        console.log('🔄 [Sync Engine] Data Keep Google Sheets baru terdeteksi!');
+        lastKnownSyncStatus.keepMtime = status.keep.mtimeMs;
+        const prog = startSmoothProgress({
+          id: 'auto-sync-keep-progress',
+          title: '📡 Auto-Sync Data Google Sheets',
+          detail: 'Data keep diperbarui di server, memuat...'
+        });
+        await loadKeepData(true);
+        prog.complete({
+          title: '✅ Data Google Sheets Tersinkronisasi!',
+          detail: `${rawKeepRows.length.toLocaleString('id-ID')} baris data live terupdate`
+        });
+      } else if (!lastKnownSyncStatus.keepMtime) {
+        lastKnownSyncStatus.keepMtime = status.keep.mtimeMs;
       }
     }
   } catch (err) {
