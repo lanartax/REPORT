@@ -18,7 +18,7 @@ const MIME_TYPES = {
 };
 
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
 
 // ==========================================
 // SERVER-SENT EVENTS (SSE) BROADCAST ENGINE

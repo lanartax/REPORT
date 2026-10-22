@@ -3038,7 +3038,7 @@ async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
   const normWA = String(rawWA || '').replace(/\D/g, '');
   if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update status.');
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
 
   let result = null;
   // 1. Coba lewat backend local-server proxy
@@ -3111,7 +3111,7 @@ async function updateReportARInGoogleSheets(rawWA, arDoc) {
   const normWA = String(rawWA || '').replace(/\D/g, '');
   if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update Report AR.');
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
 
   let result = null;
   // 1. Coba lewat backend local-server proxy
