@@ -9,6 +9,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // 1. Mount API Handlers
 app.all('/api/chat-ai', (req, res) => require('./api/chat-ai')(req, res));
 app.all('/api/sync-keep', (req, res) => require('./api/sync-keep')(req, res));
+app.all('/api/update-report-ar', (req, res) => require('./api/update-report-ar')(req, res));
+app.all('/api/update-keep-status', (req, res) => require('./api/update-keep-status')(req, res));
 app.all('/api/monthly-archives', (req, res) => require('./api/monthly-archives')(req, res));
 app.all('/api/monthly-targets', (req, res) => require('./api/monthly-targets')(req, res));
 app.all('/api/sales-photos', (req, res) => require('./api/sales-photos')(req, res));
