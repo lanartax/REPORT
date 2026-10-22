@@ -74,12 +74,12 @@ h1, h2, h3, h4, h5, h6,
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
-/* App Container: Full Width Layout with Floating Header */
+/* App Container: Full Width Layout with Floating Header (Edge-to-Edge Tanpa Ruang Kosong) */
 .app-layout {
   min-height: 100vh;
   width: 100%;
   margin: 0;
-  padding: 0 16px;
+  padding: 0;
   background-color: #ffffff;
   box-sizing: border-box;
 }
@@ -92,11 +92,14 @@ h1, h2, h3, h4, h5, h6,
    ============================================================ */
 .workspace-header-wrapper {
   width: 100%;
+  min-width: 100%;
   background: #000000;
-  padding: 16px 28px 12px 28px;
+  padding: 14px 28px 12px 28px;
   box-sizing: border-box;
   position: sticky;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   border-bottom: 1px solid #18181b;
 }
@@ -364,20 +367,25 @@ h1, h2, h3, h4, h5, h6,
     padding: 6px 12px;
     font-size: 0.85rem;
   }
+  .app-main-wrapper {
+    padding: 16px 14px 40px 14px;
+  }
 }
 
-/* Main Content Area */
+/* Main Content Area (Memberikan Jarak Rapi Antara Header dan Modul) */
 .app-main-wrapper {
   width: 100%;
-  max-width: 98%;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 24px 28px 60px 28px;
+  box-sizing: border-box;
 }
 
 .main-content {
   max-width: 100%;
   width: 100%;
   margin: 0 auto;
-  padding: 0 0 60px 0;
+  padding: 0;
 }
 
 /* Modal Login Styling */
