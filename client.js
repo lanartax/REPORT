@@ -1906,14 +1906,37 @@ function applyKeepFilters() {
   const total = filteredKeepRows.length;
   const closingRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
 
-  document.getElementById('keepTotalCount').innerText = total.toLocaleString('id-ID');
-  document.getElementById('keepWinCount').innerText = winCount.toLocaleString('id-ID');
-  document.getElementById('keepProgressCount').innerText = progressCount.toLocaleString('id-ID');
-  document.getElementById('keepLoseCount').innerText = loseCount.toLocaleString('id-ID');
-  document.getElementById('keepClosingRate').innerText = `${closingRate}%`;
+  if (document.getElementById('keepTotalCount')) document.getElementById('keepTotalCount').innerText = total.toLocaleString('id-ID');
+  if (document.getElementById('keepWinCount')) document.getElementById('keepWinCount').innerText = winCount.toLocaleString('id-ID');
+  if (document.getElementById('keepProgressCount')) document.getElementById('keepProgressCount').innerText = progressCount.toLocaleString('id-ID');
+  if (document.getElementById('keepLoseCount')) document.getElementById('keepLoseCount').innerText = loseCount.toLocaleString('id-ID');
+  if (document.getElementById('keepClosingRate')) document.getElementById('keepClosingRate').innerText = `${closingRate}%`;
+
+  let activeKeepCount = 0;
+  if (document.getElementById('keepFilterPeriode') && document.getElementById('keepFilterPeriode').value !== 'ALL') activeKeepCount++;
+  if (document.getElementById('keepFilterSosmed') && document.getElementById('keepFilterSosmed').value !== 'ALL') activeKeepCount++;
+  if (document.getElementById('keepFilterTanggal') && document.getElementById('keepFilterTanggal').value) activeKeepCount++;
+  if (document.getElementById('keepFilterStatus') && document.getElementById('keepFilterStatus').value !== 'ALL') activeKeepCount++;
+  if (document.getElementById('keepSearchInput') && document.getElementById('keepSearchInput').value.trim()) activeKeepCount++;
+  const badgeKeep = document.getElementById('keepFilterActiveCount');
+  if (badgeKeep) badgeKeep.innerText = activeKeepCount;
 
   keepCurrentPage = 1;
   renderKeepPage();
+}
+
+function toggleKeepFiltersSection() {
+  const el = document.getElementById('keepFilterSection');
+  if (el) {
+    el.style.display = (el.style.display === 'none' ? 'flex' : 'none');
+  }
+}
+
+function toggleAuditFiltersSection() {
+  const el = document.getElementById('auditFilterSection');
+  if (el) {
+    el.style.display = (el.style.display === 'none' ? 'flex' : 'none');
+  }
 }
 
 function resetKeepFilters() {
@@ -1935,20 +1958,73 @@ function changeKeepPage(delta) {
   }
 }
 
-function formatKeepTimestamp(ts) {
+function getCustomerInitials(name) {
+  if (!name || name === '-') return 'CU';
+  const clean = String(name).replace(/[^a-zA-Z0-9\s]/g, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'CU';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function formatKeepDisplayDate(ts) {
   if (!ts) return '-';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
   if (typeof ts === 'number') {
     const d = XLSX.SSF.parse_date_code(ts);
     if (d) {
-      const timeStr = (d.H || d.M) ? ` ${String(d.H).padStart(2,'0')}:${String(d.M).padStart(2,'0')}` : '';
-      return `${String(d.d).padStart(2, '0')}/${String(d.m).padStart(2, '0')}/${d.y}${timeStr}`;
+      const mStr = months[(d.m - 1) % 12] || 'Jan';
+      return `${d.d} ${mStr} ${d.y}`;
     }
   }
   if (typeof ts === 'string') {
-    const parts = ts.split(/[\/\-\s]/);
-    if (parts.length >= 3) return ts;
+    const parts = ts.trim().split(/[\/\-\s]/);
+    if (parts.length >= 3) {
+      const day = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      let y = parts[2].trim();
+      if (y.length === 2) y = '20' + y;
+      if (!isNaN(day) && !isNaN(m) && m >= 1 && m <= 12) {
+        return `${day} ${months[m - 1]} ${y}`;
+      }
+    }
+    return ts;
   }
   return String(ts);
+}
+
+function formatPickupDate(val) {
+  if (!val || val === '-') return '-';
+  const lower = String(val).toLowerCase().trim();
+  if (lower.includes('hari ini')) {
+    return `<span class="text-crimson font-bold">Hari ini</span>`;
+  }
+  return val;
+}
+
+function getModernStatusPill(st) {
+  const norm = String(st || '').trim().toUpperCase();
+  if (norm === 'WIN') return `<span class="modern-status-pill status-pill-green"><span class="status-dot"></span>Win</span>`;
+  if (norm === 'ON PROGRESS LOW' || norm === 'LOW') return `<span class="modern-status-pill status-pill-green"><span class="status-dot"></span>Low</span>`;
+  if (norm.includes('PROGRESS')) return `<span class="modern-status-pill status-pill-orange"><span class="status-dot"></span>On Progress</span>`;
+  if (norm === 'LOSE' || norm === 'TAKE OUT') return `<span class="modern-status-pill status-pill-red"><span class="status-dot"></span>Lose</span>`;
+  return `<span class="modern-status-pill status-pill-gray"><span class="status-dot"></span>${st || '-'}</span>`;
+}
+
+function openStatusChangeQuickModal(rawWA, keepRowIdx, currentStatus) {
+  const newStatus = prompt(`Ubah Status Customer:\nKetik: WIN, ON PROGRESS LOW, ON PROGRESS MEDIUM, ON PROGRESS HOT, atau LOSE`, currentStatus || 'WIN');
+  if (newStatus && newStatus.trim() && newStatus.trim().toUpperCase() !== currentStatus) {
+    const cleanSt = newStatus.trim().toUpperCase();
+    if (filteredKeepRows[keepRowIdx]) {
+      const oldSt = filteredKeepRows[keepRowIdx]['Status'];
+      filteredKeepRows[keepRowIdx]['Status'] = cleanSt;
+      renderKeepPage();
+      triggerBackgroundKeepStatusSync(rawWA, cleanSt, oldSt, () => {
+        filteredKeepRows[keepRowIdx]['Status'] = oldSt;
+        renderKeepPage();
+      });
+    }
+  }
 }
 
 function renderKeepPage() {
@@ -1962,73 +2038,96 @@ function renderKeepPage() {
   const endIdx = Math.min(startIdx + KEEP_PAGE_SIZE, total);
   const pageRows = filteredKeepRows.slice(startIdx, endIdx);
 
-  // Update pagination info
-  document.getElementById('keepPaginationInfo').innerText = total > 0 
-    ? `Menampilkan ${startIdx + 1} - ${endIdx} dari total ${total.toLocaleString('id-ID')} Data` 
-    : 'Tidak ada data yang sesuai filter';
-  document.getElementById('keepCurrentPageText').innerText = `Halaman ${keepCurrentPage} / ${maxPage}`;
-  document.getElementById('btnKeepPrev').disabled = keepCurrentPage <= 1;
-  document.getElementById('btnKeepNext').disabled = keepCurrentPage >= maxPage;
+  // Update hero subtitle and pagination info
+  const heroSub = document.getElementById('customerHeroSub');
+  if (heroSub) {
+    heroSub.innerText = `${total.toLocaleString('id-ID')} customer dari Google Sheets Live`;
+  }
+
+  const paginationInfoEl = document.getElementById('keepPaginationInfo');
+  if (paginationInfoEl) {
+    paginationInfoEl.innerText = total > 0 
+      ? `Menampilkan ${startIdx + 1} - ${endIdx} dari total ${total.toLocaleString('id-ID')} Data` 
+      : 'Tidak ada data customer yang sesuai filter';
+  }
+  const curPageTextEl = document.getElementById('keepCurrentPageText');
+  if (curPageTextEl) curPageTextEl.innerText = `Halaman ${keepCurrentPage} / ${maxPage}`;
+  const btnPrev = document.getElementById('btnKeepPrev');
+  if (btnPrev) btnPrev.disabled = keepCurrentPage <= 1;
+  const btnNext = document.getElementById('btnKeepNext');
+  if (btnNext) btnNext.disabled = keepCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data keep untuk filter yang dipilih.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center" style="padding: 40px; color: var(--text-muted); font-size: 0.9rem;">Tidak ada data customer untuk filter yang dipilih.</td></tr>`;
     return;
   }
 
   pageRows.forEach((r, i) => {
-    const globalIdx = startIdx + i + 1;
     const rawWA = String(r['Nomor WA'] || '').replace(/\D/g, '');
     const normWA = normalizePhone(rawWA);
     const displayWA = formatPhoneDisplay(rawWA);
-
-    // WA Button
-    const waHtml = (normWA && normWA.length >= 8) ? `
-      <div style="display:flex; align-items:center; gap:6px;">
-        <span class="font-bold">${displayWA}</span>
-        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:2px 7px; font-size:0.7rem;" title="Chat customer ini di WhatsApp">
-          💬 WA
-        </a>
-      </div>
-    ` : (displayWA || '-');
-
-    // AR Link (Buka Pop-up AR Modal langsung atau Input AR Cepat)
-    const arDoc = String(r['REPORT AR'] || '').trim();
+    const custName = r['Nama'] || '-';
+    const initials = getCustomerInitials(custName);
     const keepRowIdx = startIdx + i;
+
+    // 1. CUSTOMER CELL: Avatar Circle + Name Bold + Phone Subtext (Persis Gambar 1)
+    const custHtml = `
+      <div class="customer-cell-flex">
+        <div class="avatar-circle-sm" title="${custName}">${initials}</div>
+        <div class="customer-info-box">
+          <span class="customer-name-bold">${custName}</span>
+          ${(normWA && normWA.length >= 8) ? `
+            <a href="https://wa.me/${normWA}" target="_blank" class="customer-phone-sub" title="Hubungi customer di WhatsApp">
+              📞 ${displayWA}
+            </a>
+          ` : `<span class="customer-phone-sub">${displayWA || '-'}</span>`}
+        </div>
+      </div>
+    `;
+
+    // 2. REPORT AR CELL: Dashed button "+ Input AR" atau nomor merah tebal (Persis Gambar 1)
+    const arDoc = String(r['REPORT AR'] || '').trim();
     const arHtml = arDoc ? `
       <div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-keep-idx="${keepRowIdx}" data-current-ar="${arDoc}">
-        <span class="font-bold text-crimson cursor-pointer" onclick="openARDetailModalFromKeep(${keepRowIdx})" title="Klik untuk membuka pop-up detail AR">
-          📄 ${arDoc}
+        <span class="text-ar-number-bold" onclick="openARDetailModalFromKeep(${keepRowIdx})" title="Klik untuk cek detail faktur AR">
+          ${arDoc}
         </span>
         <button type="button" class="btn-edit-inline-ar" onclick="event.stopPropagation(); startEditKeepReportAR(this.parentElement, '${rawWA}', ${keepRowIdx})" title="Ubah nomor AR">✏️</button>
       </div>
     ` : `
       <div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-keep-idx="${keepRowIdx}" data-current-ar="">
-        <button type="button" class="btn-input-new-ar" onclick="startEditKeepReportAR(this.parentElement, '${rawWA}', ${keepRowIdx})" title="Klik untuk menginput nomor AR">+ Input AR</button>
+        <button type="button" class="btn-input-new-ar" onclick="startEditKeepReportAR(this.parentElement, '${rawWA}', ${keepRowIdx})" title="Klik untuk menginput nomor AR">
+          <span>📄</span> Input AR
+        </button>
       </div>
     `;
 
-    // Status Badge
-    const st = String(r['Status'] || '').trim().toUpperCase();
-    let statusClass = 'badge-ink';
-    if (st === 'WIN') statusClass = 'badge-status-win';
-    else if (st === 'ON PROGRESS HOT') statusClass = 'badge-status-hot';
-    else if (st === 'ON PROGRESS MEDIUM') statusClass = 'badge-status-med';
-    else if (st === 'ON PROGRESS LOW') statusClass = 'badge-status-low';
-    else if (st === 'LOSE' || st === 'TAKE OUT') statusClass = 'badge-status-lose';
+    // 3. STATUS PILL: Pill dengan dot warna (Win, Low, On Progress, Lose)
+    const rawSt = String(r['Status'] || '').trim().toUpperCase();
+    const statusPillHtml = `
+      <div class="cursor-pointer" onclick="openStatusChangeQuickModal('${rawWA}', ${keepRowIdx}, '${rawSt}')" title="Klik untuk mengubah status customer">
+        ${getModernStatusPill(rawSt)}
+      </div>
+    `;
 
     const tr = document.createElement('tr');
+    if (rawSt === 'LOSE' || rawSt === 'TAKE OUT') {
+      tr.classList.add('row-lose-tint');
+    }
+
     tr.innerHTML = `
-      <td class="col-sticky">${globalIdx}</td>
-      <td class="text-left font-bold">${formatKeepTimestamp(r['Timestamp'])}</td>
-      <td class="text-left font-bold">${r['Nama'] || '-'}</td>
-      <td class="text-left">${waHtml}</td>
-      <td class="text-left font-bold" style="color:var(--ink);">${r['Barang Keep'] || '-'}</td>
-      <td class="text-left" style="color:var(--ink-secondary); font-size:0.75rem;">${r['Tanggal Ambil'] || '-'}</td>
-      <td class="text-left" style="font-size:0.75rem; white-space:normal; line-height:1.3;">${r['Catatan'] || '-'}</td>
-      <td class="text-left"><span class="kpi-badge badge-crimson font-bold">${r['Kode Sosmed'] || '-'}</span></td>
+      <td class="text-left">${custHtml}</td>
+      <td class="text-center font-bold" style="color:#0f172a; white-space:nowrap;">${formatKeepDisplayDate(r['Timestamp'])}</td>
+      <td class="text-left font-bold" style="color:#0f172a;">${r['Barang Keep'] || '-'}</td>
+      <td class="text-center" style="font-size:0.80rem; white-space:nowrap;">${formatPickupDate(r['Tanggal Ambil'])}</td>
+      <td class="text-left" style="font-size:0.80rem; color:#334155; line-height:1.35;">${r['Catatan'] || '-'}</td>
+      <td class="text-center"><span class="badge-sosmed-pill">${r['Kode Sosmed'] || '-'}</span></td>
       <td class="text-center">${arHtml}</td>
-      <td class="text-center"><span class="kpi-badge ${statusClass} font-bold">${r['Status'] || '-'}</span></td>
-      <td class="text-left" style="font-size:0.75rem; white-space:normal; line-height:1.3;">${r['Feedback Tim FU'] || '-'}</td>
+      <td class="text-center">${statusPillHtml}</td>
+      <td class="text-left" style="font-size:0.80rem; color:#475569; line-height:1.35;">${r['Feedback Tim FU'] || '-'}</td>
+      <td class="text-center">
+        <button type="button" class="btn-circle-action" onclick="openARDetailModalFromKeep(${keepRowIdx})" title="Buka Detail">➔</button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -2039,7 +2138,17 @@ function openARDetailModalFromKeep(keepIndex) {
   if (!row) return;
   const arDoc = row['REPORT AR'];
   if (!arDoc) {
-    alert("Baris data keep ini tidak memiliki nomor REPORT AR.");
+    const rawWA = String(row['Nomor WA'] || '').replace(/\D/g, '');
+    const promptAR = prompt(`Customer "${row['Nama']}" belum memiliki nomor AR.\nMasukkan nomor faktur AR (misal: 260278899):`, '');
+    if (promptAR && promptAR.trim()) {
+      const cleanAR = promptAR.trim();
+      row['REPORT AR'] = cleanAR;
+      renderKeepPage();
+      triggerBackgroundReportARSync(rawWA, cleanAR, '', () => {
+        row['REPORT AR'] = '';
+        renderKeepPage();
+      });
+    }
     return;
   }
   openARDetailModal(arDoc, row);
@@ -2957,6 +3066,16 @@ function applyAuditFilters() {
   if (allMissingEl) allMissingEl.innerText = allMissingCount.toLocaleString('id-ID');
   if (potensiEl) potensiEl.innerText = formatRupiah(totalPotensiRp);
 
+  let activeAuditCount = 0;
+  if (periodeEl && periodeEl.value !== 'ALL') activeAuditCount++;
+  if (sosmedEl && sosmedEl.value !== 'ALL') activeAuditCount++;
+  if (tglVlookupEl && tglVlookupEl.value) activeAuditCount++;
+  if (tglReportEl && tglReportEl.value) activeAuditCount++;
+  if (statusEl && statusEl.value !== 'ALL') activeAuditCount++;
+  if (searchEl && searchEl.value.trim()) activeAuditCount++;
+  const badgeAudit = document.getElementById('auditFilterActiveCount');
+  if (badgeAudit) badgeAudit.innerText = activeAuditCount;
+
   auditCurrentPage = 1;
   renderAuditPage();
 }
@@ -3570,21 +3689,30 @@ function renderAuditPage() {
 
     const tr = document.createElement('tr');
     tr.className = rowStatusClass;
+    if (currentStatus === 'LOSE' || currentStatus === 'TAKE OUT') {
+      tr.classList.add('row-lose-tint');
+    }
     tr.innerHTML = `
       <td class="audit-col-no" style="text-align: center;">${globalIdx}</td>
-      <td class="audit-col-keep-date" style="text-align: center; font-weight: 600;">${formatKeepTimestamp(keepObj['Timestamp'])}</td>
-      <td class="audit-col-cust text-left font-bold" style="color: #0f172a; word-break: break-word;">${keepObj['Nama'] || '-'}</td>
-      <td class="audit-col-wa text-left" style="word-break: break-word;">${waHtml}</td>
+      <td class="audit-col-keep-date" style="text-align: center; font-weight: 600; white-space: nowrap;">${formatKeepDisplayDate(keepObj['Timestamp'])}</td>
+      <td class="audit-col-cust text-left" style="color: #0f172a; word-break: break-word;">
+        <div class="font-bold">${keepObj['Nama'] || '-'}</div>
+        ${(normWA && normWA.length >= 8) ? `
+          <a href="https://wa.me/${normWA}" target="_blank" style="font-size:0.75rem; color:#64748b; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+            📞 ${displayWA}
+          </a>
+        ` : `<div style="font-size:0.75rem; color:#64748b;">${displayWA || '-'}</div>`}
+      </td>
       <td class="audit-col-sosmed" style="text-align: center;">
         <span class="badge-sosmed-pill">${keepObj['Kode Sosmed'] || '-'}</span>
       </td>
       <td class="audit-col-keep text-left font-bold" style="color: #1e293b; word-break: break-word;">${keepObj['Barang Keep'] || '-'}</td>
-      <td class="audit-col-notes text-left" style="word-break: break-word;">${catatanHtml}</td>
+      <td class="audit-col-notes text-left" style="word-break: break-word; font-size: 0.78rem;">${catatanHtml}</td>
       <td class="audit-col-status-keep" style="text-align: center;">${statusDropdownHtml}</td>
       <td class="audit-col-report-ar" style="text-align: center;">${reportARDocDisplay}</td>
-      <td class="audit-col-report-date" style="text-align: center; font-size: 0.73rem;">${reportARDateDisplay}</td>
+      <td class="audit-col-report-date" style="text-align: center; font-size: 0.76rem; white-space: nowrap;">${reportARDateDisplay}</td>
       <td class="audit-col-vlookup-ar" style="text-align: center;">${vlookupARDocDisplay}</td>
-      <td class="audit-col-vlookup-date" style="text-align: center; font-size: 0.73rem;">${vlookupARDateDisplay}</td>
+      <td class="audit-col-vlookup-date" style="text-align: center; font-size: 0.76rem; white-space: nowrap;">${vlookupARDateDisplay}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -7614,6 +7742,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   applyDashboardFilters();
   loadKeepData();
   startRealtimeSyncEngine();
+});
+
+// Shortcut Global Cmd+K / Ctrl+K untuk Fokus ke Search Bar Aktif (Gambar 1 & 2)
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    if (currentActiveTab === 4) {
+      const inp = document.getElementById('keepSearchInput');
+      if (inp) { inp.focus(); inp.select(); }
+    } else if (currentActiveTab === 5) {
+      const inp = document.getElementById('auditSearchInput');
+      if (inp) { inp.focus(); inp.select(); }
+    }
+  }
 });
 
 

@@ -16,7 +16,7 @@
   <script src="lib/html2canvas.min.js"></script>
   <script src="lib/chart.umd.min.js"></script>
   <link rel="icon" type="image/png" href="logo.png">
-  <link rel="stylesheet" href="style.css?v=5.2">
+  <link rel="stylesheet" href="style.css?v=5.3">
 </head>
 <body>
   <div class="app-layout" id="dropZone">
@@ -751,301 +751,297 @@
         </section>
 
       <!-- ================= TAB 4: DATA KEEP & FOLLOW UP CUSTOMER (GOOGLE SHEETS) ================= -->
+      <!-- ================= TAB 4: DATA KEEP & DAFTAR CUSTOMER (GOOGLE SHEETS LIVE) ================= -->
       <section id="tabContent4" class="tab-content">
-        <div class="card-tegas table-card card-accent-left mb-24">
-          <div class="admin-card-header">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <h3>📋 Data Keep Customer & Follow Up (Google Sheets)</h3>
-                <p>Format data keep pelanggan: filter berdasarkan <strong>Kode Sosmed</strong>, <strong>Status</strong>, dan <strong>Periode</strong>.</p>
+        <div class="modern-module-container mb-24">
+          <!-- 1. Hero Yellow Banner (Persis Mockup Gambar 1) -->
+          <div class="customer-hero-banner">
+            <div class="customer-hero-content">
+              <h2 class="customer-hero-title">Daftar customer</h2>
+              <p class="customer-hero-sub" id="customerHeroSub">1.650 customer dari Google Sheets Live</p>
+            </div>
+            <div class="customer-hero-right">
+              <button type="button" class="btn-sync-live-subtle" id="btnSyncKeepData" onclick="syncLiveKeepData()" title="Sinkronkan data live terbaru dari Google Sheets">
+                🔄 Sync Live
+              </button>
+              <div class="customer-hero-badge" id="keepStatusPill">
+                <span class="live-dot-pulse"></span>
+                <span id="customerSyncStatusText">Tersinkron</span>
               </div>
-              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <button class="btn btn-crimson btn-sm" id="btnSyncKeepData" onclick="syncLiveKeepData()">
-                  🔄 Sinkronkan Google Sheets Live
+            </div>
+          </div>
+
+          <!-- 2. Modern Search & Filter Panel (Persis Mockup Gambar 1) -->
+          <div class="modern-filter-panel">
+            <div class="modern-search-row">
+              <div class="modern-search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="keepSearchInput" class="modern-search-input" placeholder="Cari nama, nomor WA, atau barang..." oninput="applyKeepFilters()">
+                <span class="kbd-shortcut">⌘K</span>
+              </div>
+              <button type="button" class="btn-modern-filter" id="btnToggleKeepFilters" onclick="toggleKeepFiltersSection()">
+                <span class="filter-icon">⚙️</span> Filter <span class="filter-badge-count" id="keepFilterActiveCount">4</span>
+              </button>
+            </div>
+
+            <div class="modern-filter-cards-grid" id="keepFilterSection">
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="keepFilterPeriode">PERIODE</label>
+                <select id="keepFilterPeriode" class="modern-filter-select" onchange="applyKeepFilters()">
+                  <option value="ALL">Semua Periode</option>
+                  <option value="Oktober-26" selected>Oktober 2026</option>
+                  <option value="September-26">September 2026</option>
+                  <option value="Agustus-26">Agustus 2026</option>
+                  <option value="Juli-26">Juli 2026</option>
+                  <option value="Juni-26">Juni 2026</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="keepFilterTanggal">TANGGAL</label>
+                <input type="date" id="keepFilterTanggal" class="modern-filter-input" onchange="applyKeepFilters()" title="Filter berdasarkan tanggal format keep">
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="keepFilterSosmed">KODE SOSMED</label>
+                <select id="keepFilterSosmed" class="modern-filter-select" onchange="applyKeepFilters()">
+                  <option value="ALL">Semua kode</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="keepFilterStatus">STATUS</label>
+                <select id="keepFilterStatus" class="modern-filter-select" onchange="applyKeepFilters()">
+                  <option value="ALL">Semua status</option>
+                  <option value="WIN">WIN (Closing)</option>
+                  <option value="ON PROGRESS HOT">On Progress Hot</option>
+                  <option value="ON PROGRESS MEDIUM">On Progress Medium</option>
+                  <option value="ON PROGRESS LOW">Low</option>
+                  <option value="LOSE">Lose</option>
+                  <option value="TAKE OUT">Take Out</option>
+                  <option value="BELUM DIINPUT">Belum diinput</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card-action">
+                <button type="button" class="btn-modern-reset" onclick="resetKeepFilters()" title="Reset filter">
+                  <span class="reset-icon">🔄</span> Reset
                 </button>
-                <div class="database-status-pill pill-active" id="keepStatusPill">
-                  <span>📁 Sumber: Google Sheets (19.978 Baris Data)</span>
-                </div>
               </div>
             </div>
           </div>
 
-          <!-- Filter Controls -->
-          <div class="keep-filters-grid" style="padding: 10px 18px 0;">
-            <div class="filter-group">
-              <label for="keepFilterPeriode">Filter Periode:</label>
-              <select id="keepFilterPeriode" class="form-input" onchange="applyKeepFilters()">
-                <option value="ALL">Semua Periode</option>
-                <option value="Oktober-26" selected>Oktober-26 (Bulan Ini)</option>
-                <option value="September-26">September-26</option>
-                <option value="Agustus-26">Agustus-26</option>
-                <option value="Juli-26">Juli-26</option>
-                <option value="Juni-26">Juni-26</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="keepFilterSosmed">Filter Kode Sosmed:</label>
-              <select id="keepFilterSosmed" class="form-input" onchange="applyKeepFilters()">
-                <option value="ALL">Semua Kode Sosmed</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="keepFilterTanggal">Filter Tanggal Format Keep:</label>
-              <input type="date" id="keepFilterTanggal" class="form-input" onchange="applyKeepFilters()" title="Filter berdasarkan tanggal format keep (Timestamp Google Sheets)">
-            </div>
-
-            <div class="filter-group">
-              <label for="keepFilterReportAR">Filter by Report No. AR:</label>
-              <input type="text" id="keepFilterReportAR" class="form-input" placeholder="Ketik No. AR..." oninput="applyKeepFilters()" title="Filter data keep berdasarkan nomor REPORT AR">
-            </div>
-
-            <div class="filter-group">
-              <label for="keepFilterStatus">Filter Status:</label>
-              <select id="keepFilterStatus" class="form-input" onchange="applyKeepFilters()">
-                <option value="ALL">Semua Status</option>
-                <option value="WIN">WIN (Closing)</option>
-                <option value="ON PROGRESS HOT">ON PROGRESS HOT</option>
-                <option value="ON PROGRESS MEDIUM">ON PROGRESS MEDIUM</option>
-                <option value="ON PROGRESS LOW">ON PROGRESS LOW</option>
-                <option value="LOSE">LOSE (Batal/Toko Lain)</option>
-                <option value="TAKE OUT">TAKE OUT</option>
-                <option value="BELUM DIINPUT">BELUM DIINPUT</option>
-              </select>
-            </div>
-
-            <div class="filter-group" style="flex: 1.5; min-width: 200px;">
-              <label for="keepSearchInput">Cari Kata Kunci:</label>
-              <input type="text" id="keepSearchInput" class="form-input" placeholder="Cari Nama Customer, No. WA, Barang..." oninput="applyKeepFilters()">
-            </div>
-
-            <div class="filter-group" style="min-width: 110px;">
-              <button class="btn btn-outline" onclick="resetKeepFilters()" style="height: 42px; width: 100%;">Reset Filter</button>
-            </div>
+          <!-- Hidden Keep Stats Summary (for JS bindings) -->
+          <div style="display:none;">
+            <span id="keepTotalCount">0</span>
+            <span id="keepWinCount">0</span>
+            <span id="keepProgressCount">0</span>
+            <span id="keepLoseCount">0</span>
+            <span id="keepClosingRate">0%</span>
+            <input type="text" id="keepFilterReportAR">
           </div>
 
-          <!-- Summary KPI Mini-Grid -->
-          <div class="keep-stats-summary" style="padding: 0 18px;">
-            <div class="keep-stat-card">
-              <div class="label">Total Data Keep</div>
-              <div class="val text-ink" id="keepTotalCount">0</div>
-            </div>
-            <div class="keep-stat-card">
-              <div class="label">Total WIN (Closing)</div>
-              <div class="val text-accent" id="keepWinCount">0</div>
-            </div>
-            <div class="keep-stat-card">
-              <div class="label">On Progress (Hot/Med/Low)</div>
-              <div class="val text-gold" id="keepProgressCount">0</div>
-            </div>
-            <div class="keep-stat-card">
-              <div class="label">Total Lose</div>
-              <div class="val text-crimson" id="keepLoseCount">0</div>
-            </div>
-            <div class="keep-stat-card">
-              <div class="label">Closing Rate (%)</div>
-              <div class="val font-bold text-accent" id="keepClosingRate">0%</div>
-            </div>
-          </div>
-
-          <!-- Table Container -->
-          <div class="table-responsive">
-            <table class="kpi-matrix-table" id="keepTable">
+          <!-- 3. Table Container: Linenya Tegas & Header Kuning Solid (Persis Gambar 1) -->
+          <div class="modern-table-wrapper">
+            <table class="modern-tegas-table" id="keepTable">
               <thead>
                 <tr>
-                  <th class="col-sticky" style="width: 3.5%; text-align: center;">NO</th>
-                  <th class="text-left" style="width: 7.5%;">TANGGAL</th>
-                  <th class="text-left" style="width: 10%;">CUSTOMER</th>
-                  <th class="text-left" style="width: 10%;">NOMOR WA</th>
-                  <th class="text-left" style="width: 16%;">BARANG KEEP</th>
-                  <th class="text-left" style="width: 7.5%;">TGL AMBIL</th>
-                  <th class="text-left" style="width: 15%;">CATATAN</th>
-                  <th class="text-left" style="width: 7.5%;">KODE SOSMED</th>
-                  <th class="text-center" style="width: 8%;">REPORT AR</th>
-                  <th class="text-center" style="width: 7.5%;">STATUS</th>
-                  <th class="text-left" style="width: 7.5%;">FEEDBACK TIM FU</th>
+                  <th style="width: 17%; text-align: left;">CUSTOMER</th>
+                  <th style="width: 9%; text-align: center;">TANGGAL</th>
+                  <th style="width: 16%; text-align: left;">BARANG KEEP</th>
+                  <th style="width: 8.5%; text-align: center;">TGL. AMBIL</th>
+                  <th style="width: 17%; text-align: left;">CATATAN</th>
+                  <th style="width: 8%; text-align: center;">KODE SOSMED</th>
+                  <th style="width: 8.5%; text-align: center;">REPORT AR</th>
+                  <th style="width: 8%; text-align: center;">STATUS</th>
+                  <th style="width: 14%; text-align: left;">FEEDBACK TIM FU</th>
+                  <th style="width: 4%; text-align: center;"></th>
                 </tr>
               </thead>
               <tbody id="keepTableBody"></tbody>
             </table>
           </div>
 
-          <!-- Pagination Bar -->
-          <div class="pagination-bar">
-            <div id="keepPaginationInfo">Menampilkan 0 dari 0 Data</div>
-            <div class="pagination-controls">
+          <!-- 4. Modern Pagination Bar -->
+          <div class="modern-pagination-bar">
+            <div id="keepPaginationInfo" class="modern-pagination-info">Menampilkan 0 dari 0 Data</div>
+            <div class="modern-pagination-controls">
               <button class="btn-page" id="btnKeepPrev" onclick="changeKeepPage(-1)">&laquo; Sebelumnya</button>
-              <span id="keepCurrentPageText" style="margin: 0 8px;">Halaman 1 / 1</span>
+              <span id="keepCurrentPageText" class="pagination-page-label">Halaman 1 / 1</span>
               <button class="btn-page" id="btnKeepNext" onclick="changeKeepPage(1)">Selanjutnya &raquo;</button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ================= TAB 5: TRACKING AR ================= -->
+      <!-- ================= TAB 5: TRACKING AR (AUDIT AR BELUM SOSMED) ================= -->
       <section id="tabContent5" class="tab-content">
-        <div class="card-tegas table-card card-accent-left mb-24">
-          <div class="admin-card-header">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <h3 style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 4px 0;">TRACKING AR</h3>
-                <p style="margin: 0; font-size: 0.82rem; color: var(--text-muted);">
-                  Audit AR hasil pencarian Nomor WA (VLOOKUP) dan Report AR di Format Keep. Klik nomor AR untuk rincian produk, potensi denda, dan salin ke rekap.
-                </p>
-              </div>
-              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <input type="file" id="auditCrosellingFileInput" accept=".xlsx, .xls" style="display:none" onchange="handleCrosellingFileSelect(event)">
-                <button class="btn btn-crimson btn-sm" onclick="document.getElementById('auditCrosellingFileInput').click()" title="Unggah file croselling/Google Sheets terbaru untuk dianalisis di sini">
-                  📁 Unggah File Cross Selling (.xlsx)
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="claimAllFilteredMissingAR()" title="Masukkan semua faktur AR yang berstatus belum/sebagian sosmed ke Modul Klaim AR (Pengumpulan 3 Hari)" style="border-color: #c8102e; color: #c8102e; font-weight: 700;">
-                  🏷️ Klaim Semua AR Belum Sosmed
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="runARMissingSosmedAudit()">
-                  🔄 Refresh Analisis Audit AR
-                </button>
-                <div class="database-status-pill pill-active" id="arAuditStatusPill">
-                  <span>📁 Audit: Siap Dianalisis</span>
-                </div>
-              </div>
+        <div class="modern-module-container mb-24">
+          <!-- Top Action Bar -->
+          <div style="padding: 12px 20px; background: #ffffff; border-bottom: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.15rem; color: #0f172a;">Audit Tracking AR</span>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">(VLOOKUP & Report AR di Keep)</span>
             </div>
-          </div>
-
-          <!-- Filter Controls -->
-          <div class="keep-filters-grid" style="padding: 10px 18px 0;">
-            <div class="filter-group">
-              <label for="auditFilterPeriode">Filter Periode Keep:</label>
-              <select id="auditFilterPeriode" class="form-input" onchange="applyAuditFilters()">
-                <option value="ALL">Semua Periode</option>
-                <option value="Oktober-26" selected>Oktober-26 (Bulan Ini)</option>
-                <option value="September-26">September-26</option>
-                <option value="Agustus-26">Agustus-26</option>
-                <option value="Juli-26">Juli-26</option>
-                <option value="Juni-26">Juni-26</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="auditFilterSosmed">Filter Kode Sosmed (Keep):</label>
-              <select id="auditFilterSosmed" class="form-input" onchange="applyAuditFilters()">
-                <option value="ALL">Semua Kode Sosmed</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="auditFilterTanggalVlookup">Filter Tanggal Faktur AR (VLOOKUP):</label>
-              <input type="date" id="auditFilterTanggalVlookup" class="form-input" onchange="applyAuditFilters()" title="Filter berdasarkan tanggal transaksi faktur AR hasil pencarian nomor WA (VLOOKUP)">
-            </div>
-
-            <div class="filter-group">
-              <label for="auditFilterTanggalReport">Filter Tanggal Faktur Report AR:</label>
-              <input type="date" id="auditFilterTanggalReport" class="form-input" onchange="applyAuditFilters()" title="Filter berdasarkan tanggal transaksi faktur Report AR yang dilaporkan di Keep">
-            </div>
-
-            <div class="filter-group">
-              <label for="auditFilterStatus">Status AR:</label>
-              <select id="auditFilterStatus" class="form-input" onchange="applyAuditFilters()">
-                <option value="ALL">Semua Status (Lengkap, Sebagian & Belum)</option>
-                <option value="ALL_SOSMED">✅ Sudah Terinput Semua (Hijau)</option>
-                <option value="PARTIAL_MISSING">⚠️ Terinput Sebagian (Orange)</option>
-                <option value="ALL_MISSING">❌ Tidak Terinput Sama Sekali (Merah)</option>
-                <option value="ANY_MISSING">🚨 Belum & Sebagian Terinput</option>
-              </select>
-            </div>
-
-            <div class="filter-group" style="flex: 1.5; min-width: 200px;">
-              <label for="auditSearchInput">Cari Kata Kunci:</label>
-              <input type="text" id="auditSearchInput" class="form-input" placeholder="Cari No. AR, Nama, No. WA, Barang..." oninput="applyAuditFilters()">
-            </div>
-
-            <!-- Hide / Show Columns Dropdown -->
-            <div class="filter-group" style="position: relative; min-width: 120px;">
-              <label>&nbsp;</label>
-              <button type="button" class="btn btn-outline" id="btnToggleAuditCols" onclick="toggleAuditColDropdown(event)" style="height: 42px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Sembunyikan atau tampilkan kolom tabel jika terasa terlalu penuh">
-                👁️ Atur Kolom ▾
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="auditCrosellingFileInput" accept=".xlsx, .xls" style="display:none" onchange="handleCrosellingFileSelect(event)">
+              <button class="btn btn-crimson btn-sm" onclick="document.getElementById('auditCrosellingFileInput').click()" title="Unggah file cross selling / Google Sheets">
+                📁 Upload Cross Selling
               </button>
-              <div id="auditColDropdownMenu" class="audit-col-dropdown-menu" style="display: none;">
-                <div class="col-menu-header">
-                  <span>Atur Tampilan Kolom</span>
-                  <button type="button" class="btn-xs-link" onclick="resetAuditColumns()">Tampilkan Semua</button>
-                </div>
-                <div class="col-menu-list">
-                  <label><input type="checkbox" data-col="audit-col-no" checked onchange="toggleAuditColumn('audit-col-no', this.checked)"> No</label>
-                  <label><input type="checkbox" data-col="audit-col-keep-date" checked onchange="toggleAuditColumn('audit-col-keep-date', this.checked)"> Tanggal Format Keep</label>
-                  <label><input type="checkbox" data-col="audit-col-cust" checked onchange="toggleAuditColumn('audit-col-cust', this.checked)"> Customer</label>
-                  <label><input type="checkbox" data-col="audit-col-wa" checked onchange="toggleAuditColumn('audit-col-wa', this.checked)"> Nomor WA</label>
-                  <label><input type="checkbox" data-col="audit-col-sosmed" checked onchange="toggleAuditColumn('audit-col-sosmed', this.checked)"> Kode Sosmed</label>
-                  <label><input type="checkbox" data-col="audit-col-keep" checked onchange="toggleAuditColumn('audit-col-keep', this.checked)"> Barang Keep</label>
-                  <label><input type="checkbox" data-col="audit-col-notes" checked onchange="toggleAuditColumn('audit-col-notes', this.checked)"> Catatan</label>
-                  <label><input type="checkbox" data-col="audit-col-status-keep" checked onchange="toggleAuditColumn('audit-col-status-keep', this.checked)"> Status Keep</label>
-                  <label><input type="checkbox" data-col="audit-col-report-ar" checked onchange="toggleAuditColumn('audit-col-report-ar', this.checked)"> Report AR dan Produk</label>
-                  <label><input type="checkbox" data-col="audit-col-report-date" checked onchange="toggleAuditColumn('audit-col-report-date', this.checked)"> Tanggal Report AR</label>
-                  <label><input type="checkbox" data-col="audit-col-vlookup-ar" checked onchange="toggleAuditColumn('audit-col-vlookup-ar', this.checked)"> AR VLOOKUP</label>
-                  <label><input type="checkbox" data-col="audit-col-vlookup-date" checked onchange="toggleAuditColumn('audit-col-vlookup-date', this.checked)"> Tanggal No AR VLOOKUP</label>
-                </div>
+              <button class="btn btn-outline btn-sm" onclick="claimAllFilteredMissingAR()" title="Klaim semua AR yang belum terinput ke Modul Klaim AR" style="border-color: #c8102e; color: #c8102e; font-weight: 700;">
+                🏷️ Klaim Semua AR Belum Sosmed
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="runARMissingSosmedAudit()">
+                🔄 Refresh Audit
+              </button>
+              <div class="database-status-pill pill-active" id="arAuditStatusPill" style="padding: 4px 10px; font-size: 0.75rem;">
+                <span>📁 Audit Siap</span>
               </div>
             </div>
+          </div>
 
-            <div class="filter-group" style="min-width: 90px;">
-              <label>&nbsp;</label>
-              <button class="btn btn-outline" onclick="resetAuditFilters()" style="height: 42px; width: 100%;">Reset</button>
+          <!-- 1. Top KPI Summary Strip (Persis Mockup Gambar 2) -->
+          <div class="modern-kpi-summary-strip">
+            <div class="modern-kpi-strip-card card-accent-yellow">
+              <div class="kpi-strip-label">TOTAL DOKUMEN AR</div>
+              <div class="kpi-strip-val" id="auditTotalCount">0</div>
+            </div>
+            <div class="modern-kpi-strip-card card-accent-green">
+              <div class="kpi-strip-label">SUDAH TERINPUT (HIJAU)</div>
+              <div class="kpi-strip-val" style="color: #10b981;" id="auditAllSosmedCount">0</div>
+            </div>
+            <div class="modern-kpi-strip-card card-accent-orange">
+              <div class="kpi-strip-label">TERINPUT SEBAGIAN (ORANGE)</div>
+              <div class="kpi-strip-val" style="color: #f59e0b;" id="auditPartialMissingCount">0</div>
+            </div>
+            <div class="modern-kpi-strip-card card-accent-red">
+              <div class="kpi-strip-label">TIDAK TERINPUT (MERAH)</div>
+              <div class="kpi-strip-val" style="color: #ef4444;" id="auditAllMissingCount">0</div>
+            </div>
+            <div class="modern-kpi-strip-card card-accent-crimson">
+              <div class="kpi-strip-label">POTENSI OMZET BELUM TERKLAIM</div>
+              <div class="kpi-strip-val" style="color: #e11d48;" id="auditTotalPotensiRp">Rp 0</div>
             </div>
           </div>
 
-          <!-- Summary KPI Mini-Grid -->
-          <div class="keep-stats-summary" style="padding: 0 18px;">
-            <div class="keep-stat-card">
-              <div class="label">Total Dokumen AR</div>
-              <div class="val font-bold text-accent" id="auditTotalCount">0</div>
+          <!-- 2. Search & Filter Panel (Persis Mockup Gambar 2) -->
+          <div class="modern-filter-panel">
+            <div class="modern-search-row">
+              <div class="modern-search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="auditSearchInput" class="modern-search-input" placeholder="Cari nama, nomor WA, atau barang..." oninput="applyAuditFilters()">
+                <span class="kbd-shortcut">⌘K</span>
+              </div>
+              <button type="button" class="btn-modern-filter" id="btnToggleAuditFilters" onclick="toggleAuditFiltersSection()">
+                <span class="filter-icon">⚙️</span> Filter <span class="filter-badge-count" id="auditFilterActiveCount">4</span>
+              </button>
             </div>
-            <div class="keep-stat-card" style="border-left: 4px solid #16a34a;">
-              <div class="label">Sudah Terinput (Hijau)</div>
-              <div class="val font-bold" style="color: #16a34a;" id="auditAllSosmedCount">0</div>
-            </div>
-            <div class="keep-stat-card" style="border-left: 4px solid #ea580c;">
-              <div class="label">Terinput Sebagian (Orange)</div>
-              <div class="val font-bold" style="color: #ea580c;" id="auditPartialMissingCount">0</div>
-            </div>
-            <div class="keep-stat-card" style="border-left: 4px solid #dc2626;">
-              <div class="label">Tidak Terinput (Merah)</div>
-              <div class="val font-bold" style="color: #dc2626;" id="auditAllMissingCount">0</div>
-            </div>
-            <div class="keep-stat-card">
-              <div class="label">Potensi Omzet Belum Terklaim</div>
-              <div class="val font-bold text-crimson" id="auditTotalPotensiRp">Rp 0</div>
+
+            <div class="modern-filter-cards-grid" id="auditFilterSection">
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="auditFilterPeriode">PERIODE KEEP:</label>
+                <select id="auditFilterPeriode" class="modern-filter-select" onchange="applyAuditFilters()">
+                  <option value="ALL">Semua Periode</option>
+                  <option value="Oktober-26" selected>Oktober-26 (Bulan ini)</option>
+                  <option value="September-26">September-26</option>
+                  <option value="Agustus-26">Agustus-26</option>
+                  <option value="Juli-26">Juli-26</option>
+                  <option value="Juni-26">Juni-26</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="auditFilterSosmed">KODE SOSMED (KEEP):</label>
+                <select id="auditFilterSosmed" class="modern-filter-select" onchange="applyAuditFilters()">
+                  <option value="ALL">Semua Kode Sosmed</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="auditFilterTanggalVlookup">TANGGAL FAKTUR AR (VLOOKUP):</label>
+                <input type="date" id="auditFilterTanggalVlookup" class="modern-filter-input" onchange="applyAuditFilters()">
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="auditFilterTanggalReport">TANGGAL FAKTUR REPORT AR:</label>
+                <input type="date" id="auditFilterTanggalReport" class="modern-filter-input" onchange="applyAuditFilters()">
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="auditFilterStatus">STATUS AR:</label>
+                <select id="auditFilterStatus" class="modern-filter-select" onchange="applyAuditFilters()">
+                  <option value="ALL">Semua Status (Lengkap, Sebagian)</option>
+                  <option value="ALL_SOSMED">✅ Sudah Terinput Semua (Hijau)</option>
+                  <option value="PARTIAL_MISSING">⚠️ Terinput Sebagian (Orange)</option>
+                  <option value="ALL_MISSING">❌ Tidak Terinput Sama Sekali (Merah)</option>
+                  <option value="ANY_MISSING">🚨 Belum & Sebagian Terinput</option>
+                </select>
+              </div>
+
+              <!-- Atur Kolom Dropdown -->
+              <div class="modern-filter-card" style="position: relative;">
+                <label class="modern-filter-label">KOLOM:</label>
+                <button type="button" class="btn-modern-col-toggle" id="btnToggleAuditCols" onclick="toggleAuditColDropdown(event)">
+                  ☷ Atur Kolom ▾
+                </button>
+                <div id="auditColDropdownMenu" class="audit-col-dropdown-menu" style="display: none;">
+                  <div class="col-menu-header">
+                    <span>Atur Tampilan Kolom</span>
+                    <button type="button" class="btn-xs-link" onclick="resetAuditColumns()">Tampilkan Semua</button>
+                  </div>
+                  <div class="col-menu-list">
+                    <label><input type="checkbox" data-col="audit-col-no" checked onchange="toggleAuditColumn('audit-col-no', this.checked)"> No</label>
+                    <label><input type="checkbox" data-col="audit-col-keep-date" checked onchange="toggleAuditColumn('audit-col-keep-date', this.checked)"> Tanggal Format Keep</label>
+                    <label><input type="checkbox" data-col="audit-col-cust" checked onchange="toggleAuditColumn('audit-col-cust', this.checked)"> Customer</label>
+                    <label><input type="checkbox" data-col="audit-col-wa" checked onchange="toggleAuditColumn('audit-col-wa', this.checked)"> Nomor WA</label>
+                    <label><input type="checkbox" data-col="audit-col-sosmed" checked onchange="toggleAuditColumn('audit-col-sosmed', this.checked)"> Kode Sosmed</label>
+                    <label><input type="checkbox" data-col="audit-col-keep" checked onchange="toggleAuditColumn('audit-col-keep', this.checked)"> Barang Keep</label>
+                    <label><input type="checkbox" data-col="audit-col-notes" checked onchange="toggleAuditColumn('audit-col-notes', this.checked)"> Catatan</label>
+                    <label><input type="checkbox" data-col="audit-col-status-keep" checked onchange="toggleAuditColumn('audit-col-status-keep', this.checked)"> Status Keep</label>
+                    <label><input type="checkbox" data-col="audit-col-report-ar" checked onchange="toggleAuditColumn('audit-col-report-ar', this.checked)"> Report AR dan Produk</label>
+                    <label><input type="checkbox" data-col="audit-col-report-date" checked onchange="toggleAuditColumn('audit-col-report-date', this.checked)"> Tanggal Report AR</label>
+                    <label><input type="checkbox" data-col="audit-col-vlookup-ar" checked onchange="toggleAuditColumn('audit-col-vlookup-ar', this.checked)"> AR VLOOKUP</label>
+                    <label><input type="checkbox" data-col="audit-col-vlookup-date" checked onchange="toggleAuditColumn('audit-col-vlookup-date', this.checked)"> Tanggal No AR VLOOKUP</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="modern-filter-card-action">
+                <button type="button" class="btn-modern-reset" onclick="resetAuditFilters()" title="Reset semua filter">
+                  <span class="reset-icon">🔄</span> Reset
+                </button>
+              </div>
             </div>
           </div>
 
-          <!-- Table Container -->
-          <div class="table-responsive">
-            <table class="kpi-matrix-table" id="auditTable">
+          <!-- 3. Table Container: Linenya Tegas & Header Kuning Solid (Persis Gambar 2) -->
+          <div class="modern-table-wrapper">
+            <table class="modern-tegas-table" id="auditTable">
               <thead>
                 <tr>
-                  <th class="audit-col-no" style="text-align: center;">NO</th>
-                  <th class="audit-col-keep-date">TANGGAL FORMAT KEEP</th>
-                  <th class="audit-col-cust">CUSTOMER</th>
-                  <th class="audit-col-wa">NOMOR WA</th>
-                  <th class="audit-col-sosmed" style="text-align: center;">KODE SOSMED</th>
-                  <th class="audit-col-keep">BARANG KEEP</th>
-                  <th class="audit-col-notes">CATATAN</th>
-                  <th class="audit-col-status-keep" style="text-align: center;">STATUS KEEP</th>
-                  <th class="audit-col-report-ar" style="text-align: center;">REPORT AR DAN PRODUK</th>
-                  <th class="audit-col-report-date" style="text-align: center;">TANGGAL REPORT AR</th>
-                  <th class="audit-col-vlookup-ar" style="text-align: center;">AR VLOOKUP</th>
-                  <th class="audit-col-vlookup-date" style="text-align: center;">TANGGAL NO AR VLOOKUP</th>
+                  <th class="audit-col-no" style="text-align: center; width: 3%;">NO</th>
+                  <th class="audit-col-keep-date" style="text-align: center; width: 7.5%;">TANGGAL FORMAT KEEP</th>
+                  <th class="audit-col-cust" style="text-align: left; width: 10%;">CUSTOMER</th>
+                  <th class="audit-col-sosmed" style="text-align: center; width: 9%;">KODE SOSMED (KEEP)</th>
+                  <th class="audit-col-keep" style="text-align: left; width: 14%;">BARANG KEEP</th>
+                  <th class="audit-col-notes" style="text-align: left; width: 14%;">CATATAN</th>
+                  <th class="audit-col-status-keep" style="text-align: center; width: 9.5%;">STATUS KEEP</th>
+                  <th class="audit-col-report-ar" style="text-align: center; width: 8.5%;">REPORT AR DARI PRODUK</th>
+                  <th class="audit-col-report-date" style="text-align: center; width: 7.5%;">TANGGAL REPORT AR</th>
+                  <th class="audit-col-vlookup-ar" style="text-align: center; width: 8.5%;">AR VLOOKUP</th>
+                  <th class="audit-col-vlookup-date" style="text-align: center; width: 8.5%;">TANGGAL NO AR VLOOKUP</th>
                 </tr>
               </thead>
               <tbody id="auditTableBody"></tbody>
             </table>
           </div>
 
-          <!-- Pagination Bar -->
-          <div class="pagination-bar">
-            <div id="auditPaginationInfo">Menampilkan 0 dari 0 Dokumen AR</div>
-            <div class="pagination-controls">
+          <!-- 4. Modern Pagination Bar -->
+          <div class="modern-pagination-bar">
+            <div id="auditPaginationInfo" class="modern-pagination-info">Menampilkan 0 dari 0 Dokumen AR</div>
+            <div class="modern-pagination-controls">
               <button class="btn-page" id="btnAuditPrev" onclick="changeAuditPage(-1)">&laquo; Sebelumnya</button>
-              <span id="auditCurrentPageText" style="margin: 0 8px;">Halaman 1 / 1</span>
+              <span id="auditCurrentPageText" class="pagination-page-label">Halaman 1 / 1</span>
               <button class="btn-page" id="btnAuditNext" onclick="changeAuditPage(1)">Selanjutnya &raquo;</button>
             </div>
           </div>
@@ -1743,6 +1739,6 @@
     </div>
   </div>
 
-  <script src="client.js?v=5.2"></script>
+  <script src="client.js?v=5.3"></script>
 </body>
 </html>
