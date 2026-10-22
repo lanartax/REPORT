@@ -1991,14 +1991,21 @@ function renderKeepPage() {
       </div>
     ` : (displayWA || '-');
 
-    // AR Link (Buka Pop-up AR Modal langsung, tidak dialihkan ke Tab 3)
-    const arDoc = r['REPORT AR'];
+    // AR Link (Buka Pop-up AR Modal langsung atau Input AR Cepat)
+    const arDoc = String(r['REPORT AR'] || '').trim();
     const keepRowIdx = startIdx + i;
     const arHtml = arDoc ? `
-      <span class="font-bold text-crimson cursor-pointer" onclick="openARDetailModalFromKeep(${keepRowIdx})" title="Klik untuk membuka pop-up AR & form lapor Akmal">
-        📄 ${arDoc}
-      </span>
-    ` : '<span style="color:var(--text-dim);">-</span>';
+      <div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-keep-idx="${keepRowIdx}" data-current-ar="${arDoc}">
+        <span class="font-bold text-crimson cursor-pointer" onclick="openARDetailModalFromKeep(${keepRowIdx})" title="Klik untuk membuka pop-up detail AR">
+          📄 ${arDoc}
+        </span>
+        <button type="button" class="btn-edit-inline-ar" onclick="event.stopPropagation(); startEditKeepReportAR(this.parentElement, '${rawWA}', ${keepRowIdx})" title="Ubah nomor AR">✏️</button>
+      </div>
+    ` : `
+      <div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-keep-idx="${keepRowIdx}" data-current-ar="">
+        <button type="button" class="btn-input-new-ar" onclick="startEditKeepReportAR(this.parentElement, '${rawWA}', ${keepRowIdx})" title="Klik untuk menginput nomor AR">+ Input AR</button>
+      </div>
+    `;
 
     // Status Badge
     const st = String(r['Status'] || '').trim().toUpperCase();
@@ -3100,6 +3107,71 @@ async function triggerBackgroundKeepStatusSync(rawWA, newVal, oldVal, onRollback
   }
 }
 
+async function updateReportARInGoogleSheets(rawWA, arDoc) {
+  const normWA = String(rawWA || '').replace(/\D/g, '');
+  if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update Report AR.');
+
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+
+  let result = null;
+  // 1. Coba lewat backend local-server proxy
+  try {
+    const res = await fetch(`/api/update-report-ar?nomorWA=${encodeURIComponent(normWA)}&arDoc=${encodeURIComponent(arDoc)}`);
+    if (res.ok) {
+      result = await res.json();
+    }
+  } catch (e) {
+    console.warn('Backend proxy update-report-ar gagal, mencoba direct fetch:', e);
+  }
+
+  // 2. Fallback direct fetch ke Apps Script Web App
+  if (!result || !result.success) {
+    try {
+      const directUrl = `${APPS_SCRIPT_URL}?action=UPDATE_REPORT_AR&nomorWA=${encodeURIComponent(normWA)}&arDoc=${encodeURIComponent(arDoc)}`;
+      const directRes = await fetch(directUrl, { redirect: 'follow' });
+      result = await directRes.json();
+    } catch (directErr) {
+      console.error('Direct fetch Apps Script error:', directErr);
+    }
+  }
+
+  if (result && result.success) {
+    return result;
+  }
+  throw new Error((result && result.message) || 'Gagal menyimpan nomor AR ke Google Sheets.');
+}
+
+// Antrean update REPORT AR Google Sheets di background (non-blocking)
+async function triggerBackgroundReportARSync(rawWA, newAR, oldAR, onRollback) {
+  const normWA = String(rawWA || '').replace(/\D/g, '');
+  if (!normWA) return;
+
+  const phoneDisplay = formatPhoneDisplay(rawWA);
+  const prog = startSmoothProgress({
+    id: `prog-ar-${normWA}`,
+    title: `⚡ Simpan Report AR WA ${phoneDisplay}`,
+    detail: `Mengirim nomor AR "${newAR || '-'}" ke Google Sheets...`
+  });
+
+  try {
+    await updateReportARInGoogleSheets(rawWA, newAR);
+    prog.complete({
+      title: `✅ Report AR Berhasil Disimpan!`,
+      detail: `Nomor AR "${newAR || '-'}" sukses tersinkronisasi ke Google Sheets.`
+    });
+  } catch (err) {
+    console.error('Background sync Report AR gagal:', err);
+    prog.fail({
+      title: `❌ Gagal Simpan AR WA ${phoneDisplay}`,
+      detail: err.message || 'Koneksi ke Google Sheets terganggu'
+    });
+    if (typeof onRollback === 'function') {
+      onRollback(err);
+    }
+  }
+}
+
+
 function handleTableKeepStatusChange(selectEl, rawWA, auditRowIdx) {
   if (!selectEl) return;
   const oldVal = selectEl.getAttribute('data-prev') || selectEl.value;
@@ -3206,6 +3278,180 @@ function handleModalKeepStatusChange(selectEl, rawWA) {
   });
 }
 
+// ==========================================================================
+// INLINE AR INPUT & EDIT ENGINE (TAB AUDIT AR & TAB FORMAT KEEP)
+// ==========================================================================
+function startEditAuditReportAR(containerEl, rawWA, auditRowIdx) {
+  if (!containerEl) return;
+  const currentAR = containerEl.getAttribute('data-current-ar') || '';
+  
+  containerEl.innerHTML = `
+    <input type="text" class="input-inline-ar" value="${currentAR}" 
+      placeholder="No. AR..." 
+      onkeydown="if(event.key==='Enter') saveInlineAuditReportAR(this, '${rawWA}', ${auditRowIdx}); else if(event.key==='Escape') cancelInlineAuditReportAR(this, '${currentAR}', ${auditRowIdx});"
+      onblur="saveInlineAuditReportAR(this, '${rawWA}', ${auditRowIdx})"
+    />
+  `;
+  const input = containerEl.querySelector('input');
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function saveInlineAuditReportAR(inputEl, rawWA, auditRowIdx) {
+  const container = inputEl.parentElement;
+  if (!container) return;
+  const oldAR = container.getAttribute('data-current-ar') || '';
+  const newAR = inputEl.value.trim().replace(/\D/g, '');
+
+  if (newAR === oldAR) {
+    cancelInlineAuditReportAR(inputEl, oldAR, auditRowIdx);
+    return;
+  }
+
+  // 1. Optimistic Update Local Memory (0ms)
+  const cleanWA = String(rawWA).replace(/\D/g, '');
+  if (filteredAuditARList[auditRowIdx]) {
+    filteredAuditARList[auditRowIdx].reportARDoc = newAR;
+    if (filteredAuditARList[auditRowIdx].keep) {
+      filteredAuditARList[auditRowIdx].keep['REPORT AR'] = newAR;
+    }
+    if (newAR && typeof docMap !== 'undefined' && docMap.has(newAR)) {
+      filteredAuditARList[auditRowIdx].reportARItems = docMap.get(newAR);
+      filteredAuditARList[auditRowIdx].reportARDate = filteredAuditARList[auditRowIdx].reportARItems[0]['Posting Date'];
+      filteredAuditARList[auditRowIdx].reportARCabang = filteredAuditARList[auditRowIdx].reportARItems[0]['Cabang'];
+    }
+  }
+
+  if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+    rawKeepRows.forEach(k => {
+      if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        k['REPORT AR'] = newAR;
+      }
+    });
+  }
+
+  // 2. Render ulang baris seketika agar status badge langsung update (0ms)
+  renderAuditPage();
+
+  // 3. Simpan ke Google Sheets di background (non-blocking)
+  triggerBackgroundReportARSync(rawWA, newAR, oldAR, () => {
+    // Rollback jika error
+    if (filteredAuditARList[auditRowIdx]) {
+      filteredAuditARList[auditRowIdx].reportARDoc = oldAR;
+      if (filteredAuditARList[auditRowIdx].keep) {
+        filteredAuditARList[auditRowIdx].keep['REPORT AR'] = oldAR;
+      }
+    }
+    renderAuditPage();
+  });
+}
+
+function cancelInlineAuditReportAR(inputEl, oldAR, auditRowIdx) {
+  renderAuditPage();
+}
+
+function startEditKeepReportAR(containerEl, rawWA, keepRowIdx) {
+  if (!containerEl) return;
+  const currentAR = containerEl.getAttribute('data-current-ar') || '';
+  
+  containerEl.innerHTML = `
+    <input type="text" class="input-inline-ar" value="${currentAR}" 
+      placeholder="No. AR..." 
+      onkeydown="if(event.key==='Enter') saveInlineKeepReportAR(this, '${rawWA}', ${keepRowIdx}); else if(event.key==='Escape') cancelInlineKeepReportAR(this, '${currentAR}', ${keepRowIdx});"
+      onblur="saveInlineKeepReportAR(this, '${rawWA}', ${keepRowIdx})"
+    />
+  `;
+  const input = containerEl.querySelector('input');
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+function saveInlineKeepReportAR(inputEl, rawWA, keepRowIdx) {
+  const container = inputEl.parentElement;
+  if (!container) return;
+  const oldAR = container.getAttribute('data-current-ar') || '';
+  const newAR = inputEl.value.trim().replace(/\D/g, '');
+
+  if (newAR === oldAR) {
+    cancelInlineKeepReportAR(inputEl, oldAR, keepRowIdx);
+    return;
+  }
+
+  // 1. Optimistic Update Local Memory (0ms)
+  const cleanWA = String(rawWA).replace(/\D/g, '');
+  if (filteredKeepRows[keepRowIdx]) {
+    filteredKeepRows[keepRowIdx]['REPORT AR'] = newAR;
+  }
+
+  if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+    rawKeepRows.forEach(k => {
+      if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        k['REPORT AR'] = newAR;
+      }
+    });
+  }
+
+  if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+    rawAuditARList.forEach(a => {
+      if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+        a.reportARDoc = newAR;
+        a.keep['REPORT AR'] = newAR;
+        if (newAR && typeof docMap !== 'undefined' && docMap.has(newAR)) {
+          a.reportARItems = docMap.get(newAR);
+          a.reportARDate = a.reportARItems[0]['Posting Date'];
+          a.reportARCabang = a.reportARItems[0]['Cabang'];
+        }
+      }
+    });
+  }
+
+  // 2. Render ulang halaman Format Keep (0ms)
+  renderKeepPage();
+
+  // 3. Simpan ke Google Sheets di background (non-blocking)
+  triggerBackgroundReportARSync(rawWA, newAR, oldAR, () => {
+    if (filteredKeepRows[keepRowIdx]) {
+      filteredKeepRows[keepRowIdx]['REPORT AR'] = oldAR;
+    }
+    renderKeepPage();
+  });
+}
+
+function cancelInlineKeepReportAR(inputEl, oldAR, keepRowIdx) {
+  renderKeepPage();
+}
+
+// Helper mandiri untuk menghitung badge status dokumen faktur
+function getDocBadgeInfo(docItems) {
+  if (!docItems || docItems.length === 0) {
+    return { badgeClass: 'badge-status-ink', badgeIcon: '❓', statusLabel: 'Data Item Faktur Tidak Ditemukan' };
+  }
+  let sosmedCount = 0;
+  let missingCount = 0;
+  docItems.forEach(it => {
+    const isExempt = isItemExemptFromSosmed(it);
+    const hasSosmed = isItemInputSosmed(it);
+    if (isExempt) {
+      if (hasSosmed) sosmedCount++;
+      return;
+    }
+    if (hasSosmed) sosmedCount++;
+    else missingCount++;
+  });
+
+  if (missingCount === 0) {
+    return { badgeClass: 'badge-status-green', badgeIcon: '✅', statusLabel: 'Sudah Terinput Semua (100% Sosmed)' };
+  } else if (sosmedCount > 0) {
+    return { badgeClass: 'badge-status-orange', badgeIcon: '⚠️', statusLabel: 'Terinput Sebagian' };
+  } else {
+    return { badgeClass: 'badge-status-red', badgeIcon: '❌', statusLabel: 'Tidak Terinput Sosmed Sama Sekali' };
+  }
+}
+
 function renderAuditPage() {
   const tbody = document.getElementById('auditTableBody');
   if (!tbody) return;
@@ -3253,7 +3499,7 @@ function renderAuditPage() {
       </div>
     ` : (displayWA || '-');
 
-    // Notes HTML (Keep Catatan and/or Cashier Remarks)
+    // Notes HTML
     const keepCatatan = String(keepObj['Catatan'] || '').trim();
     const arRemarks = String((r.items && r.items[0] && r.items[0]['Remarks']) || '').trim();
 
@@ -3269,7 +3515,7 @@ function renderAuditPage() {
       catatanHtml = `<div style="font-size:0.70rem; line-height:1.25; color:var(--text-muted); word-break:break-word;"><em>Kasir: ${arRemarks}</em></div>`;
     }
 
-    // Status Keep Dropdown (Sinkronisasi Langsung ke Google Sheets)
+    // Status Keep Dropdown
     const rawStatus = keepObj['Status'];
     const currentStatus = (rawStatus && String(rawStatus).trim() !== '-') ? String(rawStatus).trim().toUpperCase() : '';
     const statusSelectClass = getKeepStatusClass(currentStatus);
@@ -3289,29 +3535,25 @@ function renderAuditPage() {
       </select>
     ` : `<span class="kpi-badge badge-ink">-</span>`;
 
-    // Klasifikasi Status Warna Baris Tabel:
-    // 1. Status Keep memblok tebal seluruh baris (WIN, LOSE, BELUM DIINPUT, DOUBLE KEEP, ON PROGRESS LOW, ON PROGRESS MEDIUM, ON PROGRESS HOT, TAKE OUT).
-    // 2. Jika status keep kosong, gunakan indikator sosmed AR (Hijau: sudah terinput semua, Orange: terinput sebagian, Merah: tidak terinput sama sekali).
-    let badgeClass = 'badge-status-red';
-    let badgeIcon = '❌';
-    let statusLabel = 'Tidak Terinput Sosmed';
+    // Evaluasi Badge Masing-Masing Dokumen Secara Mandiri (Akurat 100%)
+    const repBadge = getDocBadgeInfo(r.reportARItems && r.reportARItems.length > 0 ? r.reportARItems : (r.reportARDoc === r.doc ? r.items : []));
+    const vlookBadge = getDocBadgeInfo(r.vlookupARItems && r.vlookupARItems.length > 0 ? r.vlookupARItems : (r.vlookupARDoc === r.doc ? r.items : []));
 
-    if (r.status === 'ALL_SOSMED') {
-      badgeClass = 'badge-status-green';
-      badgeIcon = '✅';
-      statusLabel = 'Sudah Terinput Semua (100% Sosmed)';
-    } else if (r.status === 'PARTIAL_MISSING') {
-      badgeClass = 'badge-status-orange';
-      badgeIcon = '⚠️';
-      statusLabel = 'Terinput Sebagian';
-    }
+    // Status Warna Baris Tabel
+    const effectiveStatus = (r.reportARDoc && r.reportARDoc !== '-') ? repBadge.statusLabel : r.status;
+    const rowStatusClass = getAuditRowClassByKeepStatus(currentStatus, effectiveStatus);
 
-    const rowStatusClass = getAuditRowClassByKeepStatus(currentStatus, r.status);
-
-    // Report AR cell
+    // Report AR cell (Dengan Fitur Input & Edit Cepat)
     const reportARDocDisplay = (r.reportARDoc && r.reportARDoc !== '-')
-      ? `<span class="badge-status-link ${badgeClass}" onclick="openARDetailModal('${r.reportARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'REPORT AR')" title="Status: ${statusLabel}. Klik untuk cek detail Dokumen Report AR"><span>${badgeIcon}</span> ${r.reportARDoc}</span>`
-      : '-';
+      ? `<div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-audit-idx="${auditRowIdx}" data-current-ar="${r.reportARDoc}">
+           <span class="badge-status-link ${repBadge.badgeClass}" onclick="openARDetailModal('${r.reportARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'REPORT AR')" title="Status: ${repBadge.statusLabel}. Klik untuk cek detail Dokumen Report AR">
+             <span>${repBadge.badgeIcon}</span> ${r.reportARDoc}
+           </span>
+           <button type="button" class="btn-edit-inline-ar" onclick="event.stopPropagation(); startEditAuditReportAR(this.parentElement, '${rawWA}', ${auditRowIdx})" title="Ubah nomor AR">✏️</button>
+         </div>`
+      : `<div class="cell-report-ar-wrapper" data-wa="${rawWA}" data-audit-idx="${auditRowIdx}" data-current-ar="">
+           <button type="button" class="btn-input-new-ar" onclick="startEditAuditReportAR(this.parentElement, '${rawWA}', ${auditRowIdx})" title="Klik untuk menginput nomor AR">+ Input AR</button>
+         </div>`;
 
     const reportARDateDisplay = r.reportARDate
       ? `${formatCrosellingDate(r.reportARDate)} ${r.reportARCabang || ''}`.trim()
@@ -3319,7 +3561,7 @@ function renderAuditPage() {
 
     // Vlookup AR cell
     const vlookupARDocDisplay = (r.vlookupARDoc && r.vlookupARDoc !== '-')
-      ? `<span class="badge-status-link ${badgeClass}" onclick="openARDetailModal('${r.vlookupARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'AR VLOOKUP')" title="Status: ${statusLabel}. Klik untuk cek detail Dokumen AR VLOOKUP"><span>${badgeIcon}</span> ${r.vlookupARDoc}</span>`
+      ? `<span class="badge-status-link ${vlookBadge.badgeClass}" onclick="openARDetailModal('${r.vlookupARDoc}', filteredAuditARList[${auditRowIdx}].keep, 'AR VLOOKUP')" title="Status: ${vlookBadge.statusLabel}. Klik untuk cek detail Dokumen AR VLOOKUP"><span>${vlookBadge.badgeIcon}</span> ${r.vlookupARDoc}</span>`
       : '-';
 
     const vlookupARDateDisplay = r.vlookupARDate
@@ -5651,13 +5893,144 @@ async function pollServerSyncStatus() {
   }
 }
 
+// ==========================================
+// SERVER-SENT EVENTS (SSE) LIVE SEAMLESS PUSH
+// ==========================================
+let liveEventsSource = null;
+
+function initLiveEventsSSE() {
+  if (typeof EventSource === 'undefined') {
+    console.warn('Browser tidak mendukung EventSource SSE');
+    return;
+  }
+  if (liveEventsSource) {
+    try { liveEventsSource.close(); } catch (e) {}
+  }
+
+  try {
+    liveEventsSource = new EventSource('/api/events');
+
+    liveEventsSource.onopen = () => {
+      console.log('⚡ [SSE Live Push] Terhubung ke siaran real-time server lokal!');
+    };
+
+    liveEventsSource.addEventListener('REPORT_AR_UPDATED', (e) => {
+      try {
+        const data = JSON.parse(e.data || '{}');
+        if (!data.nomorWA) return;
+        const cleanWA = String(data.nomorWA).replace(/\D/g, '');
+        const newAR = String(data.arDoc || '').trim();
+
+        console.log(`⚡ [SSE Broadcast] REPORT AR Diperbarui secara live: WA=${cleanWA} -> AR=${newAR}`);
+
+        // 1. Update memory rawKeepRows
+        if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+          rawKeepRows.forEach(k => {
+            if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+              k['REPORT AR'] = newAR;
+            }
+          });
+        }
+
+        // 2. Update memory rawAuditARList & filteredAuditARList
+        if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+          rawAuditARList.forEach(a => {
+            if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+              a.reportARDoc = newAR;
+              a.keep['REPORT AR'] = newAR;
+              if (newAR && typeof docMap !== 'undefined' && docMap.has(newAR)) {
+                a.reportARItems = docMap.get(newAR);
+                a.reportARDate = a.reportARItems[0]['Posting Date'];
+                a.reportARCabang = a.reportARItems[0]['Cabang'];
+              }
+            }
+          });
+        }
+
+        // 3. Highlight efek visual live update pada sel
+        const targetCells = document.querySelectorAll(`.cell-report-ar-wrapper[data-wa="${cleanWA}"]`);
+        targetCells.forEach(cell => {
+          cell.classList.add('cell-live-updated');
+          setTimeout(() => cell.classList.remove('cell-live-updated'), 2500);
+        });
+
+        // 4. Re-render tampilan yang aktif tanpa reload halaman
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'tab-audit-ar') {
+          renderAuditPage();
+        } else if (activeTab && activeTab.id === 'tab-keep-data') {
+          renderKeepPage();
+        }
+      } catch (err) {
+        console.warn('Gagal memproses event REPORT_AR_UPDATED:', err);
+      }
+    });
+
+    liveEventsSource.addEventListener('KEEP_STATUS_UPDATED', (e) => {
+      try {
+        const data = JSON.parse(e.data || '{}');
+        if (!data.nomorWA) return;
+        const cleanWA = String(data.nomorWA).replace(/\D/g, '');
+        const newStatus = String(data.status || '').trim().toUpperCase();
+
+        console.log(`⚡ [SSE Broadcast] Status Keep Diperbarui secara live: WA=${cleanWA} -> Status=${newStatus}`);
+
+        if (typeof rawKeepRows !== 'undefined' && Array.isArray(rawKeepRows)) {
+          rawKeepRows.forEach(k => {
+            if (String(k['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+              k['Status'] = newStatus;
+            }
+          });
+        }
+
+        if (typeof rawAuditARList !== 'undefined' && Array.isArray(rawAuditARList)) {
+          rawAuditARList.forEach(a => {
+            if (a.keep && String(a.keep['Nomor WA'] || '').replace(/\D/g, '') === cleanWA) {
+              a.keep['Status'] = newStatus;
+            }
+          });
+        }
+
+        const selects = document.querySelectorAll(`select.select-status-keep`);
+        selects.forEach(sel => {
+          const tr = sel.closest('tr');
+          if (tr && tr.innerHTML.includes(cleanWA)) {
+            sel.value = newStatus;
+            sel.setAttribute('data-prev', newStatus);
+            sel.className = `select-status-keep ${getKeepStatusClass(newStatus)}`;
+            tr.className = getAuditRowClassByKeepStatus(newStatus);
+            tr.classList.add('cell-live-updated');
+            setTimeout(() => tr.classList.remove('cell-live-updated'), 2500);
+          }
+        });
+      } catch (err) {
+        console.warn('Gagal memproses event KEEP_STATUS_UPDATED:', err);
+      }
+    });
+
+    liveEventsSource.addEventListener('KEEP_CSV_SYNCED', () => {
+      console.log('📡 [SSE Broadcast] File keep-data.csv disinkronkan di server.');
+      loadKeepData(true);
+    });
+
+    liveEventsSource.onerror = (err) => {
+      // EventSource otomatis mencoba reconnect secara berkala
+    };
+  } catch (e) {
+    console.warn('Inisialisasi SSE gagal:', e);
+  }
+}
+
 let syncEngineInterval = null;
 function startRealtimeSyncEngine() {
   if (syncEngineInterval) clearInterval(syncEngineInterval);
-  // Polling status server setiap 5 detik
-  syncEngineInterval = setInterval(pollServerSyncStatus, 5000);
-  console.log('📡 Realtime Cross-Device Sync Engine aktif (interval 5s)');
+  // Mulai siaran live SSE ke server
+  initLiveEventsSSE();
+  // Polling fallback status server setiap 10 detik
+  syncEngineInterval = setInterval(pollServerSyncStatus, 10000);
+  console.log('📡 Realtime Cross-Device SSE & Fallback Sync Engine aktif');
 }
+
 
 // Legacy function alias
 function loadDefaultTurnover() {

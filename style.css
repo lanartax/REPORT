@@ -4389,6 +4389,98 @@ h1, h2, h3, h4, h5, h6,
   display: none;
 }
 
+/* ==========================================================================
+   INLINE AR INPUT & LIVE SSE PULSE ANIMATIONS
+   ========================================================================== */
+.cell-report-ar-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+  vertical-align: middle;
+}
+
+.btn-input-new-ar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px dashed #94a3b8;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.btn-input-new-ar:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+}
+
+.btn-edit-inline-ar {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.cell-report-ar-wrapper:hover .btn-edit-inline-ar {
+  opacity: 1;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.input-inline-ar {
+  width: 105px !important;
+  padding: 3px 6px !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border: 2px solid #3b82f6 !important;
+  border-radius: 6px !important;
+  outline: none !important;
+  text-align: center !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Micro-Animation Pulse saat data terupdate secara live dari laptop lain */
+@keyframes liveUpdatePulse {
+  0% {
+    background-color: rgba(254, 240, 138, 0.6);
+    box-shadow: 0 0 0 2px #facc15;
+  }
+  50% {
+    background-color: rgba(187, 247, 208, 0.6);
+    box-shadow: 0 0 0 3px #4ade80;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.cell-live-updated {
+  animation: liveUpdatePulse 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  border-radius: 6px;
+}
+
+
 
 
 
