@@ -87,148 +87,189 @@ h1, h2, h3, h4, h5, h6,
 /* ==========================================================================
    WORKSPACE TOP HEADER BAR (MERAH CRIMSON TERANG + TULISAN PUTIH & HOVER KUNING)
    ========================================================================== */
-.workspace-header-bar {
+/* ============================================================
+   DARK CAPSULE HEADER NAVIGATION (PERSIS SESUAI MOCKUP GAMBAR USER)
+   ============================================================ */
+.workspace-header-wrapper {
   width: 100%;
-  max-width: 98%;
-  margin: 16px auto 20px auto;
-  padding: 12px 28px;
-  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 45%, #be123c 100%);
-  border: 1.5px solid #881337;
-  border-radius: 14px;
+  background: #000000;
+  padding: 16px 28px 12px 28px;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid #18181b;
+}
+
+.workspace-header-pill {
+  width: 100%;
+  max-width: 100%;
+  background: #000000;
+  border: 1px solid #27272a;
+  border-radius: 16px;
+  padding: 8px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   box-sizing: border-box;
-  position: sticky;
-  top: 12px;
-  z-index: 1000;
-  box-shadow: 0 8px 26px rgba(225, 29, 72, 0.35), 0 2px 6px rgba(0, 0, 0, 0.12);
-  transition: all 0.25s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
-.header-left {
+/* Brand Title Left */
+.header-pill-brand {
   display: flex;
   align-items: center;
-  min-width: 150px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
 }
 
-.header-link-yahya {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #ffffff !important;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-.header-link-yahya:hover {
-  color: #ffc72c !important;
-  background: rgba(0, 0, 0, 0.25) !important;
-  border-color: #ffc72c !important;
-  text-shadow: 0 0 12px rgba(255, 199, 44, 0.7);
-  transform: translateY(-1px);
-}
-
-.header-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  flex: 1;
-}
-
-.header-brand-title {
+.brand-title-italic {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1.38rem;
+  font-size: 1.25rem;
   font-weight: 800;
   font-style: italic;
-  color: #ffffff !important;
+  color: #ffffff;
   letter-spacing: -0.02em;
-  user-select: none;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  transition: all 0.22s ease;
-  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-.header-brand-title:hover {
-  color: #ffc72c !important;
-  text-shadow: 0 0 16px rgba(255, 199, 44, 0.75);
-  transform: scale(1.02);
+.brand-title-italic:hover {
+  opacity: 0.9;
 }
 
-.header-right {
+/* Center Horizontal Nav Tabs */
+.header-pill-nav {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  min-width: 150px;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
-.header-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.header-pill-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-pill-btn {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
   font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #ffffff !important;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 10px;
   cursor: pointer;
-  padding: 6px 14px;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  white-space: nowrap;
+}
+
+.nav-pill-btn:hover {
+  color: #f4f4f5;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-pill-btn.active {
+  background: #18181b;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.nav-pill-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: #ef4444;
+  border-radius: 999px;
+}
+
+/* Right Action Buttons */
+.header-pill-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btn-pill-outline {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff !important;
+  text-decoration: none;
+  border: 1px solid #3f3f46;
+  background: transparent;
+  padding: 7px 16px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
 }
 
-.header-btn:hover {
-  color: #ffc72c !important;
-  background: rgba(0, 0, 0, 0.25) !important;
-  border-color: #ffc72c !important;
-  text-shadow: 0 0 12px rgba(255, 199, 44, 0.6);
-  transform: translateY(-1px);
+.btn-pill-outline:hover {
+  border-color: #71717a;
+  background: #18181b;
+  color: #ffffff !important;
 }
 
-.header-menu-wrapper {
+.header-gear-dropdown-wrap {
   position: relative;
   display: inline-block;
 }
 
-.btn-menu-toggle {
+.btn-pill-icon {
+  background: transparent;
+  border: 1px solid #3f3f46;
+  color: #ffffff;
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
 }
 
-.workspace-nav-dropdown {
+.btn-pill-icon:hover {
+  border-color: #71717a;
+  background: #18181b;
+}
+
+.btn-pill-icon svg {
+  stroke: #ffffff;
+}
+
+/* Gear Dropdown Popover */
+.header-gear-dropdown {
   position: absolute;
-  top: calc(100% + 14px);
+  top: calc(100% + 10px);
   right: 0;
-  width: 290px;
-  background: #ffffff;
-  border: 2px solid #be123c;
+  width: 270px;
+  background: #18181b;
+  border: 1px solid #27272a;
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(190, 18, 60, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12);
-  padding: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  padding: 8px;
   display: none;
   flex-direction: column;
   gap: 3px;
   z-index: 1001;
-  animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: dropdownFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.workspace-nav-dropdown.show {
+.header-gear-dropdown.show {
   display: flex;
-}
-
-@keyframes dropdownFadeIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .dropdown-group-title {
@@ -236,12 +277,12 @@ h1, h2, h3, h4, h5, h6,
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: #71717a;
   text-transform: uppercase;
   padding: 8px 10px 4px 10px;
 }
 
-.dropdown-item {
+.gear-dropdown-item {
   width: 100%;
   display: flex;
   align-items: center;
@@ -250,55 +291,79 @@ h1, h2, h3, h4, h5, h6,
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: #1e293b;
+  color: #e4e4e7;
   font-family: 'Inter', sans-serif;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all 0.15s ease;
   text-decoration: none;
   box-sizing: border-box;
 }
 
-.dropdown-item:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+.gear-dropdown-item:hover {
+  background: #27272a;
+  color: #ffffff;
 }
 
-.dropdown-item.active {
-  background: #fef2f2;
-  border-color: #be123c;
-  color: #be123c;
-  font-weight: 700;
-}
-
-.dropdown-icon {
-  font-size: 1.05rem;
+.gear-dropdown-item.active {
+  background: #27272a;
+  color: #ffffff;
+  font-weight: 600;
+  border-color: #3f3f46;
 }
 
 .dropdown-separator {
   height: 1px;
-  background: #e2e8f0;
-  margin: 6px 0;
+  background: #27272a;
+  margin: 4px 0;
 }
 
 .dropdown-ext-arrow {
   margin-left: auto;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: #71717a;
 }
 
-.dropdown-upload-btn {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  color: #0f172a;
-  margin-top: 2px;
+/* Sub-header Under Capsule: "Modul aktif: [Name]" */
+.workspace-subbar {
+  padding: 14px 4px 4px 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.94rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
 }
 
-.dropdown-upload-btn:hover {
-  background: #f1f5f9;
-  border-color: #475569;
+.subbar-label {
+  color: #71717a;
+  font-weight: 500;
+}
+
+.subbar-active-title {
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 960px) {
+  .workspace-header-wrapper {
+    padding: 12px 14px 8px 14px;
+  }
+  .workspace-header-pill {
+    padding: 6px 12px;
+    gap: 10px;
+  }
+  .brand-title-italic {
+    font-size: 1.05rem;
+  }
+  .nav-pill-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
 }
 
 /* Main Content Area */

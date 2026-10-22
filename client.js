@@ -955,21 +955,29 @@ function updateExecutiveKPICards(picStats, activePICs) {
 // 7. TAB NAVIGATION & VIEW MODE FILTER (SUPPORT 7 UNIFIED TABS)
 let currentReportViewMode = 'all'; // 'all', 'r1', 'r2'
 
-function toggleWorkspaceMenu(e) {
+function toggleSettingsDropdown(e) {
   if (e) e.stopPropagation();
-  const dropdown = document.getElementById('workspaceNavDropdown');
+  const dropdown = document.getElementById('headerGearDropdown');
   if (dropdown) dropdown.classList.toggle('show');
 }
 
-function closeWorkspaceMenu() {
-  const dropdown = document.getElementById('workspaceNavDropdown');
+function closeSettingsDropdown() {
+  const dropdown = document.getElementById('headerGearDropdown');
   if (dropdown) dropdown.classList.remove('show');
+}
+
+function toggleWorkspaceMenu(e) {
+  toggleSettingsDropdown(e);
+}
+
+function closeWorkspaceMenu() {
+  closeSettingsDropdown();
 }
 
 // Close workspace dropdown menu when clicking anywhere outside
 document.addEventListener('click', function(e) {
-  const wrapper = document.querySelector('.header-menu-wrapper');
-  const dropdown = document.getElementById('workspaceNavDropdown');
+  const wrapper = document.querySelector('.header-gear-dropdown-wrap') || document.querySelector('.header-menu-wrapper');
+  const dropdown = document.getElementById('headerGearDropdown') || document.getElementById('workspaceNavDropdown');
   if (dropdown && wrapper && !wrapper.contains(e.target)) {
     dropdown.classList.remove('show');
   }
@@ -1031,7 +1039,24 @@ function switchTab(tabIndex) {
     if (content) content.classList.toggle('active', i === tabIndex);
   }
 
+  // Update dynamic active module name in subbar (Sesuai Mockup Gambar User)
+  const moduleNames = {
+    1: 'Dashboard',
+    2: 'Report',
+    3: 'Cek AR',
+    4: 'Format Keep',
+    5: 'Tracking AR',
+    6: 'Klaim AR',
+    7: 'Arsip Pencapaian Bulanan',
+    8: 'Pengaturan Admin'
+  };
+  const activeModEl = document.getElementById('activeModuleName');
+  if (activeModEl) {
+    activeModEl.textContent = moduleNames[tabIndex] || 'Dashboard';
+  }
+
   closeWorkspaceMenu();
+  closeSettingsDropdown();
 
   // Toggle KPI Cards and Gemini Prompt visibility
   const kpiSection = document.getElementById('kpiGridSection');

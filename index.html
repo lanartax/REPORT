@@ -16,79 +16,71 @@
   <script src="lib/html2canvas.min.js"></script>
   <script src="lib/chart.umd.min.js"></script>
   <link rel="icon" type="image/png" href="logo.png">
-  <link rel="stylesheet" href="style.css?v=5.3">
+  <link rel="stylesheet" href="style.css?v=5.4">
 </head>
 <body>
   <div class="app-layout" id="dropZone">
     <!-- Top Horizontal Navigation Header Bar (Persis Sesuai Mockup Gambar User) -->
-    <header class="workspace-header-bar">
-      <div class="header-left">
-        <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Gadgetmart's%20Workspace.%20Tolong%20perbaiki%20segera." target="_blank" class="header-link-yahya" title="Hubungi Yahya via WhatsApp">
-          Hubungi Yahya
-        </a>
-      </div>
+    <!-- Workspace Dark Capsule Header Bar (Sesuai Mockup Gambar User) -->
+    <header class="workspace-header-wrapper">
+      <div class="workspace-header-pill">
+        <div class="header-pill-brand" onclick="switchTab(1)" title="Kembali ke Dashboard">
+          <span class="brand-title-italic">Workspace Sosmed</span>
+        </div>
 
-      <div class="header-center">
-        <span class="header-brand-title">Gadgetmart's Workspace</span>
-      </div>
+        <nav class="header-pill-nav">
+          <button type="button" class="nav-pill-btn active" id="tabBtn1" onclick="switchTab(1)">Dashboard</button>
+          <button type="button" class="nav-pill-btn" id="tabBtn2" onclick="switchTab(2)">Report</button>
+          <button type="button" class="nav-pill-btn" id="tabBtn3" onclick="switchTab(3)">Cek AR</button>
+          <button type="button" class="nav-pill-btn" id="tabBtn4" onclick="switchTab(4)">Format Keep</button>
+          <button type="button" class="nav-pill-btn" id="tabBtn5" onclick="switchTab(5)">Tracking AR</button>
+          <button type="button" class="nav-pill-btn" id="tabBtn6" onclick="switchTab(6)">Klaim AR</button>
+        </nav>
 
-      <div class="header-right">
-        <button class="header-btn" onclick="switchTab(8)" title="Buka Pengaturan Admin">Setting</button>
-        <button class="header-btn" id="headerLoginBtn" onclick="openLoginModal()" title="Login Akun Workspace">Login</button>
-        <div class="header-menu-wrapper">
-          <button class="header-btn btn-menu-toggle" id="headerMenuBtn" onclick="toggleWorkspaceMenu(event)" title="Buka Menu Navigasi">Menu</button>
-          
-          <!-- Dropdown Menu Navigasi Workspace -->
-          <div class="workspace-nav-dropdown" id="workspaceNavDropdown">
-            <div class="dropdown-group-title">MENU UTAMA</div>
-            <button class="dropdown-item active" id="tabBtn1" onclick="switchTab(1); closeWorkspaceMenu();">
-              <span class="dropdown-icon">🏆</span>
-              <span class="dropdown-text">Dashboard & Leaderboard</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn2" onclick="switchTab(2); closeWorkspaceMenu();">
-              <span class="dropdown-icon">📊</span>
-              <span class="dropdown-text">Laporan Pencapaian & KPI</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn3" onclick="switchTab(3); closeWorkspaceMenu();">
-              <span class="dropdown-icon">🔍</span>
-              <span class="dropdown-text">Cek AR & WhatsApp</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn4" onclick="switchTab(4); closeWorkspaceMenu();">
-              <span class="dropdown-icon">📋</span>
-              <span class="dropdown-text">Data Keep Customer</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn5" onclick="switchTab(5); closeWorkspaceMenu();">
-              <span class="dropdown-icon">⚠️</span>
-              <span class="dropdown-text">Audit AR Belum Sosmed</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn6" onclick="switchTab(6); closeWorkspaceMenu();">
-              <span class="dropdown-icon">🏷️</span>
-              <span class="dropdown-text">Klaim AR & Denda Cabang</span>
-            </button>
-            <button class="dropdown-item" id="tabBtn7" onclick="switchTab(7); closeWorkspaceMenu();">
-              <span class="dropdown-icon">📁</span>
-              <span class="dropdown-text">Arsip Pencapaian Bulanan</span>
-            </button>
+        <div class="header-pill-actions">
+          <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Gadgetmart's%20Workspace.%20Tolong%20perbaiki%20segera." target="_blank" class="btn-pill-outline" title="Hubungi Yahya via WhatsApp">
+            Hubungi Yahya
+          </a>
 
-            <div class="dropdown-separator"></div>
-            <div class="dropdown-group-title">ADMINISTRASI</div>
-            <button class="dropdown-item" id="tabBtn8" onclick="switchTab(8); closeWorkspaceMenu();">
-              <span class="dropdown-icon">⚙️</span>
-              <span class="dropdown-text">Pengaturan Admin</span>
+          <div class="header-gear-dropdown-wrap">
+            <button type="button" class="btn-pill-icon" id="headerGearBtn" onclick="toggleSettingsDropdown(event)" title="Pengaturan & Menu Tambahan">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
             </button>
-            <a href="https://kandidatgadgetmart.my.id" target="_blank" class="dropdown-item dropdown-link" title="Buka Portal Rekrutmen Kandidat GadgetMart">
-              <span class="dropdown-icon">🚀</span>
-              <span class="dropdown-text">Kandidat Gadgetmart</span>
-              <span class="dropdown-ext-arrow">↗</span>
-            </a>
-
-            <div class="dropdown-separator"></div>
-            <button class="dropdown-item dropdown-upload-btn" onclick="document.getElementById('fileInput').click(); closeWorkspaceMenu();">
-              <span class="dropdown-icon">📂</span>
-              <span class="dropdown-text">Unggah File Turnover (.xlsx)</span>
-            </button>
+            <div class="header-gear-dropdown" id="headerGearDropdown">
+              <div class="dropdown-group-title">ADMINISTRASI & TOOLS</div>
+              <button type="button" class="gear-dropdown-item" id="tabBtn8" onclick="switchTab(8); closeSettingsDropdown();">
+                <span class="dropdown-icon">⚙️</span>
+                <span class="dropdown-text">Pengaturan Admin</span>
+              </button>
+              <button type="button" class="gear-dropdown-item" id="tabBtn7" onclick="switchTab(7); closeSettingsDropdown();">
+                <span class="dropdown-icon">📁</span>
+                <span class="dropdown-text">Arsip Pencapaian Bulanan</span>
+              </button>
+              <div class="dropdown-separator"></div>
+              <button type="button" class="gear-dropdown-item" onclick="document.getElementById('fileInput').click(); closeSettingsDropdown();">
+                <span class="dropdown-icon">📂</span>
+                <span class="dropdown-text">Unggah File Turnover (.xlsx)</span>
+              </button>
+              <button type="button" class="gear-dropdown-item" id="headerLoginBtn" onclick="openLoginModal(); closeSettingsDropdown();">
+                <span class="dropdown-icon">🔐</span>
+                <span class="dropdown-text">Login Akun Workspace</span>
+              </button>
+              <a href="https://kandidatgadgetmart.my.id" target="_blank" class="gear-dropdown-item" style="text-decoration:none;">
+                <span class="dropdown-icon">🚀</span>
+                <span class="dropdown-text">Kandidat Gadgetmart</span>
+                <span class="dropdown-ext-arrow">↗</span>
+              </a>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div class="workspace-subbar">
+        <span class="subbar-label">Modul aktif:</span>
+        <span class="subbar-active-title" id="activeModuleName">Dashboard</span>
       </div>
     </header>
 
@@ -1739,6 +1731,6 @@
     </div>
   </div>
 
-  <script src="client.js?v=5.3"></script>
+  <script src="client.js?v=5.4"></script>
 </body>
 </html>
