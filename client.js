@@ -1783,6 +1783,19 @@ async function syncLiveKeepData() {
   const originalText = btn ? btn.innerHTML : '';
   if (btn) btn.innerHTML = '⏳ Menyinkronkan...';
 
+  const headerBtn = document.getElementById('headerBtnSyncSheets');
+  const originalHeaderText = headerBtn ? headerBtn.innerHTML : '';
+  if (headerBtn) {
+    headerBtn.innerHTML = `
+      <svg class="spin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+      <span>Syncing...</span>
+    `;
+  }
+
   const prog = startSmoothProgress({
     id: 'sync-live-keep-progress',
     title: '🔄 Sinkronisasi Data Google Sheets',
@@ -1842,6 +1855,7 @@ async function syncLiveKeepData() {
     await loadKeepData();
   } finally {
     if (btn) btn.innerHTML = originalText;
+    if (headerBtn) headerBtn.innerHTML = originalHeaderText;
   }
 }
 window.syncLiveKeepData = syncLiveKeepData;
@@ -6844,10 +6858,10 @@ function addSingleARToClaims(auditItem, customItems = null) {
 
   if (addedCount > 0) {
     saveARClaimsData();
-    showSaveToast(`🏷️ ${addedCount} item dari AR ${docNum} berhasil dimasukkan ke Keranjang Klaim (Batch 3 Hari)!`);
+    showSaveToast(`${addedCount} item dari AR ${docNum} berhasil dimasukkan ke Keranjang Klaim (Batch 3 Hari).`);
     renderARClaimsModule();
   } else {
-    showSaveToast(`ℹ️ Item AR ${docNum} sudah ada di daftar klaim sebelumnya.`);
+    showSaveToast(`Item AR ${docNum} sudah ada di daftar klaim sebelumnya.`);
   }
 }
 
@@ -6917,7 +6931,7 @@ function claimAllFilteredMissingAR() {
   });
 
   saveARClaimsData();
-  showSaveToast(`🏷️ Berhasil menambahkan ${totalAdded} item belum sosmed ke Modul Klaim AR!`);
+  showSaveToast(`Berhasil menambahkan ${totalAdded} item belum sosmed ke Modul Klaim AR.`);
   renderARClaimsModule();
 }
 
@@ -6992,7 +7006,7 @@ function handleEvidenceFileSelected(fileInput) {
       const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
       item.evidenceImage = compressedDataUrl;
       saveARClaimsData();
-      showSaveToast(`📷 Bukti gambar format keep untuk AR ${item.docNumber} berhasil diunggah!`);
+      showSaveToast(`Bukti gambar format keep untuk AR ${item.docNumber} berhasil diunggah.`);
       renderARClaimsTable();
     };
     img.src = e.target.result;
@@ -7006,7 +7020,7 @@ function removeEvidenceImage(claimId) {
   if (!confirm(`Hapus bukti gambar untuk AR ${item.docNumber}?`)) return;
   item.evidenceImage = null;
   saveARClaimsData();
-  showSaveToast('🗑️ Bukti gambar berhasil dihapus.');
+  showSaveToast('Bukti gambar berhasil dihapus.');
   renderARClaimsTable();
 }
 
@@ -7502,8 +7516,23 @@ function applyClaimsFilters() {
     return true;
   });
 
+  let activeCount = 0;
+  if (cabVal !== 'ALL') activeCount++;
+  if (sosVal !== 'ALL') activeCount++;
+  if (tglVal) activeCount++;
+  const badgeEl = document.getElementById('claimsFilterActiveCount');
+  if (badgeEl) badgeEl.innerText = activeCount;
+
   renderARClaimsTable();
 }
+
+function toggleClaimsFiltersSection() {
+  const el = document.getElementById('claimsFilterSection');
+  if (el) {
+    el.style.display = (el.style.display === 'none' ? 'flex' : 'none');
+  }
+}
+window.toggleClaimsFiltersSection = toggleClaimsFiltersSection;
 
 function renderARClaimsModule() {
   populateClaimsDropdowns();
@@ -7527,6 +7556,11 @@ function renderARClaimsModule() {
       totalPenaltyRp += (c.penaltyAmount || 0);
     } else if (c.status === 'RESOLVED_BY_STORE') countResolved++;
   });
+
+  const heroSub = document.getElementById('claimsHeroSub');
+  if (heroSub) {
+    heroSub.innerText = `${rawARClaimsList.length.toLocaleString('id-ID')} data klaim faktur AR dari siklus pengawasan denda`;
+  }
 
   const elColl = document.getElementById('claimCountCollecting');
   const elShar = document.getElementById('claimCountShared');
@@ -7557,7 +7591,7 @@ function renderARClaimsModule() {
   const btnShare = document.getElementById('btnShareBatchDay4');
   if (btnShare) {
     btnShare.style.display = (currentClaimsSubTab === 'COLLECTING') ? 'inline-flex' : 'none';
-    btnShare.innerText = `📦 Unduh Paket Cabang & Share (${countCollecting} Item)`;
+    btnShare.innerText = `Unduh Paket Cabang & Share (${countCollecting} Item)`;
   }
 
   applyClaimsFilters();
@@ -7574,6 +7608,11 @@ function renderARClaimsTable() {
   const endIdx = Math.min(startIdx + CLAIMS_PAGE_SIZE, total);
   const pageRows = filteredARClaimsList.slice(startIdx, endIdx);
 
+  const heroSub = document.getElementById('claimsHeroSub');
+  if (heroSub) {
+    heroSub.innerText = `${total.toLocaleString('id-ID')} data klaim faktur AR pada sub-tab ini`;
+  }
+
   const infoEl = document.getElementById('claimsPaginationInfo');
   if (infoEl) {
     infoEl.innerText = total > 0 
@@ -7588,122 +7627,170 @@ function renderARClaimsTable() {
   if (btnNext) btnNext.disabled = claimsCurrentPage >= maxPage;
 
   if (pageRows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="16" class="text-center" style="padding: 30px; color: var(--text-muted);">Tidak ada data klaim AR pada status ini.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="text-center" style="padding: 40px; color: var(--text-muted); font-size: 0.9rem;">Tidak ada data klaim AR pada status ini.</td></tr>`;
     return;
   }
 
   pageRows.forEach((r, i) => {
-    const globalIdx = startIdx + i + 1;
     const rawWA = String(r.customerPhone || '').replace(/\D/g, '');
     const normWA = normalizePhone(rawWA);
     const displayWA = formatPhoneDisplay(rawWA);
+    const custName = r.customerName || '-';
+    const initials = getCustomerInitials(custName);
 
-    const waHtml = (normWA && normWA.length >= 8) ? `
-      <div style="font-size:0.75rem; color: #475569; margin-top: 2px;">
-        ${displayWA}
-        <a href="https://wa.me/${normWA}" target="_blank" class="btn-whatsapp" style="padding:1px 5px; font-size:0.65rem; border-radius:3px; margin-left:4px;">💬</a>
+    // 1. CUSTOMER: Avatar Circle (slate-900) + Name Bold + Phone Subtext (Persis Format Keep)
+    const custHtml = `
+      <div class="customer-cell-flex">
+        <div class="avatar-circle-sm" title="${custName}">${initials}</div>
+        <div class="customer-info-box">
+          <span class="customer-name-bold">${custName}</span>
+          ${(normWA && normWA.length >= 8) ? `
+            <a href="https://wa.me/${normWA}" target="_blank" class="customer-phone-sub" title="Hubungi customer di WhatsApp">
+              ${displayWA}
+            </a>
+          ` : `<span class="customer-phone-sub">${displayWA || '-'}</span>`}
+        </div>
       </div>
-    ` : '';
+    `;
 
+    // 2. TANGGAL: Formatted Date + Periode
+    const dateFormatted = formatCrosellingDate(r.postingDate) || '-';
+    const periodeDisplay = r.periode || '';
+    const dateHtml = `
+      <div style="font-weight: 700; color: #0f172a; white-space: nowrap; font-variant-numeric: tabular-nums;">${dateFormatted}</div>
+      ${periodeDisplay ? `<div style="font-size: 0.70rem; color: #64748b; margin-top: 2px;">${periodeDisplay}</div>` : ''}
+    `;
+
+    // 3. NO. AR: Bold Red/Blue Clickable Number
+    const arHtml = `
+      <div class="cell-report-ar-wrapper" style="justify-content: center;">
+        <span class="text-ar-number-bold" onclick="openARDetailModal('${r.docNumber}')" title="Klik untuk cek detail faktur AR" style="cursor: pointer; font-variant-numeric: tabular-nums;">
+          ${r.docNumber}
+        </span>
+      </div>
+    `;
+
+    // 4. BARANG: Product name bold + Harga Jual
+    const barangHtml = `
+      <div style="font-weight: 700; color: #0f172a; font-size: 0.82rem; line-height: 1.35;">${r.productName || '-'}</div>
+      <div style="font-size: 0.72rem; color: #64748b; margin-top: 3px; font-variant-numeric: tabular-nums; font-weight: 600;">${formatRupiah(r.hargaJual)}</div>
+    `;
+
+    // 5. KODE SOSMED: Pill badge + PIC
+    const sosmedHtml = `
+      <span class="badge-sosmed-pill" style="font-size: 0.72rem; padding: 3px 8px; font-weight: 700;">${r.targetSosmedCode || '-'}</span>
+      ${r.picSosmed ? `<div style="font-size: 0.70rem; color: #64748b; margin-top: 3px;">${r.picSosmed}</div>` : ''}
+    `;
+
+    // 6. CABANG: Bold Branch Name
+    const cabangHtml = `
+      <span style="font-weight: 800; font-size: 0.80rem; color: #0f172a; letter-spacing: 0.02em;">${r.cabang || '-'}</span>
+    `;
+
+    // 7. DENDA: Modern Status Pill with Dot (Anti-Slop Clean Style)
     let dendaDisplay = '';
-    if (r.status === 'COLLECTING') {
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
-    } else if (r.status === 'SHARED') {
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-potensi">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
-    } else if (r.status === 'PENALTY_REAL') {
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA REAL Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
-    } else if (r.status === 'RESOLVED_MANUAL_SOSMED') {
-      dendaDisplay = r.isHandphone ? `<span class="badge-denda-real">DENDA Rp 50k</span>` : `<span class="badge-denda-pass">PASS Rp 0</span>`;
+    if (r.status === 'COLLECTING' || r.status === 'SHARED') {
+      dendaDisplay = r.isHandphone 
+        ? `<span class="modern-status-pill status-pill-orange"><span class="status-dot"></span>Potensi Rp 50.000</span>` 
+        : `<span class="modern-status-pill status-pill-gray"><span class="status-dot"></span>Pass (Rp 0)</span>`;
+    } else if (r.status === 'PENALTY_REAL' || r.status === 'RESOLVED_MANUAL_SOSMED') {
+      dendaDisplay = r.isHandphone 
+        ? `<span class="modern-status-pill status-pill-red"><span class="status-dot"></span>Denda Rp 50.000</span>` 
+        : `<span class="modern-status-pill status-pill-gray"><span class="status-dot"></span>Pass (Rp 0)</span>`;
     } else if (r.status === 'RESOLVED_BY_STORE') {
-      dendaDisplay = `<span class="badge-denda-pass">GUGUR (PASS)</span>`;
+      dendaDisplay = `<span class="modern-status-pill status-pill-green"><span class="status-dot"></span>Gugur (Pass)</span>`;
+    } else {
+      dendaDisplay = `<span class="modern-status-pill status-pill-gray"><span class="status-dot"></span>-</span>`;
     }
 
-    // Evidence cell (Thumbnail or Upload button)
+    // 8. FORMAT KEEP: Clean snippet box
+    const keepHtml = r.keepText ? `
+      <div class="claim-keep-box" title="Format Keep WhatsApp">${r.keepText}</div>
+    ` : `<span style="color: #94a3b8; font-size: 0.76rem;">-</span>`;
+
+    // 9. EVIDENCE: Clean thumbnail or flat button (No Emoji)
     let evidenceHtml = '';
     if (r.evidenceImage) {
       evidenceHtml = `
         <div class="evidence-cell">
           <div class="evidence-thumb-wrapper" onclick="openEvidenceImageModal('${r.id}')" title="Klik untuk perbesar bukti format keep">
             <img src="${r.evidenceImage}" class="evidence-thumb-img" alt="Bukti">
-            <div class="evidence-zoom-hint">🔍 Zoom</div>
+            <div class="evidence-zoom-hint">Zoom</div>
           </div>
-          <div style="display:flex; gap:6px; margin-top:3px;">
-            <button class="btn-remove-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Ganti foto bukti">🔄 Ganti</button>
-            <button class="btn-remove-evidence" onclick="removeEvidenceImage('${r.id}')" title="Hapus foto bukti">🗑️ Hapus</button>
+          <div style="display: flex; gap: 6px; margin-top: 3px;">
+            <button type="button" class="btn-remove-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Ganti foto bukti">Ganti</button>
+            <button type="button" class="btn-remove-evidence" onclick="removeEvidenceImage('${r.id}')" title="Hapus foto bukti">Hapus</button>
           </div>
         </div>
       `;
     } else {
       evidenceHtml = `
-        <button class="btn-upload-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Klik untuk mengunggah screenshot / foto bukti format keep">
-          📷 Unggah Bukti
+        <button type="button" class="btn-upload-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Klik untuk mengunggah bukti format keep">
+          Unggah Bukti
         </button>
       `;
     }
 
-    // Action buttons
+    // 10. AR SALES EMPLOYEE
+    const salesHtml = `
+      <span style="font-size: 0.76rem; font-weight: 600; color: #334155;">${r.currentSalesCode || '-'}</span>
+    `;
+
+    // 11. STATUS VALIDASI
+    const isInvalid = (r.validationStatus === 'TIDAK VALID');
+    const validityHtml = `
+      <select class="select-claim-validity ${isInvalid ? 'invalid' : 'valid'}" onchange="handleClaimValidityChange('${r.id}', this.value)" title="Ubah status validasi klaim">
+        <option value="VALID" ${!isInvalid ? 'selected' : ''}>Valid</option>
+        <option value="TIDAK VALID" ${isInvalid ? 'selected' : ''}>Tidak Valid</option>
+      </select>
+    `;
+
+    // 12. ALASAN TIDAK VALID
+    const reasonHtml = isInvalid ? `
+      <input type="text" class="input-claim-reason" value="${r.invalidReason || ''}" placeholder="Tulis alasan..." onchange="handleClaimInvalidReasonChange('${r.id}', this.value)" title="Alasan tidak valid">
+    ` : `<span style="color: #94a3b8; font-size: 0.76rem;">-</span>`;
+
+    // 13. AKSI: Anti-Slop Clean Flat Buttons
     let actionBtn = '';
     if (r.status === 'COLLECTING') {
-      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus dari antrean klaim" style="color:#e11d48; border-color:#fda4af;">✕ Hapus</button>`;
+      actionBtn = `<button type="button" class="btn-claim-action btn-claim-delete" onclick="deleteARClaimItem('${r.id}')" title="Hapus dari antrean klaim">Hapus</button>`;
     } else if (r.status === 'SHARED') {
       actionBtn = `
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <button class="btn btn-outline btn-xs" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Salin chat follow-up WA untuk cabang ini" style="font-size:0.65rem; padding:2px 4px;">💬 Chat WA</button>
-          <button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus" style="color:#64748b; font-size:0.65rem; padding:1px 4px;">✕</button>
+        <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+          <button type="button" class="btn-claim-action btn-claim-secondary" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Salin pesan follow-up WA untuk cabang ini">Chat WA</button>
+          <button type="button" class="btn-claim-action btn-claim-delete" onclick="deleteARClaimItem('${r.id}')" title="Hapus">Hapus</button>
         </div>
       `;
     } else if (r.status === 'PENALTY_REAL') {
       actionBtn = `
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <button class="btn btn-crimson btn-xs" onclick="markClaimResolvedManually('${r.id}')" title="Tandai bahwa tim sosmed sudah mengubah AR ini sendiri di SAP" style="font-size:0.65rem; padding:2px 6px;">✍️ Ubah Sendiri</button>
-          <button class="btn btn-outline btn-xs" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Kirim teguran denda ke cabang" style="font-size:0.65rem; padding:1px 4px;">🚨 Tegur</button>
+        <div style="display: flex; flex-direction: column; gap: 4px; align-items: center;">
+          <button type="button" class="btn-claim-action btn-claim-primary" onclick="markClaimResolvedManually('${r.id}')" title="Tandai sudah direvisi mandiri oleh tim sosmed di SAP">Ubah Mandiri</button>
+          <button type="button" class="btn-claim-action btn-claim-secondary" onclick="copyBranchWAFollowupMessage('${r.cabang}')" title="Kirim teguran denda ke cabang">Tegur</button>
         </div>
       `;
     } else {
-      actionBtn = `<button class="btn btn-outline btn-xs" onclick="deleteARClaimItem('${r.id}')" title="Hapus" style="color:#64748b; font-size:0.65rem; padding:1px 4px;">✕</button>`;
+      actionBtn = `<button type="button" class="btn-claim-action btn-claim-delete" onclick="deleteARClaimItem('${r.id}')" title="Hapus">Hapus</button>`;
     }
 
-    const isInvalid = (r.validationStatus === 'TIDAK VALID');
-
     const tr = document.createElement('tr');
+    if (isInvalid) {
+      tr.classList.add('row-lose-tint');
+    }
+
     tr.innerHTML = `
-      <td style="text-align: center;">${globalIdx}</td>
-      <td style="text-align: center; font-size: 0.73rem;">${formatCrosellingDate(r.postingDate)}</td>
-      <td style="text-align: center; font-size: 0.73rem; color: #64748b;">${r.periode || 'Oktober-26'}</td>
-      <td style="text-align: center; font-weight: 700;">
-        <span class="badge-status-link badge-status-blue" onclick="openARDetailModal('${r.docNumber}')" title="Klik untuk cek detail faktur ini">${r.docNumber}</span>
-      </td>
-      <td style="text-align: center;">
-        <div class="font-bold" style="color: #0f172a; font-size: 0.78rem;">${r.customerName || '-'}</div>
-        ${waHtml}
-      </td>
-      <td style="text-align: center;">
-        <span class="badge-sosmed-pill" style="font-size: 0.68rem; padding: 2px 7px;">${r.targetSosmedCode}</span>
-      </td>
-      <td style="text-align: center; font-size: 0.72rem; color: #475569;">${r.picSosmed || '-'}</td>
-      <td style="text-align: center; font-weight: 800; color: #c8102e;">${r.cabang}</td>
-      <td style="text-align: center;">${dendaDisplay}</td>
-      <td class="text-left">
-        <div style="font-size: 0.76rem; font-weight: 700; color: #1e293b;">${r.productName}</div>
-        <div style="font-size: 0.70rem; color: #64748b; margin-top: 1px;">${formatRupiah(r.hargaJual)}</div>
-      </td>
-      <td class="text-left">
-        ${r.keepText ? `<div class="claim-keep-box" title="Format Keep WhatsApp">${r.keepText}</div>` : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>'}
-      </td>
-      <td style="text-align: center;">${evidenceHtml}</td>
-      <td class="text-left" style="font-size: 0.74rem; color: #475569;">${r.currentSalesCode || '-'}</td>
-      <td style="text-align: center;">
-        <select class="select-claim-validity ${isInvalid ? 'invalid' : 'valid'}" onchange="handleClaimValidityChange('${r.id}', this.value)" title="Ubah status validasi klaim ini">
-          <option value="VALID" ${!isInvalid ? 'selected' : ''}>🟢 VALID</option>
-          <option value="TIDAK VALID" ${isInvalid ? 'selected' : ''}>🔴 TIDAK VALID</option>
-        </select>
-      </td>
-      <td class="text-left">
-        ${isInvalid ? `
-          <input type="text" class="input-claim-reason" value="${r.invalidReason || ''}" placeholder="Alasan tidak valid..." onchange="handleClaimInvalidReasonChange('${r.id}', this.value)" title="Klik untuk mengedit alasan tidak valid">
-        ` : `<span style="color:var(--text-muted); font-size:0.75rem;">-</span>`}
-      </td>
-      <td style="text-align: center;">${actionBtn}</td>
+      <td class="text-left">${custHtml}</td>
+      <td class="text-center">${dateHtml}</td>
+      <td class="text-center">${arHtml}</td>
+      <td class="text-left">${barangHtml}</td>
+      <td class="text-center">${sosmedHtml}</td>
+      <td class="text-center">${cabangHtml}</td>
+      <td class="text-center">${dendaDisplay}</td>
+      <td class="text-left">${keepHtml}</td>
+      <td class="text-center">${evidenceHtml}</td>
+      <td class="text-left">${salesHtml}</td>
+      <td class="text-center">${validityHtml}</td>
+      <td class="text-left">${reasonHtml}</td>
+      <td class="text-center">${actionBtn}</td>
     `;
     tbody.appendChild(tr);
   });

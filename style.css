@@ -197,8 +197,98 @@ h1, h2, h3, h4, h5, h6,
 .header-pill-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+/* Quick Action Buttons: Turnover, Crosselling, Sync Sheets (Anti-Slop Enterprise Style) */
+.header-pill-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-header-quick {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 9px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.btn-header-quick:hover {
+  background: #27272a;
+  border-color: #71717a;
+  color: #ffffff;
+}
+
+.btn-header-quick svg {
+  color: #a1a1aa;
+  transition: color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.btn-header-quick:hover svg {
+  color: #ffffff;
+}
+
+.btn-header-sync {
+  border-color: rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.08);
+  color: #facc15;
+}
+
+.btn-header-sync:hover {
+  background: rgba(250, 204, 21, 0.18);
+  border-color: #facc15;
+  color: #fef08a;
+}
+
+.btn-header-sync svg {
+  color: #facc15;
+}
+
+.header-action-separator {
+  width: 1px;
+  height: 22px;
+  background: #27272a;
+  margin: 0 3px;
+}
+
+@keyframes headerSpin {
+  100% { transform: rotate(360deg); }
+}
+
+.btn-header-quick .spin-icon {
+  animation: headerSpin 1s linear infinite;
+}
+
+@media (max-width: 1280px) {
+  .btn-header-quick span {
+    display: none;
+  }
+  .btn-header-quick {
+    padding: 6px 9px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-pill-quick-actions {
+    display: none;
+  }
+  .header-action-separator {
+    display: none;
+  }
 }
 
 .btn-pill-outline {
@@ -4007,6 +4097,15 @@ h1, h2, h3, h4, h5, h6,
 /* ==========================================================================
    MODUL KLAIM AR: SUB-TABS, COUNTDOWN TIMERS & DENDA BADGES
    ========================================================================== */
+.claims-subtabs-nav {
+  padding: 10px 20px 0;
+  display: flex;
+  gap: 8px;
+  background: #ffffff;
+  border-bottom: 1.5px solid #e2e8f0;
+  overflow-x: auto;
+}
+
 .btn-subtab {
   background: transparent;
   border: none;
@@ -4307,6 +4406,54 @@ h1, h2, h3, h4, h5, h6,
   max-height: 80px;
   overflow-y: auto;
   word-break: break-word;
+}
+
+/* Modul Klaim AR Action Buttons (Anti-Slop Enterprise Flat) */
+.btn-claim-action {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.btn-claim-primary {
+  background: #c8102e;
+  color: #ffffff;
+  border-color: #be123c;
+}
+.btn-claim-primary:hover {
+  background: #9f0d24;
+  border-color: #881337;
+}
+
+.btn-claim-secondary {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+.btn-claim-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-claim-delete {
+  background: transparent;
+  color: #94a3b8;
+  border-color: transparent;
+}
+.btn-claim-delete:hover {
+  color: #e11d48;
+  background: #fff1f2;
+  border-color: #fecdd3;
 }
 
 /* ==========================================================================
@@ -4900,6 +5047,7 @@ h1, h2, h3, h4, h5, h6,
   border-spacing: 0;
   background: #ffffff;
   table-layout: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .modern-tegas-table th {

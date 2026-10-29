@@ -38,6 +38,39 @@
         </nav>
 
         <div class="header-pill-actions">
+          <!-- Quick Action Buttons: Turnover, Crosselling, Sync Sheets (Sesuai Permintaan User) -->
+          <div class="header-pill-quick-actions">
+            <button type="button" class="btn-header-quick" onclick="document.getElementById('fileInput').click()" title="Unggah / Update file Excel turnover.xlsx">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>Turnover</span>
+            </button>
+
+            <button type="button" class="btn-header-quick" onclick="document.getElementById('crosellingFileInput').click()" title="Unggah / Update file Excel CROSSELLING-12102026.xlsx">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+              <span>Crosselling</span>
+            </button>
+
+            <button type="button" class="btn-header-quick btn-header-sync" id="headerBtnSyncSheets" onclick="syncLiveKeepData()" title="Sinkronkan data live terbaru dari Google Sheets">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>Sync Sheets</span>
+            </button>
+          </div>
+
+          <div class="header-action-separator"></div>
+
           <a href="https://wa.me/6289603864476?text=Halo%20Yahya,%20ada%20bug/ada%20trouble%20di%20Gadgetmart's%20Workspace.%20Tolong%20perbaiki%20segera." target="_blank" class="btn-pill-outline" title="Hubungi Yahya via WhatsApp">
             Hubungi Yahya
           </a>
@@ -1042,145 +1075,154 @@
 
       <!-- ================= TAB 6: KLAIM AR & PENGAWASAN DENDA CABANG ================= -->
       <section id="tabContent6" class="tab-content">
-        <div class="card-tegas table-card card-accent-left mb-24">
-          <div class="admin-card-header">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                  <h3 style="font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; margin: 0;">🏷️ KLAIM AR & PENGAWASAN DENDA CABANG</h3>
-                  <span class="kpi-pill-badge badge-crimson" id="claimCycleBadge">Siklus 3 Hari</span>
-                </div>
-                <p style="margin: 0; font-size: 0.82rem; color: var(--text-muted);">
-                  Pengawasan faktur AR belum sosmed: kumpulkan 3 hari sekali, distribusikan hari ke-4, pantau masa tenggang H+1, dan eskalasi denda sungguhan jika tidak direvisi cabang.
-                </p>
-              </div>
-
-              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <button class="btn btn-crimson btn-sm" id="btnShareBatchDay4" onclick="shareARClaimsBatchDay4()" title="Unduh paket file Excel per cabang (.zip) dan pindahkan semua item ke antrean 'Cek AR Setelah di Share'">
-                  📦 Unduh Paket Cabang & Share (Hari ke-4)
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="checkARClaimsAutoResolution(true)" title="Cek apakah ada AR yang sudah direvisi cabang di transaksi SAP atau sudah lewat batas H+1">
-                  🔄 Cek Status Revisi & H+1
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="exportClaimsPenaltyReport()" title="Salin atau unduh rekap denda kasir per cabang untuk diserahkan ke Manajemen/HRD">
-                  📋 Rekap Denda Cabang
-                </button>
+        <div class="modern-module-container mb-24">
+          <!-- 1. Hero Yellow Banner (Persis Format Keep) -->
+          <div class="customer-hero-banner">
+            <div class="customer-hero-content">
+              <h2 class="customer-hero-title">Klaim AR &amp; Pengawasan Denda</h2>
+              <p class="customer-hero-sub" id="claimsHeroSub">Pengawasan faktur AR belum sosmed, siklus batch 3 hari, masa tenggang H+1, dan eskalasi denda cabang</p>
+            </div>
+            <div class="customer-hero-right">
+              <button type="button" class="btn-sync-live-subtle" id="btnShareBatchDay4" onclick="shareARClaimsBatchDay4()" title="Unduh paket file Excel per cabang (.zip) dan pindahkan semua item ke antrean 'Cek AR Setelah di Share'">
+                Unduh Paket Cabang &amp; Share
+              </button>
+              <button type="button" class="btn-sync-live-subtle" onclick="checkARClaimsAutoResolution(true)" title="Cek apakah ada AR yang sudah direvisi cabang di transaksi SAP atau sudah lewat batas H+1">
+                Cek Status Revisi &amp; H+1
+              </button>
+              <button type="button" class="btn-sync-live-subtle" onclick="exportClaimsPenaltyReport()" title="Salin atau unduh rekap denda kasir per cabang untuk diserahkan ke Manajemen/HRD">
+                Rekap Denda Cabang
+              </button>
+              <div class="customer-hero-badge" id="claimCycleBadge">
+                <span class="live-dot-pulse"></span>
+                <span>Siklus 3 Hari</span>
               </div>
             </div>
           </div>
 
-          <!-- Summary Mini Cards -->
-          <div class="keep-stats-summary" style="padding: 14px 18px 0;">
-            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('COLLECTING')" id="cardStatCollecting">
-              <div class="label">1. Pengumpulan (3 Hari)</div>
-              <div class="val text-ink" id="claimCountCollecting">0</div>
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">Menunggu Hari ke-4</div>
+          <!-- 2. KPI Summary Strip (Modern Tone Step) -->
+          <div class="modern-kpi-summary-strip">
+            <div class="modern-kpi-strip-card card-accent-yellow" style="cursor: pointer;" onclick="setClaimsSubTab('COLLECTING')" id="cardStatCollecting" title="Klik untuk filter Batch Pengumpulan">
+              <div class="kpi-strip-label">1. Pengumpulan (3 Hari)</div>
+              <div class="kpi-strip-val" id="claimCountCollecting">0</div>
+              <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px; font-weight: 600;">Menunggu Hari ke-4</div>
             </div>
-            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('SHARED')" id="cardStatShared">
-              <div class="label">2. Setelah di Share (H+1)</div>
-              <div class="val text-gold" id="claimCountShared">0</div>
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">Masa Tenggang Cabang</div>
+            <div class="modern-kpi-strip-card card-accent-orange" style="cursor: pointer;" onclick="setClaimsSubTab('SHARED')" id="cardStatShared" title="Klik untuk filter Masa Tenggang">
+              <div class="kpi-strip-label">2. Setelah di Share (H+1)</div>
+              <div class="kpi-strip-val" style="color: #b45309;" id="claimCountShared">0</div>
+              <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px; font-weight: 600;">Masa Tenggang Cabang</div>
             </div>
-            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('PENALTY')" id="cardStatPenalty">
-              <div class="label">3. Denda Sungguhan</div>
-              <div class="val text-crimson" id="claimCountPenalty">0</div>
-              <div style="font-size: 0.7rem; color: #be123c; margin-top: 3px;" id="claimTotalPenaltyRp">Rp 0 (Lewat H+1)</div>
+            <div class="modern-kpi-strip-card card-accent-crimson" style="cursor: pointer;" onclick="setClaimsSubTab('PENALTY')" id="cardStatPenalty" title="Klik untuk filter Denda Real">
+              <div class="kpi-strip-label">3. Denda Sungguhan</div>
+              <div class="kpi-strip-val" style="color: #e11d48;" id="claimCountPenalty">0</div>
+              <div style="font-size: 0.72rem; color: #be123c; margin-top: 4px; font-weight: 700;" id="claimTotalPenaltyRp">Rp 0 (Lewat H+1)</div>
             </div>
-            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('RESOLVED')" id="cardStatResolved">
-              <div class="label">4. Selesai Direvisi</div>
-              <div class="val text-accent" id="claimCountResolved">0</div>
-              <div style="font-size: 0.7rem; color: #15803d; margin-top: 3px;">Sudah Jadi BJM.SOS</div>
+            <div class="modern-kpi-strip-card card-accent-green" style="cursor: pointer;" onclick="setClaimsSubTab('RESOLVED')" id="cardStatResolved" title="Klik untuk filter Selesai Direvisi">
+              <div class="kpi-strip-label">4. Selesai Direvisi</div>
+              <div class="kpi-strip-val" style="color: #15803d;" id="claimCountResolved">0</div>
+              <div style="font-size: 0.72rem; color: #166534; margin-top: 4px; font-weight: 600;">Sudah Jadi BJM.SOS</div>
             </div>
-            <div class="keep-stat-card" style="cursor: pointer;" onclick="setClaimsSubTab('INVALID')" id="cardStatInvalid">
-              <div class="label">5. Tidak Valid</div>
-              <div class="val text-muted" id="claimCountInvalid" style="color: #64748b;">0</div>
-              <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">Item Dianulir / Dibatalkan</div>
-            </div>
-          </div>
-
-          <!-- Sub-Tab Navigation Bar -->
-          <div style="padding: 16px 18px 0; display: flex; gap: 8px; border-bottom: 1.5px solid #e2e8f0; overflow-x: auto;">
-            <button class="btn-subtab active" id="subtabBtnCollecting" onclick="setClaimsSubTab('COLLECTING')">
-              📥 1. Pengumpulan AR (Batch 3 Hari) <span class="subtab-badge" id="badgeSubtabCollecting">0</span>
-            </button>
-            <button class="btn-subtab" id="subtabBtnShared" onclick="setClaimsSubTab('SHARED')">
-              📤 2. Cek AR Setelah di Share (Tenggat H+1) <span class="subtab-badge" id="badgeSubtabShared">0</span>
-            </button>
-            <button class="btn-subtab" id="subtabBtnPenalty" onclick="setClaimsSubTab('PENALTY')">
-              🚨 3. Denda Sungguhan & Input Mandiri <span class="subtab-badge badge-red" id="badgeSubtabPenalty">0</span>
-            </button>
-            <button class="btn-subtab" id="subtabBtnResolved" onclick="setClaimsSubTab('RESOLVED')">
-              ✅ 4. Selesai Direvisi Cabang <span class="subtab-badge badge-green" id="badgeSubtabResolved">0</span>
-            </button>
-            <button class="btn-subtab" id="subtabBtnInvalid" onclick="setClaimsSubTab('INVALID')">
-              🚫 5. Tidak Valid <span class="subtab-badge badge-gray" id="badgeSubtabInvalid">0</span>
-            </button>
-          </div>
-
-          <!-- Filter Controls -->
-          <div class="keep-filters-grid" style="padding: 14px 18px 0;">
-            <div class="filter-group">
-              <label for="claimsFilterCabang">Filter Cabang Toko:</label>
-              <select id="claimsFilterCabang" class="form-input" onchange="applyClaimsFilters()">
-                <option value="ALL">Semua Cabang Toko</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="claimsFilterSosmed">Filter Target Sosmed:</label>
-              <select id="claimsFilterSosmed" class="form-input" onchange="applyClaimsFilters()">
-                <option value="ALL">Semua Kode Sosmed</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <label for="claimsFilterTanggal">Filter Tanggal Masuk / Share:</label>
-              <input type="date" id="claimsFilterTanggal" class="form-input" onchange="applyClaimsFilters()">
-            </div>
-
-            <div class="filter-group" style="flex: 1.5; min-width: 200px;">
-              <label for="claimsSearchInput">Cari Kata Kunci:</label>
-              <input type="text" id="claimsSearchInput" class="form-input" placeholder="Cari No. AR, Nama Kasir, Cabang, Barang, Customer..." oninput="applyClaimsFilters()">
-            </div>
-
-            <div class="filter-group" style="min-width: 100px;">
-              <button class="btn btn-outline" onclick="resetClaimsFilters()" style="height: 42px; width: 100%;">Reset</button>
+            <div class="modern-kpi-strip-card" style="cursor: pointer;" onclick="setClaimsSubTab('INVALID')" id="cardStatInvalid" title="Klik untuk filter Tidak Valid">
+              <div class="kpi-strip-label">5. Tidak Valid</div>
+              <div class="kpi-strip-val" style="color: #64748b;" id="claimCountInvalid">0</div>
+              <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px; font-weight: 600;">Item Dianulir / Dibatalkan</div>
             </div>
           </div>
 
-          <!-- Table Container -->
-          <div class="table-responsive" style="margin-top: 14px;">
-            <table class="kpi-matrix-table" id="claimsTable">
+          <!-- 3. Sub-Tab Navigation Bar (Anti-Slop Clean Typography) -->
+          <div class="claims-subtabs-nav">
+            <button type="button" class="btn-subtab active" id="subtabBtnCollecting" onclick="setClaimsSubTab('COLLECTING')">
+              1. Pengumpulan AR (Batch 3 Hari) <span class="subtab-badge" id="badgeSubtabCollecting">0</span>
+            </button>
+            <button type="button" class="btn-subtab" id="subtabBtnShared" onclick="setClaimsSubTab('SHARED')">
+              2. Cek AR Setelah di Share (Tenggat H+1) <span class="subtab-badge" id="badgeSubtabShared">0</span>
+            </button>
+            <button type="button" class="btn-subtab" id="subtabBtnPenalty" onclick="setClaimsSubTab('PENALTY')">
+              3. Denda Sungguhan &amp; Input Mandiri <span class="subtab-badge badge-red" id="badgeSubtabPenalty">0</span>
+            </button>
+            <button type="button" class="btn-subtab" id="subtabBtnResolved" onclick="setClaimsSubTab('RESOLVED')">
+              4. Selesai Direvisi Cabang <span class="subtab-badge badge-green" id="badgeSubtabResolved">0</span>
+            </button>
+            <button type="button" class="btn-subtab" id="subtabBtnInvalid" onclick="setClaimsSubTab('INVALID')">
+              5. Tidak Valid <span class="subtab-badge badge-gray" id="badgeSubtabInvalid">0</span>
+            </button>
+          </div>
+
+          <!-- 4. Modern Search & Filter Panel (Persis Format Keep) -->
+          <div class="modern-filter-panel">
+            <div class="modern-search-row">
+              <div class="modern-search-box">
+                <span class="search-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+                <input type="text" id="claimsSearchInput" class="modern-search-input" placeholder="Cari No. AR, Customer, No. WA, Cabang, Barang, Sales..." oninput="applyClaimsFilters()">
+                <span class="kbd-shortcut">&#8984;K</span>
+              </div>
+              <button type="button" class="btn-modern-filter" id="btnToggleClaimsFilters" onclick="toggleClaimsFiltersSection()">
+                <span class="filter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                </span>
+                Filter <span class="filter-badge-count" id="claimsFilterActiveCount">0</span>
+              </button>
+            </div>
+
+            <div class="modern-filter-cards-grid" id="claimsFilterSection">
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="claimsFilterCabang">CABANG TOKO</label>
+                <select id="claimsFilterCabang" class="modern-filter-select" onchange="applyClaimsFilters()">
+                  <option value="ALL">Semua Cabang Toko</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="claimsFilterSosmed">TARGET SOSMED</label>
+                <select id="claimsFilterSosmed" class="modern-filter-select" onchange="applyClaimsFilters()">
+                  <option value="ALL">Semua Kode Sosmed</option>
+                </select>
+              </div>
+
+              <div class="modern-filter-card">
+                <label class="modern-filter-label" for="claimsFilterTanggal">TANGGAL MASUK / SHARE</label>
+                <input type="date" id="claimsFilterTanggal" class="modern-filter-input" onchange="applyClaimsFilters()" title="Filter tanggal">
+              </div>
+
+              <div class="modern-filter-card-action">
+                <button type="button" class="btn-modern-reset" onclick="resetClaimsFilters()" title="Reset semua filter">
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Table Container: Yellow Header Solid & Firm Lines (Persis Format Keep) -->
+          <div class="modern-table-wrapper">
+            <table class="modern-tegas-table" id="claimsTable">
               <thead>
                 <tr>
-                  <th style="width: 2.5%; text-align: center;">NO</th>
-                  <th style="width: 6%; text-align: center;">TANGGAL</th>
-                  <th style="width: 5.5%; text-align: center;">PERIODE</th>
-                  <th style="width: 7%; text-align: center;">NO AR</th>
-                  <th style="width: 8%; text-align: center;">NO.HP USER</th>
-                  <th style="width: 7%; text-align: center;">KODE SOSMED</th>
-                  <th style="width: 6.5%; text-align: center;">PIC SOSMED</th>
-                  <th style="width: 5%; text-align: center;">CABANG</th>
-                  <th style="width: 6.5%; text-align: center;">POTENSI DENDA</th>
-                  <th style="width: 10%; text-align: left;">BARANG</th>
-                  <th style="width: 11%; text-align: left;">KEEP</th>
-                  <th style="width: 8%; text-align: center;">EVIDENCE FORMAT KEEP</th>
-                  <th style="width: 7.5%; text-align: left;">AR SALES EMPLOYEE</th>
-                  <th style="width: 6.5%; text-align: center;">STATUS VALIDASI</th>
-                  <th style="width: 8%; text-align: left;">ALASAN TIDAK VALID</th>
-                  <th style="width: 4%; text-align: center;">AKSI</th>
+                  <th style="width: 15%; text-align: left;">CUSTOMER</th>
+                  <th style="width: 7.5%; text-align: center;">TANGGAL</th>
+                  <th style="width: 8%; text-align: center;">NO. AR</th>
+                  <th style="width: 13%; text-align: left;">BARANG</th>
+                  <th style="width: 8%; text-align: center;">KODE SOSMED</th>
+                  <th style="width: 6.5%; text-align: center;">CABANG</th>
+                  <th style="width: 8.5%; text-align: center;">DENDA</th>
+                  <th style="width: 10%; text-align: left;">FORMAT KEEP</th>
+                  <th style="width: 7%; text-align: center;">EVIDENCE</th>
+                  <th style="width: 6.5%; text-align: left;">AR SALES</th>
+                  <th style="width: 6.5%; text-align: center;">VALIDASI</th>
+                  <th style="width: 7.5%; text-align: left;">ALASAN</th>
+                  <th style="width: 5%; text-align: center;">AKSI</th>
                 </tr>
               </thead>
               <tbody id="claimsTableBody"></tbody>
             </table>
           </div>
 
-          <!-- Pagination Bar -->
-          <div class="pagination-bar">
-            <div id="claimsPaginationInfo">Menampilkan 0 dari 0 Data Klaim</div>
-            <div class="pagination-controls">
+          <!-- 6. Modern Pagination Bar (Persis Format Keep) -->
+          <div class="modern-pagination-bar">
+            <div id="claimsPaginationInfo" class="modern-pagination-info">Menampilkan 0 dari 0 Data Klaim</div>
+            <div class="modern-pagination-controls">
               <button class="btn-page" id="btnClaimsPrev" onclick="changeClaimsPage(-1)">&laquo; Sebelumnya</button>
-              <span id="claimsCurrentPageText" style="margin: 0 8px;">Halaman 1 / 1</span>
+              <span id="claimsCurrentPageText" class="pagination-page-label">Halaman 1 / 1</span>
               <button class="btn-page" id="btnClaimsNext" onclick="changeClaimsPage(1)">Selanjutnya &raquo;</button>
             </div>
           </div>
@@ -1552,7 +1594,7 @@
                 📋 Salin Item Tercentang (Format Excel)
               </button>
               <button class="btn btn-outline" onclick="claimModalSelectedItems(this)" style="font-weight: 700; border: 1.5px solid #c8102e; color: #c8102e;" title="Masukkan item tercentang ke Modul Klaim AR (Pengumpulan 3 Hari)">
-                🏷️ Masukkan ke Klaim Cabang
+                Masukkan ke Klaim Cabang
               </button>
             </div>
             <button class="btn btn-crimson" onclick="switchModalSubTab(2)">
@@ -1707,7 +1749,7 @@
     <div class="modal-dialog card-tegas" style="max-width: 820px; width: 92%; padding: 20px; text-align: center; background: #ffffff; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 10px;">
         <div style="text-align: left;">
-          <h4 id="evidenceModalTitle" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a;">📷 Bukti Format Keep</h4>
+          <h4 id="evidenceModalTitle" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a;">Bukti Format Keep</h4>
           <span id="evidenceModalSub" style="font-size: 0.76rem; color: var(--text-muted);">-</span>
         </div>
         <button class="btn-close" onclick="closeEvidenceImageModal()" style="font-size: 1.1rem; cursor: pointer;">✕</button>
@@ -1717,7 +1759,7 @@
       </div>
       <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <button class="btn btn-outline btn-sm" id="btnReplaceEvidenceModal" onclick="triggerEvidenceUploadFromModal()" style="color: #64748b; font-size: 0.78rem;">
-          🔄 Ganti Foto Bukti
+          Ganti Foto Bukti
         </button>
         <div style="display: flex; gap: 8px;">
           <a id="btnDownloadEvidence" href="#" download="evidence_keep.jpg" class="btn btn-outline btn-sm" style="font-size: 0.78rem;">
