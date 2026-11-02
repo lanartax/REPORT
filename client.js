@@ -6900,11 +6900,61 @@ function handleClaimInvalidReasonChange(claimId, newReason) {
 // ==========================================
 // EXCEL EXPORT ENGINE (EXCELJS + FALLBACK)
 // ==========================================
+function parseSortDate(d) {
+  if (!d) return 0;
+  if (typeof d === 'number') return d;
+  if (d instanceof Date) return d.getTime();
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return new Date(s).getTime() || 0;
+  }
+  const parts = s.split(/[\/\-]/);
+  if (parts.length >= 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    let year = parseInt(parts[2].split(' ')[0], 10);
+    if (year < 100) year += 2000;
+    return new Date(year, month, day).getTime() || 0;
+  }
+  return 0;
+}
+
+function sortARClaimsRows(rows, groupByBranch = true) {
+  return [...rows].sort((a, b) => {
+    if (groupByBranch) {
+      const cabA = String(a.cabang || '').toUpperCase();
+      const cabB = String(b.cabang || '').toUpperCase();
+      if (cabA !== cabB) return cabA.localeCompare(cabB);
+    }
+    const dateA = parseSortDate(a.postingDate);
+    const dateB = parseSortDate(b.postingDate);
+    if (dateA !== dateB) return dateA - dateB;
+
+    const docA = String(a.docNumber || '');
+    const docB = String(b.docNumber || '');
+    return docA.localeCompare(docB, undefined, { numeric: true });
+  });
+}
+
 async function buildClaimsWorksheet(wb, sheetName, rows) {
   const safeName = String(sheetName || 'Klaim').replace(/[:\\/?*\[\]]/g, '_').slice(0, 31);
   const ws = wb.addWorksheet(safeName);
 
-  ws.columns = [
+  // 1. Urutkan data secara rapi dan kronologis
+  const isAllSheet = (sheetName === 'SEMUA CABANG');
+  const sortedRows = sortARClaimsRows(rows, isAllSheet);
+
+  // 2. Hitung jumlah maksimum foto bukti pada baris-baris ini
+  let maxEv = 1;
+  sortedRows.forEach(r => {
+    const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+      ? r.evidenceImages
+      : (r.evidenceImage ? [r.evidenceImage] : []);
+    if (imgs.length > maxEv) maxEv = imgs.length;
+  });
+
+  // 3. Bangun kolom tabel secara berurutan
+  const cols = [
     { header: 'NO', key: 'no', width: 6 },
     { header: 'TANGGAL', key: 'tanggal', width: 14 },
     { header: 'PERIODE', key: 'periode', width: 14 },
@@ -6914,16 +6964,32 @@ async function buildClaimsWorksheet(wb, sheetName, rows) {
     { header: 'PIC SOSMED', key: 'picSosmed', width: 16 },
     { header: 'CABANG', key: 'cabang', width: 14 },
     { header: 'POTENSI DENDA', key: 'potensiDenda', width: 16 },
-    { header: 'BARANG', key: 'barang', width: 32 },
-    { header: 'KEEP', key: 'keep', width: 35 },
-    { header: 'EVIDENCE FORMAT KEEP', key: 'evidence', width: 28 },
+    { header: 'BARANG', key: 'barang', width: 34 },
+    { header: 'KEEP', key: 'keep', width: 36 }
+  ];
+
+  // Kolom Evidence terpisah per foto bukti dengan lebar besar (width: 48 ≈ 370px) agar muat foto besar tanpa bertumpuk
+  for (let e = 0; e < maxEv; e++) {
+    const headerTitle = maxEv === 1 
+      ? 'EVIDENCE FORMAT KEEP' 
+      : `EVIDENCE ${e + 1} (FORMAT KEEP)`;
+    cols.push({
+      header: headerTitle,
+      key: `evidence_${e}`,
+      width: 48
+    });
+  }
+
+  cols.push(
     { header: 'AR SALES EMPLOYEE', key: 'salesEmployee', width: 22 },
     { header: 'STATUS VALIDASI', key: 'statusValidasi', width: 16 },
     { header: 'ALASAN TIDAK VALID', key: 'alasanTidakValid', width: 24 }
-  ];
+  );
+
+  ws.columns = cols;
 
   const headerRow = ws.getRow(1);
-  headerRow.height = 28;
+  headerRow.height = 30;
   headerRow.eachCell((cell) => {
     cell.fill = {
       type: 'pattern',
@@ -6937,16 +7003,24 @@ async function buildClaimsWorksheet(wb, sheetName, rows) {
       color: { argb: 'FFFFFFFF' }
     };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF7F1D1D' } },
+      left: { style: 'thin', color: { argb: 'FF7F1D1D' } },
+      bottom: { style: 'medium', color: { argb: 'FF450A0A' } },
+      right: { style: 'thin', color: { argb: 'FF7F1D1D' } }
+    };
   });
 
-  for (let idx = 0; idx < rows.length; idx++) {
-    const r = rows[idx];
+  const evidenceStartCol = 11; // 0-indexed column 11 = Column L
+
+  for (let idx = 0; idx < sortedRows.length; idx++) {
+    const r = sortedRows[idx];
     const rowNumber = idx + 2;
     const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
       ? r.evidenceImages
       : (r.evidenceImage ? [r.evidenceImage] : []);
 
-    const row = ws.addRow({
+    const rowObj = {
       no: idx + 1,
       tanggal: formatCrosellingDate(r.postingDate),
       periode: r.periode || 'Oktober-26',
@@ -6958,11 +7032,20 @@ async function buildClaimsWorksheet(wb, sheetName, rows) {
       potensiDenda: r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
       barang: r.productName,
       keep: r.keepText || '-',
-      evidence: imgs.length > 0 ? (imgs.length > 1 ? `(${imgs.length} Bukti Foto Terlampir)` : '(Bukti Foto Terlampir)') : '-',
       salesEmployee: r.currentSalesCode || '-',
       statusValidasi: r.validationStatus || 'VALID',
       alasanTidakValid: r.invalidReason || '-'
-    });
+    };
+
+    for (let e = 0; e < maxEv; e++) {
+      rowObj[`evidence_${e}`] = imgs[e] ? '' : '-';
+    }
+
+    const row = ws.addRow(rowObj);
+
+    // Jika ada bukti foto: buat baris tinggi besar (200pt ≈ 267px) agar tulisan WhatsApp terbaca jelas!
+    const hasImgs = imgs.length > 0;
+    row.height = hasImgs ? 200 : 36;
 
     row.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     row.getCell('no').alignment = { vertical: 'middle', horizontal: 'center' };
@@ -6976,28 +7059,42 @@ async function buildClaimsWorksheet(wb, sheetName, rows) {
     row.getCell('potensiDenda').alignment = { vertical: 'middle', horizontal: 'center' };
     row.getCell('statusValidasi').alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Embed all evidence images
-    if (imgs.length > 0) {
-      try {
-        row.height = 72;
-        imgs.forEach((imgStr, imgIdx) => {
-          if (typeof imgStr !== 'string') return;
+    for (let e = 0; e < maxEv; e++) {
+      row.getCell(`evidence_${e}`).alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+
+    // Border grid rapi pada setiap cell
+    row.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+    });
+
+    // Embed setiap foto bukti secara berurutan pada kolomnya masing-masing dengan ukuran BESAR (330px x 240px)
+    if (hasImgs) {
+      imgs.forEach((imgStr, imgIdx) => {
+        if (!imgStr || typeof imgStr !== 'string') return;
+        try {
           const isPng = imgStr.includes('image/png');
           const base64Data = imgStr.includes(',') ? imgStr.split(',')[1] : imgStr;
           const imgId = wb.addImage({
             base64: base64Data,
             extension: isPng ? 'png' : 'jpeg'
           });
+          // Letakkan tepat di dalam kolom bukti masing-masing (Col 11 + imgIdx) tanpa overlap
           ws.addImage(imgId, {
-            tl: { col: 11 + (imgIdx * 0.35), row: rowNumber - 1 + 0.05 },
-            ext: { width: 110, height: 65 },
+            tl: { col: evidenceStartCol + imgIdx + 0.04, row: rowNumber - 1 + 0.05 },
+            ext: { width: 330, height: 240 },
             editAs: 'oneCell'
           });
-        });
-      } catch (imgErr) {
-        console.warn('Gagal embed image ExcelJS:', imgErr);
-        row.getCell('evidence').value = `(${imgs.length} Bukti Foto Terlampir)`;
-      }
+        } catch (imgErr) {
+          console.warn('Gagal embed image ExcelJS:', imgErr);
+          row.getCell(`evidence_${imgIdx}`).value = `(Bukti Foto ${imgIdx + 1})`;
+        }
+      });
     }
   }
 }
@@ -7020,7 +7117,7 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
     const userChoice = confirm(
       `📊 UNDUH SEMUANYA JADI 1 FILE EXCEL (.xlsx)\n\n` +
       `Ditemukan ${collectingItems.length} item AR dalam antrean "1. Pengumpulan (Batch 3 Hari)".\n\n` +
-      `• Klik [OK] untuk mengunduh 1 file Excel Gabungan dan SEKALIGUS memindahkan status ke "Cek AR Setelah di Share (Tenggat H+1)".\n` +
+      `• Klik [OK] untuk mengunduh 1 file Excel Gabungan (diurutkan rapi & gambar besar) dan SEKALIGUS memindahkan status ke "Cek AR Setelah di Share (Tenggat H+1)".\n` +
       `• Klik [Batal] jika hanya ingin mengunduh data tampilan saat ini tanpa memindahkan status klaim.`
     );
     if (userChoice) {
@@ -7040,17 +7137,17 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
 
   const nowStr = new Date().toISOString().split('T')[0];
 
-  // Gunakan ExcelJS untuk menghasilkan 1 file Excel lengkap dengan sheet gabungan & sheet per cabang serta gambar ter-embed
+  // Gunakan ExcelJS untuk menghasilkan 1 file Excel lengkap dengan sheet gabungan & sheet per cabang serta gambar ter-embed besar
   if (typeof ExcelJS !== 'undefined') {
     try {
       const wb = new ExcelJS.Workbook();
       wb.creator = 'GadgetMart Sosmed System';
       wb.title = 'Klaim AR Semua Cabang';
 
-      // 1. Sheet Master Gabungan Seluruh Cabang
+      // 1. Sheet Master Gabungan Seluruh Cabang (Urut Cabang A-Z -> Tanggal -> No AR)
       await buildClaimsWorksheet(wb, 'SEMUA CABANG', itemsToExport);
 
-      // 2. Sheet per Cabang terpisah di file Excel yang sama
+      // 2. Sheet per Cabang terpisah di file Excel yang sama (Urut Alfabetis Tab Cabang)
       const byBranch = {};
       itemsToExport.forEach(c => {
         const cab = c.cabang || 'LAINNYA';
@@ -7058,7 +7155,8 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
         byBranch[cab].push(c);
       });
 
-      for (const cab of Object.keys(byBranch)) {
+      const sortedCabangList = Object.keys(byBranch).sort();
+      for (const cab of sortedCabangList) {
         await buildClaimsWorksheet(wb, cab, byBranch[cab]);
       }
 
@@ -7094,14 +7192,29 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
   // Fallback SheetJS jika ExcelJS bermasalah
   const wb = XLSX.utils.book_new();
   const buildSheetJSData = (rows) => {
-    const data = [
-      ['NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP', 'EVIDENCE FORMAT KEEP', 'AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID']
-    ];
-    rows.forEach((r, idx) => {
+    const sorted = sortARClaimsRows(rows, true);
+    let maxEv = 1;
+    sorted.forEach(r => {
       const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
         ? r.evidenceImages
         : (r.evidenceImage ? [r.evidenceImage] : []);
-      data.push([
+      if (imgs.length > maxEv) maxEv = imgs.length;
+    });
+
+    const headers = [
+      'NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP'
+    ];
+    for (let e = 0; e < maxEv; e++) {
+      headers.push(maxEv === 1 ? 'EVIDENCE FORMAT KEEP' : `EVIDENCE ${e + 1}`);
+    }
+    headers.push('AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID');
+
+    const data = [headers];
+    sorted.forEach((r, idx) => {
+      const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+        ? r.evidenceImages
+        : (r.evidenceImage ? [r.evidenceImage] : []);
+      const rArr = [
         idx + 1,
         formatCrosellingDate(r.postingDate),
         r.periode || 'Oktober-26',
@@ -7112,12 +7225,17 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
         r.cabang,
         r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
         r.productName,
-        r.keepText || '-',
-        imgs.length > 0 ? `(${imgs.length} Bukti Foto Terlampir)` : '-',
+        r.keepText || '-'
+      ];
+      for (let e = 0; e < maxEv; e++) {
+        rArr.push(imgs[e] ? `(Bukti Foto ${e + 1})` : '-');
+      }
+      rArr.push(
         r.currentSalesCode || '-',
         r.validationStatus || 'VALID',
         r.invalidReason || '-'
-      ]);
+      );
+      data.push(rArr);
     });
     return XLSX.utils.aoa_to_sheet(data);
   };
@@ -7130,7 +7248,8 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
     if (!byBranch[cab]) byBranch[cab] = [];
     byBranch[cab].push(c);
   });
-  for (const cab of Object.keys(byBranch)) {
+  const sortedCabangList = Object.keys(byBranch).sort();
+  for (const cab of sortedCabangList) {
     XLSX.utils.book_append_sheet(wb, buildSheetJSData(byBranch[cab]), cab.slice(0, 31));
   }
 
@@ -7165,7 +7284,7 @@ async function shareARClaimsBatchDay4() {
   const choiceMsg = `📦 DISTRIBUSI KLAIM AR HARI KE-4:\n\n` +
                     `Total: ${collectingItems.length} item AR dari ${branchCount} cabang toko siap didistribusikan.\n\n` +
                     `Pilih format unduhan:\n` +
-                    `• Klik [OK] untuk mengunduh SEMUANYA JADI 1 FILE EXCEL GABUNGAN (.xlsx).\n` +
+                    `• Klik [OK] untuk mengunduh SEMUANYA JADI 1 FILE EXCEL GABUNGAN (.xlsx) (diurutkan rapi & gambar besar).\n` +
                     `• Klik [Batal] untuk mengunduh PAKET ZIP FILE TERPISAH PER CABANG (.zip).`;
 
   const wantSingleExcel = confirm(choiceMsg);
@@ -7186,7 +7305,8 @@ async function shareARClaimsBatchDay4() {
   const nowStr = new Date().toISOString().split('T')[0];
   const zip = (typeof JSZip !== 'undefined') ? new JSZip() : null;
 
-  for (const cab of Object.keys(byBranch)) {
+  const sortedCabangList = Object.keys(byBranch).sort();
+  for (const cab of sortedCabangList) {
     const rows = byBranch[cab];
 
     if (typeof ExcelJS !== 'undefined') {
@@ -7205,14 +7325,29 @@ async function shareARClaimsBatchDay4() {
     }
 
     // Fallback SheetJS
-    const excelData = [
-      ['NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP', 'EVIDENCE FORMAT KEEP', 'AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID']
-    ];
-    rows.forEach((r, idx) => {
+    const sortedCabRows = sortARClaimsRows(rows, false);
+    let maxEv = 1;
+    sortedCabRows.forEach(r => {
       const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
         ? r.evidenceImages
         : (r.evidenceImage ? [r.evidenceImage] : []);
-      excelData.push([
+      if (imgs.length > maxEv) maxEv = imgs.length;
+    });
+
+    const headers = [
+      'NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP'
+    ];
+    for (let e = 0; e < maxEv; e++) {
+      headers.push(maxEv === 1 ? 'EVIDENCE FORMAT KEEP' : `EVIDENCE ${e + 1}`);
+    }
+    headers.push('AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID');
+
+    const excelData = [headers];
+    sortedCabRows.forEach((r, idx) => {
+      const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+        ? r.evidenceImages
+        : (r.evidenceImage ? [r.evidenceImage] : []);
+      const rArr = [
         idx + 1,
         formatCrosellingDate(r.postingDate),
         r.periode || 'Oktober-26',
@@ -7223,12 +7358,17 @@ async function shareARClaimsBatchDay4() {
         r.cabang,
         r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
         r.productName,
-        r.keepText || '-',
-        imgs.length > 0 ? `(${imgs.length} Bukti Foto Terlampir)` : '-',
+        r.keepText || '-'
+      ];
+      for (let e = 0; e < maxEv; e++) {
+        rArr.push(imgs[e] ? `(Bukti Foto ${e + 1})` : '-');
+      }
+      rArr.push(
         r.currentSalesCode || '-',
         r.validationStatus || 'VALID',
         r.invalidReason || '-'
-      ]);
+      );
+      excelData.push(rArr);
     });
     const ws = XLSX.utils.aoa_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
