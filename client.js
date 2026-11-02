@@ -6399,6 +6399,7 @@ function applyDashboardFilters() {
 // (Yipyep Floating AI Chat Widget telah dihapus sesuai permintaan)
 
 // Live Real-Time Date and Clock Engine for Report Header
+function initLiveClock() {
   function update() {
     const now = new Date();
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
