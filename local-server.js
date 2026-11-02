@@ -267,7 +267,7 @@ const server = http.createServer(async (req, res) => {
       broadcastLiveEvent('KEEP_CSV_SYNCED', { timestamp: Date.now() });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, message: 'Data keep berhasil disinkronisasi langsung dari Google Sheets!', bytes: text.length }));
+      res.end(JSON.stringify({ success: true, message: 'Data keep berhasil disinkronisasi langsung dari Google Sheets!', bytes: text.length, csvText: text }));
       return;
     } catch (err) {
       console.error('❌ Sync failed:', err.message);

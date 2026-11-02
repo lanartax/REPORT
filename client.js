@@ -1232,6 +1232,11 @@ function showProgressNotification({ id = `prog-${Date.now()}`, title = 'Memprose
       }, 2500);
     },
     fail({ title: errTitle = '❌ Gagal', detail: errDetail = 'Terjadi kesalahan saat memproses data' } = {}) {
+      if (pctEl) pctEl.innerText = 'Gagal';
+      if (fillEl) {
+        fillEl.style.width = '100%';
+        fillEl.style.background = '#ef4444';
+      }
       if (titleEl) titleEl.innerHTML = errTitle;
       if (detailEl) detailEl.innerText = errDetail;
       toast.classList.remove('success');
@@ -1254,7 +1259,13 @@ function showProgressNotification({ id = `prog-${Date.now()}`, title = 'Memprose
 }
 window.showProgressNotification = showProgressNotification;
 
-function startSmoothProgress({ id = `smooth-${Date.now()}`, title = 'Menyimpan ke Google Sheets...', detail = 'Menghubungkan ke server...' }) {
+function startSmoothProgress({ 
+  id = `smooth-${Date.now()}`, 
+  title = 'Menyimpan ke Google Sheets...', 
+  detail = 'Menghubungkan ke server...',
+  timeoutMs = 15000,
+  onTimeout
+} = {}) {
   const ctrl = showProgressNotification({ id, title, detail, initialPct: 10 });
   let current = 10;
   let isDone = false;
@@ -1273,23 +1284,44 @@ function startSmoothProgress({ id = `smooth-${Date.now()}`, title = 'Menyimpan k
     ctrl.update({ pct: current });
   }, 130);
 
+  // Safety timer agar notifikasi tidak tertahan selamanya di 92% jika jaringan bermasalah
+  const safetyTimer = setTimeout(() => {
+    if (!isDone) {
+      isDone = true;
+      clearInterval(interval);
+      ctrl.fail({
+        title: '⚠️ Batas Waktu Terlampaui (Timeout)',
+        detail: 'Koneksi jaringan terlalu lama (15 detik). Silakan coba lagi atau pastikan server lokal aktif.'
+      });
+      if (typeof onTimeout === 'function') {
+        try { onTimeout(); } catch (_) {}
+      }
+    }
+  }, timeoutMs);
+
   return {
     id: ctrl.id,
     update: ctrl.update,
     complete(opts) {
+      if (isDone) return;
       isDone = true;
       clearInterval(interval);
+      clearTimeout(safetyTimer);
       ctrl.update({ pct: 100 });
       ctrl.complete(opts);
     },
     fail(opts) {
+      if (isDone) return;
       isDone = true;
       clearInterval(interval);
+      clearTimeout(safetyTimer);
       ctrl.fail(opts);
     },
     dismiss() {
+      if (isDone) return;
       isDone = true;
       clearInterval(interval);
+      clearTimeout(safetyTimer);
       ctrl.dismiss();
     }
   };
@@ -1805,12 +1837,19 @@ async function syncLiveKeepData() {
   try {
     let csvData = null;
     try {
-      const res = await fetch('/api/sync-keep');
+      const res = await fetch('/api/sync-keep', { signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined });
       const text = await res.text();
       if (text.trim().startsWith('{')) {
         const data = JSON.parse(text);
-        if (data.success && data.csvText) {
-          csvData = data.csvText;
+        if (data.success) {
+          if (data.csvText) {
+            csvData = data.csvText;
+          } else {
+            const localRes = await fetch(`keep-data.csv?t=${Date.now()}`, { signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined });
+            if (localRes.ok) {
+              csvData = await localRes.text();
+            }
+          }
         }
       }
     } catch (e) {
@@ -1820,7 +1859,7 @@ async function syncLiveKeepData() {
     // Direct browser fallback to Google Sheets CSV export
     if (!csvData) {
       prog.update({ pct: 45, detail: 'Mengunduh langsung dari server Google Sheets...' });
-      const directRes = await fetch('https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310');
+      const directRes = await fetch('https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310', { signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined });
       if (directRes.ok) {
         csvData = await directRes.text();
       }
@@ -3201,7 +3240,7 @@ async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
   let result = null;
   // 1. Coba lewat backend local-server proxy
   try {
-    const res = await fetch(`/api/update-keep-status?nomorWA=${encodeURIComponent(normWA)}&status=${encodeURIComponent(newStatus)}`);
+    const res = await fetch(`/api/update-keep-status?nomorWA=${encodeURIComponent(normWA)}&status=${encodeURIComponent(newStatus)}`, { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
     if (res.ok) {
       result = await res.json();
     }
@@ -3213,7 +3252,7 @@ async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
   if (!result || !result.success) {
     try {
       const directUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(normWA)}&status=${encodeURIComponent(newStatus)}`;
-      const directRes = await fetch(directUrl, { redirect: 'follow' });
+      const directRes = await fetch(directUrl, { redirect: 'follow', signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
       result = await directRes.json();
     } catch (directErr) {
       console.error('Direct fetch Apps Script error:', directErr);
@@ -3274,7 +3313,7 @@ async function updateReportARInGoogleSheets(rawWA, arDoc) {
   let result = null;
   // 1. Coba lewat backend local-server proxy
   try {
-    const res = await fetch(`/api/update-report-ar?nomorWA=${encodeURIComponent(normWA)}&arDoc=${encodeURIComponent(arDoc)}`);
+    const res = await fetch(`/api/update-report-ar?nomorWA=${encodeURIComponent(normWA)}&arDoc=${encodeURIComponent(arDoc)}`, { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
     if (res.ok) {
       result = await res.json();
     }
@@ -3286,7 +3325,7 @@ async function updateReportARInGoogleSheets(rawWA, arDoc) {
   if (!result || !result.success) {
     try {
       const directUrl = `${APPS_SCRIPT_URL}?action=UPDATE_REPORT_AR&nomorWA=${encodeURIComponent(normWA)}&arDoc=${encodeURIComponent(arDoc)}`;
-      const directRes = await fetch(directUrl, { redirect: 'follow' });
+      const directRes = await fetch(directUrl, { redirect: 'follow', signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
       result = await directRes.json();
     } catch (directErr) {
       console.error('Direct fetch Apps Script error:', directErr);
@@ -6357,363 +6396,9 @@ function applyDashboardFilters() {
   }
 }
 
-// ==========================================================================
-// 17. TANYA YIPYEP FLOATING WIDGET ENGINE (CHAT AI ASISTEN KUCING ROBOT)
-// ==========================================================================
-function toggleYipyepChat() {
-  const win = document.getElementById('yipyepChatWindow');
-  if (!win) return;
-  const isHidden = win.style.display === 'none' || !win.style.display;
-  win.style.display = isHidden ? 'flex' : 'none';
-  if (isHidden) {
-    const input = document.getElementById('yipyepChatInput');
-    if (input) input.focus();
-  }
-}
-
-function quickAskYipyep(question) {
-  const input = document.getElementById('yipyepChatInput');
-  if (input) {
-    input.value = question;
-    sendYipyepChat();
-  }
-}
-
-function formatMarkdownForChat(mdText) {
-  if (!mdText) return '';
-  return mdText
-    .replace(/\r\n/g, '\n')
-    .replace(/^### (.*$)/gim, '<strong style="display:block; margin:6px 0 2px 0;">$1</strong>')
-    .replace(/^## (.*$)/gim, '<strong style="display:block; margin:8px 0 3px 0; font-size:1.05em;">$1</strong>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^\* (.*$)/gim, '• $1')
-    .replace(/^- (.*$)/gim, '• $1')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n/g, '<br>');
-}
-
-function getYipyepAIContext() {
-  try {
-    const monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-
-    // 1. Database Arsip Bulanan Konsolidasi (Januari - Desember 2026)
-    const arsipBulanKeBulan = monthNames.map((mName, i) => {
-      const monthNum = i + 1;
-      const arc = (typeof cachedMonthlyArchives !== 'undefined' && Array.isArray(cachedMonthlyArchives))
-        ? cachedMonthlyArchives.find(a => Number(a.month) === monthNum && (Number(a.year) === activeYear || !a.year))
-        : null;
-
-      if (arc) {
-        return {
-          bulan: `${mName} ${activeYear}`,
-          status: 'Tersimpan di Arsip',
-          targetOmzet: arc.targetOmzet || 8447356034,
-          realisasiOmzet: arc.totalAchieve || (arc.totalAchieveRaw ? formatRupiah(arc.totalAchieveRaw) : '-'),
-          persenOmzet: arc.pctOmzet ? `${arc.pctOmzet}%` : (arc.progress || '-'),
-          targetGP: arc.targetGP || 422367802,
-          realisasiGP: arc.totalGP || (arc.totalGPRaw ? formatRupiah(arc.totalGPRaw) : '-'),
-          persenGP: arc.pctGP ? `${arc.pctGP}%` : '-',
-          crossSellingRatio: arc.crossRatio || '-'
-        };
-      } else if (monthNum === activeMonth) {
-        const totAch = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
-        const totGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
-        const prog = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
-        return {
-          bulan: `${mName} ${activeYear} (Bulan Berjalan / Live)`,
-          status: 'Sedang Berjalan (Live)',
-          targetOmzet: 8447356034,
-          realisasiOmzet: totAch,
-          persenOmzet: prog,
-          targetGP: 422367802,
-          realisasiGP: totGP,
-          timegone: typeof timegonePct !== 'undefined' ? `${timegonePct}%` : '42%'
-        };
-      } else {
-        return {
-          bulan: `${mName} ${activeYear}`,
-          status: 'Mendatang (Belum Ada Transaksi)',
-          targetOmzet: 8447356034,
-          realisasiOmzet: '-'
-        };
-      }
-    });
-
-    // 2. Data Penjualan Cabang (Live dari turnover bulan aktif)
-    const cabangMap = {};
-    if (typeof rawTurnoverRows !== 'undefined' && Array.isArray(rawTurnoverRows) && rawTurnoverRows.length > 0) {
-      rawTurnoverRows.forEach(r => {
-        const cab = String(r['Cabang'] || r['SalesCabang'] || 'LAINNYA').trim().toUpperCase();
-        const dpp = Number(r['DPP']) || 0;
-        const total = Number(r['Total']) || 0;
-        const amt = (typeof currentCalculationMode !== 'undefined' && currentCalculationMode === 'DPP') ? dpp : total;
-        cabangMap[cab] = (cabangMap[cab] || 0) + amt;
-      });
-    }
-    const cabangList = Object.keys(cabangMap)
-      .sort((a,b) => cabangMap[b] - cabangMap[a])
-      .map(c => ({
-        kodeCabang: c,
-        namaCabang: (typeof CABANG_NAMES !== 'undefined' && CABANG_NAMES[c]) ? CABANG_NAMES[c] : c,
-        totalOmzet: formatRupiah(cabangMap[c]),
-        nominalRaw: cabangMap[c]
-      }));
-
-    // 3. Leaderboard Sales Teratas
-    let salesLeaderboard = [];
-    if (typeof lastActivePICs !== 'undefined' && Array.isArray(lastActivePICs) && typeof lastProcessedPicStats !== 'undefined' && lastProcessedPicStats) {
-      salesLeaderboard = lastActivePICs.map((pic, idx) => {
-        const st = lastProcessedPicStats[pic] || {};
-        return {
-          ranking: idx + 1,
-          namaSales: pic,
-          omzet: formatRupiah(st.pencapaian || 0),
-          persenTarget: `${Math.round(st.pctAchieve || 0)}%`,
-          grossProfit: formatRupiah(st.acvGP || 0)
-        };
-      });
-    }
-
-    // 4. Data Keep Customer
-    const keepSummary = {
-      totalKeep: (typeof filteredKeepRows !== 'undefined' && filteredKeepRows) ? filteredKeepRows.length : 0,
-      closingRate: document.getElementById('keepClosingRate') ? document.getElementById('keepClosingRate').innerText : '0%',
-      win: document.getElementById('keepWinCount') ? document.getElementById('keepWinCount').innerText : '0',
-      progress: document.getElementById('keepProgressCount') ? document.getElementById('keepProgressCount').innerText : '0',
-      lose: document.getElementById('keepLoseCount') ? document.getElementById('keepLoseCount').innerText : '0'
-    };
-
-    return {
-      arsipBulananLengkap: arsipBulanKeBulan,
-      penjualanCabangOktober: cabangList,
-      leaderboardSales: salesLeaderboard,
-      ringkasanKeep: keepSummary
-    };
-  } catch (err) {
-    console.warn("getYipyepAIContext error fallback:", err);
-    return {
-      arsipBulananLengkap: [],
-      penjualanCabangOktober: [],
-      leaderboardSales: [],
-      ringkasanKeep: {}
-    };
-  }
-}
-
-async function sendYipyepChat() {
-  const input = document.getElementById('yipyepChatInput');
-  const container = document.getElementById('yipyepMessagesBody');
-  if (!input || !container) return;
-
-  const prompt = input.value.trim();
-  if (!prompt) return;
-
-  const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  const userHtml = `
-    <div class="yipyep-msg-bubble yipyep-user">
-      <div class="yipyep-bubble-text">${prompt}</div>
-      <div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; text-align:right; margin-top:4px;">${timeStr}</div>
-    </div>
-  `;
-  container.insertAdjacentHTML('beforeend', userHtml);
-  input.value = '';
-  container.scrollTop = container.scrollHeight;
-
-  const typingId = `typing_${Date.now()}`;
-  container.insertAdjacentHTML('beforeend', `
-    <div class="yipyep-msg-bubble yipyep-bot" id="${typingId}">
-      <div class="yipyep-bubble-text"><span class="yipyep-typing-dots"><span>.</span><span>.</span><span>.</span> Yipyep sedang menghitung data</span></div>
-    </div>
-  `);
-  container.scrollTop = container.scrollHeight;
-
-  try {
-    // Shortcuts: WA number, AR number, Keep
-    const waMatch = prompt.match(/(?:wa|whatsapp|nomor|no\s*hp|telepon|hp)?\s*(\+?62\d{8,13}|08\d{8,12})/i);
-    const arMatch = prompt.match(/\b(26\d{7})\b/);
-    const isKeep = prompt.toLowerCase().includes('keep');
-
-    if (waMatch) {
-      const phone = waMatch[1];
-      if (typeof quickCheckAR === 'function') quickCheckAR(phone);
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) {
-        typingEl.innerHTML = `<div class="yipyep-bubble-text">📱 <strong>Hasil Cek WA (${phone}):</strong> Aku sudah alihkan ke <strong>Tab 3 (Cek AR & WhatsApp)</strong> untuk melihat data pelanggan dan transaksi!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-        container.scrollTop = container.scrollHeight;
-      }
-      return;
-    }
-
-    if (arMatch) {
-      const docNo = arMatch[1];
-      if (typeof quickCheckAR === 'function') quickCheckAR(docNo);
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) {
-        typingEl.innerHTML = `<div class="yipyep-bubble-text">🔍 <strong>Hasil Cek AR ${docNo}:</strong> Aku sudah buka rincian faktur di <strong>Tab 3</strong> untuk memverifikasi item sosmed!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-        container.scrollTop = container.scrollHeight;
-      }
-      return;
-    }
-
-    if (isKeep) {
-      if (typeof switchTab === 'function') switchTab(4);
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) {
-        typingEl.innerHTML = `<div class="yipyep-bubble-text">📋 <strong>Data Keep:</strong> Aku sudah membawamu ke <strong>Tab 4 (Data Keep Customer)</strong> untuk mengecek status WIN/Progress/Lose!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-        container.scrollTop = container.scrollHeight;
-      }
-      return;
-    }
-
-    // Context & System Instruction
-    const dbContext = getYipyepAIContext();
-    const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_GEMINI_API_KEY;
-    let userModel = localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
-    if (userModel === 'gemini-flash-latest' || userModel === 'gemini-2.5-flash') {
-      userModel = 'gemini-3.5-flash-lite';
-    }
-
-    const systemInstruction = `Kamu adalah Yipyep 🐱✨, asisten AI analitik robot kucing pintar dan ramah untuk Divisi Sosmed GadgetMart.
-Kamu memiliki akses langsung ke DATABASE ARSIP BULANAN (Januari - Desember 2026), DATA PENJUALAN PER CABANG TOKO, LEADERBOARD SALES, dan DATA KEEP CUSTOMER.
-
-DATA SISTEM REAL-TIME:
-${JSON.stringify(dbContext)}
-
-PANDUAN MENJAWAB:
-1. Jawab pertanyaan user dengan ramah, cerdas, akurat, dan percaya diri.
-2. Jika user meminta rincian atau memecah omzet/pencapaian per bulan (misal dari Januari sampai Desember), tampilkan rincian setiap bulan secara jelas dan runtut berdasarkan data 'arsipBulananLengkap'.
-3. Jika user menanyakan cabang tertentu (misal BJMC, BTCC, dll), berikan informasi data cabang yang ada (termasuk kontribusi cabang di bulan berjalan Oktober atau perbandingan dengan total).
-4. Gunakan pemformatan Markdown yang bersih: bullet points (*), teks tebal (**teks**), atau tabel mini bila diperlukan agar sangat mudah dibaca.
-5. Bila user menyapa atau bertanya umum, jawab dengan gaya kucing robot cerdas yang menyenangkan.`;
-
-    let aiSuccess = false;
-
-    // STEP 1: Try Backend Serverless Route /api/chat-ai (Ultra-fast, zero CORS, Node.js connection)
-    try {
-      const serverRes = await fetch('/api/chat-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: prompt,
-          systemInstruction: systemInstruction,
-          apiKey: apiKey,
-          model: userModel
-        })
-      });
-      if (serverRes.ok) {
-        const data = await serverRes.json();
-        if (data && data.success && data.text) {
-          const formatted = formatMarkdownForChat(data.text);
-          const typingEl = document.getElementById(typingId);
-          if (typingEl) {
-            typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${formatted}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-            container.scrollTop = container.scrollHeight;
-          }
-          aiSuccess = true;
-          return;
-        }
-      }
-    } catch (serverErr) {
-      console.warn("Backend /api/chat-ai call failed, trying direct browser fetch:", serverErr);
-    }
-
-    // STEP 2: Direct browser fetch fallback (if backend unavailable)
-    if (!aiSuccess && apiKey) {
-      const modelsToTry = [userModel, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
-      const uniqueModels = Array.from(new Set(modelsToTry.filter(Boolean)));
-
-      for (const m of uniqueModels) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `${systemInstruction}\n\nPertanyaan User: "${prompt}"` }] }]
-            })
-          });
-          const data = await res.json();
-          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-            const rawText = data.candidates[0].content.parts.map(p => p.text || '').join('');
-            const formatted = formatMarkdownForChat(rawText);
-            const typingEl = document.getElementById(typingId);
-            if (typingEl) {
-              typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${formatted}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-              container.scrollTop = container.scrollHeight;
-            }
-            aiSuccess = true;
-            return;
-          }
-        } catch(e) {
-          console.warn(`Direct Gemini call with ${m} failed:`, e);
-        }
-      }
-    }
-
-    // STEP 3: Fallback Local Database Calculation Engine
-    if (!aiSuccess) {
-      const q = prompt.toLowerCase();
-      let reply = '';
-
-      const isMonthRangeQuery = q.includes('januari') || q.includes('desember') || q.includes('bulan') || q.includes('arsip') || q.includes('pecah');
-      const matchedCabang = Object.keys(CABANG_NAMES).find(c => q.includes(c.toLowerCase()));
-
-      if (isMonthRangeQuery && matchedCabang) {
-        const cabInfo = (dbContext.penjualanCabangOktober || []).find(c => c.kodeCabang === matchedCabang);
-        const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
-        const cabOktoberVal = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
-
-        const lines = (dbContext.arsipBulananLengkap || []).map(m => {
-          return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} <em>(${m.status})</em>`;
-        }).join('<br>');
-
-        reply = `Meong! 🐾 Berikut adalah rincian omzet Divisi Sosmed dari <strong>Database Arsip Bulanan (Januari - Desember 2026)</strong>:<br><br>${lines}<br><br>🏢 <strong>Khusus Cabang ${cabName}:</strong> Pada transaksi bulan berjalan (Oktober 2026), cabang ini mencatat omzet sebesar <strong>${cabOktoberVal}</strong>!`;
-      } else if (isMonthRangeQuery) {
-        const lines = (dbContext.arsipBulananLengkap || []).map(m => {
-          return `• <strong>${m.bulan}:</strong> ${m.realisasiOmzet} (${m.persenOmzet || m.status})`;
-        }).join('<br>');
-        reply = `Meong! 🐾 Ini data rekapitulasi omzet dari <strong>Database Arsip Bulanan 2026</strong>:<br><br>${lines}`;
-      } else if (matchedCabang) {
-        const cabInfo = (dbContext.penjualanCabangOktober || []).find(c => c.kodeCabang === matchedCabang);
-        const cabName = CABANG_NAMES[matchedCabang] || matchedCabang;
-        const val = cabInfo ? cabInfo.totalOmzet : 'Rp 0';
-        reply = `🏢 <strong>Cabang ${cabName}:</strong> Total omzet sosmed yang tercatat di bulan berjalan mencapai <strong>${val}</strong>!`;
-      } else if (q.includes('omzet') || q.includes('revenue') || q.includes('capaian')) {
-        const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
-        const progressPct = document.getElementById('kpiProgressPct') ? document.getElementById('kpiProgressPct').innerText : '39%';
-        reply = `Meong! 🐾 Total pencapaian omzet tim sosmed bulan ini adalah <strong>${totalAchieve}</strong> (${progressPct} dari target). Status capaian berada di posisi <strong>🖤 On Track</strong>!`;
-      } else if (q.includes('gp') || q.includes('gross') || q.includes('profit')) {
-        const totalGP = document.getElementById('kpiTotalGP') ? document.getElementById('kpiTotalGP').innerText : 'Rp 71.955.484';
-        reply = `Gross Profit tim yang telah dikumpulkan mencapai <strong>${totalGP}</strong>. Ingat target GP kita adalah 5%, pantau terus margin produk ya! 📈`;
-      } else if (q.includes('cabang')) {
-        const top3 = (dbContext.penjualanCabangOktober || []).slice(0, 3).map((c, i) => `<strong>${i+1}. ${c.namaCabang}</strong> (${c.totalOmzet})`).join(', ');
-        reply = `🏢 <strong>Top Cabang Sosmed:</strong> ${top3}! 🚀`;
-      } else {
-        const totalAchieve = document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057';
-        reply = `Halo! Aku <strong>Yipyep</strong> 🐱✨. Database arsip bulanan (Januari - Desember) dan data transaksi live sudah terhubung penuh. Tanyakan padaku rincian omzet, data cabang toko, atau performa sales!`;
-      }
-
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) {
-        typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>${reply}</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-        container.scrollTop = container.scrollHeight;
-      }
-    }
-  } catch (globalErr) {
-    console.error("Critical Yipyep chat error:", globalErr);
-    const typingEl = document.getElementById(typingId);
-    if (typingEl) {
-      typingEl.innerHTML = `<div class="yipyep-bubble-text">🐱 <strong>Yipyep:</strong><br>Meong! 🐾 Aku sudah membaca database sistem. Saat ini total pencapaian omzet tim sosmed mencapai <strong>${document.getElementById('kpiTotalAchieve') ? document.getElementById('kpiTotalAchieve').innerText : 'Rp 3.279.978.057'}</strong>. Silakan tanyakan data spesifik seputar cabang, arsip bulanan, atau faktur AR!</div><div class="yipyep-msg-time" style="font-size:0.68rem; opacity:0.8; margin-top:4px;">${timeStr}</div>`;
-      container.scrollTop = container.scrollHeight;
-    }
-  }
-}
+// (Yipyep Floating AI Chat Widget telah dihapus sesuai permintaan)
 
 // Live Real-Time Date and Clock Engine for Report Header
-function initLiveClock() {
   function update() {
     const now = new Date();
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -6769,7 +6454,10 @@ async function loadARClaimsData() {
   rawARClaimsList.forEach(c => {
     c.validationStatus = c.validationStatus || 'VALID';
     c.invalidReason = c.invalidReason || '';
-    c.evidenceImage = c.evidenceImage || null;
+    if (!Array.isArray(c.evidenceImages)) {
+      c.evidenceImages = c.evidenceImage ? [c.evidenceImage] : [];
+    }
+    c.evidenceImage = c.evidenceImages[0] || null;
     c.periode = c.periode || 'Oktober-26';
     c.keepText = c.keepText || '';
   });
@@ -6839,6 +6527,7 @@ function addSingleARToClaims(auditItem, customItems = null) {
         customerPhone: wa,
         keepText: keepFormatted,
         evidenceImage: null,
+        evidenceImages: [],
         validationStatus: 'VALID',
         invalidReason: '',
         isHandphone: isHP,
@@ -6912,6 +6601,7 @@ function claimAllFilteredMissingAR() {
           customerPhone: (auditItem.keep && auditItem.keep['Nomor WA']) ? auditItem.keep['Nomor WA'] : (it['No HP Customer'] || '-'),
           keepText: keepFormatted,
           evidenceImage: null,
+          evidenceImages: [],
           validationStatus: 'VALID',
           invalidReason: '',
           isHandphone: isHP,
@@ -6951,7 +6641,9 @@ function claimModalSelectedItems(btnElement = null) {
   closeARDetailModal();
 }
 
-// Evidence Image Handlers
+// Evidence Image Handlers (Dukungan Beberapa Evidence per Baris & Carousel Modal)
+let currentEvidenceModalIndex = 0;
+
 function triggerEvidenceUpload(claimId) {
   currentEvidenceTargetClaimId = claimId;
   const input = document.getElementById('evidenceFileInput');
@@ -6964,15 +6656,16 @@ function triggerEvidenceUpload(claimId) {
 function triggerEvidenceUploadFromModal() {
   const claimId = currentEvidenceTargetClaimId;
   if (!claimId) return;
-  closeEvidenceImageModal();
   triggerEvidenceUpload(claimId);
 }
 
 function handleEvidenceFileSelected(fileInput) {
-  if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
-  const file = fileInput.files[0];
-  if (!file.type.startsWith('image/')) {
-    alert('File yang dipilih harus berupa gambar (JPG, PNG, WEBP).');
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+  const rawFiles = Array.from(fileInput.files);
+  const imageFiles = rawFiles.filter(f => f.type.startsWith('image/'));
+
+  if (imageFiles.length === 0) {
+    alert('File yang dipilih harus berupa file gambar (JPG, PNG, WEBP).');
     return;
   }
 
@@ -6980,76 +6673,197 @@ function handleEvidenceFileSelected(fileInput) {
   const item = rawARClaimsList.find(c => c.id === claimId);
   if (!item) return;
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      // Compress to max 1200x1200 to keep JSON storage light and Excel fast
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      const maxDim = 1200;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
+  if (!Array.isArray(item.evidenceImages)) {
+    item.evidenceImages = item.evidenceImage ? [item.evidenceImage] : [];
+  }
 
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
-      item.evidenceImage = compressedDataUrl;
-      saveARClaimsData();
-      showSaveToast(`Bukti gambar format keep untuk AR ${item.docNumber} berhasil diunggah.`);
-      renderARClaimsTable();
-    };
-    img.src = e.target.result;
+  const compressSingleFile = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1200;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => resolve(null);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
   };
-  reader.readAsDataURL(file);
+
+  Promise.all(imageFiles.map(compressSingleFile)).then(results => {
+    const validImages = results.filter(Boolean);
+    if (validImages.length === 0) return;
+
+    item.evidenceImages.push(...validImages);
+    item.evidenceImage = item.evidenceImages[0] || null;
+
+    saveARClaimsData();
+    showSaveToast(`📸 Berhasil menambahkan ${validImages.length} bukti gambar untuk AR ${item.docNumber} (Total: ${item.evidenceImages.length} foto).`);
+    renderARClaimsTable();
+
+    // Jika modal zoom sedang terbuka, refresh langsung ke foto baru
+    const modal = document.getElementById('evidenceImageModal');
+    if (modal && modal.style.display !== 'none' && currentEvidenceTargetClaimId === claimId) {
+      openEvidenceImageModal(claimId, item.evidenceImages.length - 1);
+    }
+  });
 }
 
-function removeEvidenceImage(claimId) {
+function removeEvidenceImage(claimId, imageIdx = null) {
   const item = rawARClaimsList.find(c => c.id === claimId);
   if (!item) return;
-  if (!confirm(`Hapus bukti gambar untuk AR ${item.docNumber}?`)) return;
-  item.evidenceImage = null;
+  if (!Array.isArray(item.evidenceImages)) {
+    item.evidenceImages = item.evidenceImage ? [item.evidenceImage] : [];
+  }
+  if (item.evidenceImages.length === 0) return;
+
+  if (imageIdx !== null && imageIdx >= 0 && imageIdx < item.evidenceImages.length) {
+    if (!confirm(`Hapus foto bukti ke-${imageIdx + 1} untuk AR ${item.docNumber}?`)) return;
+    item.evidenceImages.splice(imageIdx, 1);
+  } else {
+    if (!confirm(`Hapus seluruh (${item.evidenceImages.length}) bukti gambar untuk AR ${item.docNumber}?`)) return;
+    item.evidenceImages = [];
+  }
+
+  item.evidenceImage = item.evidenceImages[0] || null;
   saveARClaimsData();
   showSaveToast('Bukti gambar berhasil dihapus.');
   renderARClaimsTable();
+
+  const modal = document.getElementById('evidenceImageModal');
+  if (modal && modal.style.display !== 'none' && currentEvidenceTargetClaimId === claimId) {
+    if (item.evidenceImages.length === 0) {
+      closeEvidenceImageModal();
+    } else {
+      const nextIdx = Math.min(imageIdx !== null ? imageIdx : 0, item.evidenceImages.length - 1);
+      openEvidenceImageModal(claimId, nextIdx);
+    }
+  }
 }
 
-function openEvidenceImageModal(claimId) {
+function openEvidenceImageModal(claimId, activeIndex = 0) {
   const item = rawARClaimsList.find(c => c.id === claimId);
-  if (!item || !item.evidenceImage) return;
+  if (!item) return;
+  if (!Array.isArray(item.evidenceImages)) {
+    item.evidenceImages = item.evidenceImage ? [item.evidenceImage] : [];
+  }
+  if (item.evidenceImages.length === 0) return;
 
   currentEvidenceTargetClaimId = claimId;
-  const modal = document.getElementById('evidenceImageModal');
-  const fullImg = document.getElementById('evidenceFullImg');
-  const titleEl = document.getElementById('evidenceModalTitle');
-  const subEl = document.getElementById('evidenceModalSub');
-  const btnDownload = document.getElementById('btnDownloadEvidence');
+  currentEvidenceModalIndex = Math.max(0, Math.min(activeIndex, item.evidenceImages.length - 1));
 
-  if (fullImg) fullImg.src = item.evidenceImage;
-  if (titleEl) titleEl.innerText = `📷 Bukti Format Keep: AR ${item.docNumber}`;
-  if (subEl) subEl.innerText = `Customer: ${item.customerName || '-'} (${item.customerPhone || '-'}) | Cabang: ${item.cabang} | Barang: ${item.productName}`;
-  if (btnDownload) {
-    btnDownload.href = item.evidenceImage;
-    btnDownload.download = `Evidence_Keep_AR_${item.docNumber}.jpg`;
+  renderEvidenceModalContent();
+
+  const modal = document.getElementById('evidenceImageModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function renderEvidenceModalContent() {
+  const item = rawARClaimsList.find(c => c.id === currentEvidenceTargetClaimId);
+  if (!item || !item.evidenceImages || item.evidenceImages.length === 0) {
+    closeEvidenceImageModal();
+    return;
   }
 
-  if (modal) modal.style.display = 'flex';
+  const imgs = item.evidenceImages;
+  const currentIdx = Math.max(0, Math.min(currentEvidenceModalIndex, imgs.length - 1));
+  const currentImgUrl = imgs[currentIdx];
+
+  const titleEl = document.getElementById('evidenceModalTitle');
+  const subEl = document.getElementById('evidenceModalSub');
+  const fullImg = document.getElementById('evidenceFullImg');
+  const btnDownload = document.getElementById('btnDownloadEvidence');
+  const counterEl = document.getElementById('evidenceModalCounter');
+  const galleryStrip = document.getElementById('evidenceModalGalleryStrip');
+
+  if (titleEl) titleEl.innerText = `📷 Bukti Format Keep: AR ${item.docNumber} (${currentIdx + 1} dari ${imgs.length})`;
+  if (subEl) subEl.innerText = `Customer: ${item.customerName || '-'} (${item.customerPhone || '-'}) | Cabang: ${item.cabang} | Barang: ${item.productName}`;
+  if (fullImg) fullImg.src = currentImgUrl;
+  if (btnDownload) {
+    btnDownload.href = currentImgUrl;
+    btnDownload.download = `Evidence_Keep_AR_${item.docNumber}_Foto_${currentIdx + 1}.jpg`;
+  }
+  if (counterEl) {
+    counterEl.innerText = `Foto ${currentIdx + 1} dari ${imgs.length}`;
+  }
+
+  // Thumbnails carousel strip
+  if (galleryStrip) {
+    if (imgs.length > 1) {
+      galleryStrip.style.display = 'flex';
+      galleryStrip.innerHTML = imgs.map((img, i) => `
+        <div class="evidence-modal-thumb ${i === currentIdx ? 'active' : ''}" onclick="switchEvidenceModalIndex(${i})" title="Buka foto ke-${i + 1}">
+          <img src="${img}" alt="Thumb ${i + 1}">
+        </div>
+      `).join('');
+    } else {
+      galleryStrip.style.display = 'none';
+      galleryStrip.innerHTML = '';
+    }
+  }
+}
+
+function switchEvidenceModalIndex(newIdx) {
+  const item = rawARClaimsList.find(c => c.id === currentEvidenceTargetClaimId);
+  if (!item || !item.evidenceImages || item.evidenceImages.length === 0) return;
+  if (newIdx < 0) newIdx = item.evidenceImages.length - 1;
+  if (newIdx >= item.evidenceImages.length) newIdx = 0;
+  currentEvidenceModalIndex = newIdx;
+  renderEvidenceModalContent();
+}
+
+function nextEvidenceModalImage() {
+  switchEvidenceModalIndex(currentEvidenceModalIndex + 1);
+}
+
+function prevEvidenceModalImage() {
+  switchEvidenceModalIndex(currentEvidenceModalIndex - 1);
+}
+
+function removeCurrentModalEvidence() {
+  removeEvidenceImage(currentEvidenceTargetClaimId, currentEvidenceModalIndex);
 }
 
 function closeEvidenceImageModal(e = null) {
   const modal = document.getElementById('evidenceImageModal');
   if (modal) modal.style.display = 'none';
 }
+
+// Navigasi keyboard (Panah Kiri & Kanan) untuk galeri bukti foto
+document.addEventListener('keydown', function(e) {
+  const modal = document.getElementById('evidenceImageModal');
+  if (modal && modal.style.display === 'flex') {
+    if (e.key === 'ArrowRight') {
+      nextEvidenceModalImage();
+    } else if (e.key === 'ArrowLeft') {
+      prevEvidenceModalImage();
+    } else if (e.key === 'Escape') {
+      closeEvidenceImageModal();
+    }
+  }
+});
 
 // Validation Handlers
 function handleClaimValidityChange(claimId, newStatus) {
@@ -7082,8 +6896,264 @@ function handleClaimInvalidReasonChange(claimId, newReason) {
   saveARClaimsData();
 }
 
+// ==========================================
+// EXCEL EXPORT ENGINE (EXCELJS + FALLBACK)
+// ==========================================
+async function buildClaimsWorksheet(wb, sheetName, rows) {
+  const safeName = String(sheetName || 'Klaim').replace(/[:\\/?*\[\]]/g, '_').slice(0, 31);
+  const ws = wb.addWorksheet(safeName);
+
+  ws.columns = [
+    { header: 'NO', key: 'no', width: 6 },
+    { header: 'TANGGAL', key: 'tanggal', width: 14 },
+    { header: 'PERIODE', key: 'periode', width: 14 },
+    { header: 'NO AR', key: 'noAR', width: 16 },
+    { header: 'NO.HP USER', key: 'noHP', width: 18 },
+    { header: 'KODE SOSMED', key: 'kodeSosmed', width: 16 },
+    { header: 'PIC SOSMED', key: 'picSosmed', width: 16 },
+    { header: 'CABANG', key: 'cabang', width: 14 },
+    { header: 'POTENSI DENDA', key: 'potensiDenda', width: 16 },
+    { header: 'BARANG', key: 'barang', width: 32 },
+    { header: 'KEEP', key: 'keep', width: 35 },
+    { header: 'EVIDENCE FORMAT KEEP', key: 'evidence', width: 28 },
+    { header: 'AR SALES EMPLOYEE', key: 'salesEmployee', width: 22 },
+    { header: 'STATUS VALIDASI', key: 'statusValidasi', width: 16 },
+    { header: 'ALASAN TIDAK VALID', key: 'alasanTidakValid', width: 24 }
+  ];
+
+  const headerRow = ws.getRow(1);
+  headerRow.height = 28;
+  headerRow.eachCell((cell) => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF991B1B' } // Crimson / Red
+    };
+    cell.font = {
+      name: 'Arial',
+      size: 10,
+      bold: true,
+      color: { argb: 'FFFFFFFF' }
+    };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  });
+
+  for (let idx = 0; idx < rows.length; idx++) {
+    const r = rows[idx];
+    const rowNumber = idx + 2;
+    const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+      ? r.evidenceImages
+      : (r.evidenceImage ? [r.evidenceImage] : []);
+
+    const row = ws.addRow({
+      no: idx + 1,
+      tanggal: formatCrosellingDate(r.postingDate),
+      periode: r.periode || 'Oktober-26',
+      noAR: r.docNumber,
+      noHP: r.customerPhone || '-',
+      kodeSosmed: r.targetSosmedCode,
+      picSosmed: r.picSosmed || '-',
+      cabang: r.cabang,
+      potensiDenda: r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
+      barang: r.productName,
+      keep: r.keepText || '-',
+      evidence: imgs.length > 0 ? (imgs.length > 1 ? `(${imgs.length} Bukti Foto Terlampir)` : '(Bukti Foto Terlampir)') : '-',
+      salesEmployee: r.currentSalesCode || '-',
+      statusValidasi: r.validationStatus || 'VALID',
+      alasanTidakValid: r.invalidReason || '-'
+    });
+
+    row.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    row.getCell('no').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('tanggal').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('periode').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('noAR').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('noHP').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('kodeSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('picSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('cabang').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('potensiDenda').alignment = { vertical: 'middle', horizontal: 'center' };
+    row.getCell('statusValidasi').alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Embed all evidence images
+    if (imgs.length > 0) {
+      try {
+        row.height = 72;
+        imgs.forEach((imgStr, imgIdx) => {
+          if (typeof imgStr !== 'string') return;
+          const isPng = imgStr.includes('image/png');
+          const base64Data = imgStr.includes(',') ? imgStr.split(',')[1] : imgStr;
+          const imgId = wb.addImage({
+            base64: base64Data,
+            extension: isPng ? 'png' : 'jpeg'
+          });
+          ws.addImage(imgId, {
+            tl: { col: 11 + (imgIdx * 0.35), row: rowNumber - 1 + 0.05 },
+            ext: { width: 110, height: 65 },
+            editAs: 'oneCell'
+          });
+        });
+      } catch (imgErr) {
+        console.warn('Gagal embed image ExcelJS:', imgErr);
+        row.getCell('evidence').value = `(${imgs.length} Bukti Foto Terlampir)`;
+      }
+    }
+  }
+}
+
+// 1. UNDUH SELURUH KLAIM JADI 1 FILE EXCEL GABUNGAN
+async function downloadARClaimsSingleExcel(autoShare = false) {
+  if (!rawARClaimsList || rawARClaimsList.length === 0) {
+    alert('Belum ada data klaim AR untuk diunduh.');
+    return;
+  }
+
+  const collectingItems = rawARClaimsList.filter(c => c.status === 'COLLECTING' && c.validationStatus !== 'TIDAK VALID');
+  let itemsToExport = [];
+  let doAdvanceToShared = false;
+
+  if (autoShare) {
+    itemsToExport = collectingItems;
+    doAdvanceToShared = true;
+  } else if (currentClaimsSubTab === 'COLLECTING' && collectingItems.length > 0) {
+    const userChoice = confirm(
+      `📊 UNDUH SEMUANYA JADI 1 FILE EXCEL (.xlsx)\n\n` +
+      `Ditemukan ${collectingItems.length} item AR dalam antrean "1. Pengumpulan (Batch 3 Hari)".\n\n` +
+      `• Klik [OK] untuk mengunduh 1 file Excel Gabungan dan SEKALIGUS memindahkan status ke "Cek AR Setelah di Share (Tenggat H+1)".\n` +
+      `• Klik [Batal] jika hanya ingin mengunduh data tampilan saat ini tanpa memindahkan status klaim.`
+    );
+    if (userChoice) {
+      itemsToExport = collectingItems;
+      doAdvanceToShared = true;
+    } else {
+      itemsToExport = filteredARClaimsList.length > 0 ? filteredARClaimsList : rawARClaimsList;
+    }
+  } else {
+    itemsToExport = filteredARClaimsList.length > 0 ? filteredARClaimsList : rawARClaimsList;
+  }
+
+  if (itemsToExport.length === 0) {
+    alert('Tidak ada data klaim yang memenuhi kriteria untuk diunduh.');
+    return;
+  }
+
+  const nowStr = new Date().toISOString().split('T')[0];
+
+  // Gunakan ExcelJS untuk menghasilkan 1 file Excel lengkap dengan sheet gabungan & sheet per cabang serta gambar ter-embed
+  if (typeof ExcelJS !== 'undefined') {
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'GadgetMart Sosmed System';
+      wb.title = 'Klaim AR Semua Cabang';
+
+      // 1. Sheet Master Gabungan Seluruh Cabang
+      await buildClaimsWorksheet(wb, 'SEMUA CABANG', itemsToExport);
+
+      // 2. Sheet per Cabang terpisah di file Excel yang sama
+      const byBranch = {};
+      itemsToExport.forEach(c => {
+        const cab = c.cabang || 'LAINNYA';
+        if (!byBranch[cab]) byBranch[cab] = [];
+        byBranch[cab].push(c);
+      });
+
+      for (const cab of Object.keys(byBranch)) {
+        await buildClaimsWorksheet(wb, cab, byBranch[cab]);
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Klaim_AR_Semua_Cabang_Gabungan_${nowStr}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      if (doAdvanceToShared) {
+        const shareTime = Date.now();
+        const deadlineH1 = shareTime + (24 * 60 * 60 * 1000);
+        itemsToExport.forEach(c => {
+          c.status = 'SHARED';
+          c.shareTimestamp = shareTime;
+          c.deadlineH1Timestamp = deadlineH1;
+        });
+        await saveARClaimsData();
+        showSaveToast(`🚀 ${itemsToExport.length} item AR berhasil diunduh jadi 1 Excel & dipindahkan ke sub-tab "Cek AR Setelah di Share" (H+1)!`);
+        setClaimsSubTab('SHARED');
+      } else {
+        showSaveToast(`✅ Berhasil mengunduh 1 File Excel Gabungan (${itemsToExport.length} item AR)!`);
+      }
+      return;
+    } catch (excelErr) {
+      console.warn('ExcelJS error, fallback ke SheetJS:', excelErr);
+    }
+  }
+
+  // Fallback SheetJS jika ExcelJS bermasalah
+  const wb = XLSX.utils.book_new();
+  const buildSheetJSData = (rows) => {
+    const data = [
+      ['NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP', 'EVIDENCE FORMAT KEEP', 'AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID']
+    ];
+    rows.forEach((r, idx) => {
+      const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+        ? r.evidenceImages
+        : (r.evidenceImage ? [r.evidenceImage] : []);
+      data.push([
+        idx + 1,
+        formatCrosellingDate(r.postingDate),
+        r.periode || 'Oktober-26',
+        r.docNumber,
+        r.customerPhone || '-',
+        r.targetSosmedCode,
+        r.picSosmed || '-',
+        r.cabang,
+        r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
+        r.productName,
+        r.keepText || '-',
+        imgs.length > 0 ? `(${imgs.length} Bukti Foto Terlampir)` : '-',
+        r.currentSalesCode || '-',
+        r.validationStatus || 'VALID',
+        r.invalidReason || '-'
+      ]);
+    });
+    return XLSX.utils.aoa_to_sheet(data);
+  };
+
+  XLSX.utils.book_append_sheet(wb, buildSheetJSData(itemsToExport), 'SEMUA CABANG');
+
+  const byBranch = {};
+  itemsToExport.forEach(c => {
+    const cab = c.cabang || 'LAINNYA';
+    if (!byBranch[cab]) byBranch[cab] = [];
+    byBranch[cab].push(c);
+  });
+  for (const cab of Object.keys(byBranch)) {
+    XLSX.utils.book_append_sheet(wb, buildSheetJSData(byBranch[cab]), cab.slice(0, 31));
+  }
+
+  XLSX.writeFile(wb, `Klaim_AR_Semua_Cabang_Gabungan_${nowStr}.xlsx`);
+
+  if (doAdvanceToShared) {
+    const shareTime = Date.now();
+    const deadlineH1 = shareTime + (24 * 60 * 60 * 1000);
+    itemsToExport.forEach(c => {
+      c.status = 'SHARED';
+      c.shareTimestamp = shareTime;
+      c.deadlineH1Timestamp = deadlineH1;
+    });
+    await saveARClaimsData();
+    showSaveToast(`🚀 ${itemsToExport.length} item AR berhasil diunduh jadi 1 Excel & dipindahkan ke sub-tab "Cek AR Setelah di Share" (H+1)!`);
+    setClaimsSubTab('SHARED');
+  } else {
+    showSaveToast(`✅ Berhasil mengunduh 1 File Excel Gabungan (${itemsToExport.length} item AR)!`);
+  }
+}
+window.downloadARClaimsSingleExcel = downloadARClaimsSingleExcel;
+
+// 2. DISTRIBUSI KLAIM HARI KE-4 (DENGAN PILIHAN 1 EXCEL ATAU PAKET ZIP)
 async function shareARClaimsBatchDay4() {
-  // Hanya proses item yang statusnya COLLECTING dan VALID (TIDAK VALID dikecualikan)
   const collectingItems = rawARClaimsList.filter(c => c.status === 'COLLECTING' && c.validationStatus !== 'TIDAK VALID');
   if (collectingItems.length === 0) {
     alert('Tidak ada item valid dalam antrean "1. Pengumpulan (Batch 3 Hari)".\nSilakan kumpulkan AR belum sosmed dari Tab 5 (Tracking AR) terlebih dahulu.');
@@ -7091,16 +7161,20 @@ async function shareARClaimsBatchDay4() {
   }
 
   const branchCount = new Set(collectingItems.map(c => c.cabang)).size;
-  const msg = `📦 KONFIRMASI DISTRIBUSI HARI KE-4:\n\n` +
-              `Total: ${collectingItems.length} item AR dari ${branchCount} cabang toko siap didistribusikan.\n\n` +
-              `Setelah diunduh:\n` +
-              `1. Sistem akan men-generate paket file Excel per cabang (.zip) lengkap dengan gambar bukti Format Keep.\n` +
-              `2. Seluruh data ini OTOMATIS BERPINDAH ke tab '2. Cek AR Setelah di Share'.\n` +
-              `3. Batas waktu H+1 (24 jam) cabang merevisi kode sosmed akan mulai berjalan.\n\n` +
-              `Lanjutkan proses unduh & pindah status?`;
+  const choiceMsg = `📦 DISTRIBUSI KLAIM AR HARI KE-4:\n\n` +
+                    `Total: ${collectingItems.length} item AR dari ${branchCount} cabang toko siap didistribusikan.\n\n` +
+                    `Pilih format unduhan:\n` +
+                    `• Klik [OK] untuk mengunduh SEMUANYA JADI 1 FILE EXCEL GABUNGAN (.xlsx).\n` +
+                    `• Klik [Batal] untuk mengunduh PAKET ZIP FILE TERPISAH PER CABANG (.zip).`;
 
-  if (!confirm(msg)) return;
+  const wantSingleExcel = confirm(choiceMsg);
 
+  if (wantSingleExcel) {
+    await downloadARClaimsSingleExcel(true);
+    return;
+  }
+
+  // Jika user memilih Batal, unduh paket zip terpisah per cabang
   const byBranch = {};
   collectingItems.forEach(c => {
     const cab = c.cabang || 'LAINNYA';
@@ -7114,102 +7188,11 @@ async function shareARClaimsBatchDay4() {
   for (const cab of Object.keys(byBranch)) {
     const rows = byBranch[cab];
 
-    // Gunakan ExcelJS jika tersedia agar gambar bukti ter-embed langsung ke file Excel
     if (typeof ExcelJS !== 'undefined') {
       try {
         const wb = new ExcelJS.Workbook();
         wb.creator = 'GadgetMart Sosmed System';
-        const ws = wb.addWorksheet(cab.slice(0, 31));
-
-        ws.columns = [
-          { header: 'NO', key: 'no', width: 6 },
-          { header: 'TANGGAL', key: 'tanggal', width: 14 },
-          { header: 'PERIODE', key: 'periode', width: 14 },
-          { header: 'NO AR', key: 'noAR', width: 16 },
-          { header: 'NO.HP USER', key: 'noHP', width: 18 },
-          { header: 'KODE SOSMED', key: 'kodeSosmed', width: 16 },
-          { header: 'PIC SOSMED', key: 'picSosmed', width: 16 },
-          { header: 'CABANG', key: 'cabang', width: 14 },
-          { header: 'POTENSI DENDA', key: 'potensiDenda', width: 16 },
-          { header: 'BARANG', key: 'barang', width: 32 },
-          { header: 'KEEP', key: 'keep', width: 35 },
-          { header: 'EVIDENCE FORMAT KEEP', key: 'evidence', width: 24 },
-          { header: 'AR SALES EMPLOYEE', key: 'salesEmployee', width: 22 },
-          { header: 'STATUS VALIDASI', key: 'statusValidasi', width: 16 },
-          { header: 'ALASAN TIDAK VALID', key: 'alasanTidakValid', width: 24 }
-        ];
-
-        const headerRow = ws.getRow(1);
-        headerRow.height = 28;
-        headerRow.eachCell((cell) => {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FF991B1B' } // Crimson / Red
-          };
-          cell.font = {
-            name: 'Arial',
-            size: 10,
-            bold: true,
-            color: { argb: 'FFFFFFFF' }
-          };
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        });
-
-        for (let idx = 0; idx < rows.length; idx++) {
-          const r = rows[idx];
-          const rowNumber = idx + 2;
-          const row = ws.addRow({
-            no: idx + 1,
-            tanggal: formatCrosellingDate(r.postingDate),
-            periode: r.periode || 'Oktober-26',
-            noAR: r.docNumber,
-            noHP: r.customerPhone || '-',
-            kodeSosmed: r.targetSosmedCode,
-            picSosmed: r.picSosmed || '-',
-            cabang: r.cabang,
-            potensiDenda: r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
-            barang: r.productName,
-            keep: r.keepText || '-',
-            evidence: r.evidenceImage ? '' : '-',
-            salesEmployee: r.currentSalesCode || '-',
-            statusValidasi: r.validationStatus || 'VALID',
-            alasanTidakValid: r.invalidReason || '-'
-          });
-
-          row.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-          row.getCell('no').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('tanggal').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('periode').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('noAR').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('noHP').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('kodeSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('picSosmed').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('cabang').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('potensiDenda').alignment = { vertical: 'middle', horizontal: 'center' };
-          row.getCell('statusValidasi').alignment = { vertical: 'middle', horizontal: 'center' };
-
-          if (r.evidenceImage && typeof r.evidenceImage === 'string') {
-            try {
-              const isPng = r.evidenceImage.includes('image/png');
-              const base64Data = r.evidenceImage.includes(',') ? r.evidenceImage.split(',')[1] : r.evidenceImage;
-              const imgId = wb.addImage({
-                base64: base64Data,
-                extension: isPng ? 'png' : 'jpeg'
-              });
-              ws.addImage(imgId, {
-                tl: { col: 11, row: rowNumber - 1 },
-                ext: { width: 130, height: 75 },
-                editAs: 'oneCell'
-              });
-              row.height = 70;
-            } catch (imgErr) {
-              console.warn('Gagal embed image ExcelJS:', imgErr);
-              row.getCell('evidence').value = '(Bukti Foto Terlampir)';
-            }
-          }
-        }
-
+        await buildClaimsWorksheet(wb, cab, rows);
         const buffer = await wb.xlsx.writeBuffer();
         if (zip) {
           zip.file(`Klaim_AR_${cab}_${nowStr}.xlsx`, buffer);
@@ -7225,6 +7208,9 @@ async function shareARClaimsBatchDay4() {
       ['NO', 'TANGGAL', 'PERIODE', 'NO AR', 'NO.HP USER', 'KODE SOSMED', 'PIC SOSMED', 'CABANG', 'POTENSI DENDA', 'BARANG', 'KEEP', 'EVIDENCE FORMAT KEEP', 'AR SALES EMPLOYEE', 'STATUS VALIDASI', 'ALASAN TIDAK VALID']
     ];
     rows.forEach((r, idx) => {
+      const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+        ? r.evidenceImages
+        : (r.evidenceImage ? [r.evidenceImage] : []);
       excelData.push([
         idx + 1,
         formatCrosellingDate(r.postingDate),
@@ -7237,7 +7223,7 @@ async function shareARClaimsBatchDay4() {
         r.isHandphone ? 'DENDA Rp 50.000' : 'PASS Rp 0',
         r.productName,
         r.keepText || '-',
-        r.evidenceImage ? '(Bukti Foto Terlampir)' : '-',
+        imgs.length > 0 ? `(${imgs.length} Bukti Foto Terlampir)` : '-',
         r.currentSalesCode || '-',
         r.validationStatus || 'VALID',
         r.invalidReason || '-'
@@ -7275,7 +7261,7 @@ async function shareARClaimsBatchDay4() {
   });
 
   await saveARClaimsData();
-  showSaveToast(`🚀 ${collectingItems.length} item AR berhasil diunduh dan dipindahkan ke "Cek AR Setelah di Share" (Tenggat H+1 aktif)!`);
+  showSaveToast(`🚀 ${collectingItems.length} item AR berhasil diunduh paket zip & dipindahkan ke "Cek AR Setelah di Share" (Tenggat H+1 aktif)!`);
   setClaimsSubTab('SHARED');
 }
 
@@ -7591,7 +7577,14 @@ function renderARClaimsModule() {
   const btnShare = document.getElementById('btnShareBatchDay4');
   if (btnShare) {
     btnShare.style.display = (currentClaimsSubTab === 'COLLECTING') ? 'inline-flex' : 'none';
-    btnShare.innerText = `Unduh Paket Cabang & Share (${countCollecting} Item)`;
+    btnShare.innerText = `📦 Unduh Paket Cabang & Share (${countCollecting})`;
+  }
+
+  const btnSingle = document.getElementById('btnDownloadSingleExcel');
+  if (btnSingle) {
+    btnSingle.innerHTML = (currentClaimsSubTab === 'COLLECTING' && countCollecting > 0)
+      ? `📊 Unduh Jadi 1 Excel (${countCollecting})`
+      : `📊 Unduh Jadi 1 Excel`;
   }
 
   applyClaimsFilters();
@@ -7708,25 +7701,41 @@ function renderARClaimsTable() {
       <div class="claim-keep-box" title="Format Keep WhatsApp">${r.keepText}</div>
     ` : `<span style="color: #94a3b8; font-size: 0.76rem;">-</span>`;
 
-    // 9. EVIDENCE: Clean thumbnail or flat button (No Emoji)
+    // 9. EVIDENCE: Clean thumbnail or multi-photo strip
+    const imgs = (Array.isArray(r.evidenceImages) && r.evidenceImages.length > 0)
+      ? r.evidenceImages
+      : (r.evidenceImage ? [r.evidenceImage] : []);
+
     let evidenceHtml = '';
-    if (r.evidenceImage) {
+    if (imgs.length > 0) {
+      const thumbsHtml = imgs.slice(0, 2).map((imgUrl, i) => `
+        <div class="evidence-thumb-wrapper" onclick="openEvidenceImageModal('${r.id}', ${i})" title="Bukti ${i + 1} dari ${imgs.length} (Klik untuk perbesar)">
+          <img src="${imgUrl}" class="evidence-thumb-img" alt="Bukti ${i + 1}">
+          <div class="evidence-zoom-hint">${i + 1}</div>
+        </div>
+      `).join('');
+
+      const moreBadge = imgs.length > 2 
+        ? `<span class="evidence-more-badge" onclick="openEvidenceImageModal('${r.id}', 2)" title="Lihat ${imgs.length - 2} bukti lainnya">+${imgs.length - 2}</span>` 
+        : '';
+
       evidenceHtml = `
         <div class="evidence-cell">
-          <div class="evidence-thumb-wrapper" onclick="openEvidenceImageModal('${r.id}')" title="Klik untuk perbesar bukti format keep">
-            <img src="${r.evidenceImage}" class="evidence-thumb-img" alt="Bukti">
-            <div class="evidence-zoom-hint">Zoom</div>
+          <div class="evidence-thumbs-strip">
+            ${thumbsHtml}
+            ${moreBadge}
           </div>
-          <div style="display: flex; gap: 6px; margin-top: 3px;">
-            <button type="button" class="btn-remove-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Ganti foto bukti">Ganti</button>
-            <button type="button" class="btn-remove-evidence" onclick="removeEvidenceImage('${r.id}')" title="Hapus foto bukti">Hapus</button>
+          <div class="evidence-cell-actions" style="margin-top: 3px;">
+            <button type="button" class="btn-evidence-tiny" onclick="triggerEvidenceUpload('${r.id}')" title="Tambah foto bukti lain pada baris ini">+ Tambah</button>
+            <button type="button" class="btn-evidence-tiny" onclick="openEvidenceImageModal('${r.id}', 0)" title="Lihat galeri semua foto bukti (${imgs.length})">Lihat (${imgs.length})</button>
+            <button type="button" class="btn-evidence-tiny btn-evidence-del" onclick="removeEvidenceImage('${r.id}')" title="Hapus foto bukti baris ini">Hapus</button>
           </div>
         </div>
       `;
     } else {
       evidenceHtml = `
-        <button type="button" class="btn-upload-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Klik untuk mengunggah bukti format keep">
-          Unggah Bukti
+        <button type="button" class="btn-upload-evidence" onclick="triggerEvidenceUpload('${r.id}')" title="Klik untuk mengunggah bukti format keep (bisa pilih beberapa gambar)">
+          + Unggah Bukti
         </button>
       `;
     }
