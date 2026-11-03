@@ -1,23 +1,50 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const MESSAGES_FILE = path.join(process.cwd(), 'watzap_messages.json');
+const CLOUD_STORE_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a1a032afdb18bc';
+const LOCAL_MESSAGES_FILE = path.join(os.tmpdir(), 'watzap_messages.json');
 
-function getStoredMessages() {
+async function getStoredMessages() {
+  // 1. Try cloud store first (persistent across all Vercel instances)
   try {
-    if (fs.existsSync(MESSAGES_FILE)) {
-      const raw = fs.readFileSync(MESSAGES_FILE, 'utf8');
-      return JSON.parse(raw) || [];
+    const res = await fetch(CLOUD_STORE_URL);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && Array.isArray(json.data.messages)) {
+        return json.data.messages;
+      }
     }
   } catch (e) {}
+
+  // 2. Fallback to local file
+  try {
+    if (fs.existsSync(LOCAL_MESSAGES_FILE)) {
+      return JSON.parse(fs.readFileSync(LOCAL_MESSAGES_FILE, 'utf8')) || [];
+    }
+  } catch (e) {}
+
   return [];
 }
 
-function saveStoredMessages(list) {
+async function saveStoredMessages(list) {
+  const trimmed = list.slice(-1000);
+
+  // 1. Save to cloud store
   try {
-    // Keep at most 1000 recent messages
-    const trimmed = list.slice(-1000);
-    fs.writeFileSync(MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
+    await fetch(CLOUD_STORE_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'gadgetmart_watzap_inbox',
+        data: { messages: trimmed }
+      })
+    });
+  } catch (e) {}
+
+  // 2. Save to local fallback
+  try {
+    fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
   } catch (e) {}
 }
 
@@ -36,7 +63,7 @@ module.exports = async function handler(req, res) {
     const since = parseInt(url.searchParams.get('since') || '0', 10);
     const phoneFilter = (url.searchParams.get('phone') || '').replace(/\D/g, '');
 
-    let msgs = getStoredMessages();
+    let msgs = await getStoredMessages();
     if (since > 0) {
       msgs = msgs.filter(m => (m.timestamp || 0) > since);
     }
@@ -61,9 +88,16 @@ module.exports = async function handler(req, res) {
       const body = req.body || {};
       console.log('📥 [WATZAP WEBHOOK RECEIVED]:', JSON.stringify(body));
 
-      const rawPhone = body.phone || body.from || body.sender || body.phone_no || '';
-      const text = body.message_text || body.message || body.body || body.text || '';
+      let rawPhone = body.phone || body.from || body.sender || body.phone_no || body.wa_number || '';
+      let text = body.message_text || body.message || body.body || body.text || '';
       const messageId = body.message_id || body.id || ('wz_' + Date.now());
+
+      if (!rawPhone && body.data) {
+        rawPhone = body.data.phone || body.data.from || body.data.sender || body.data.phone_no || '';
+      }
+      if (!text && body.data) {
+        text = body.data.message_text || body.data.message || body.data.body || body.data.text || '';
+      }
 
       let ts = Date.now();
       if (body.timestamp) {
@@ -74,8 +108,7 @@ module.exports = async function handler(req, res) {
       const cleanPhone = String(rawPhone).replace(/\D/g, '');
 
       if (cleanPhone && text) {
-        const msgs = getStoredMessages();
-        // Check duplicate message_id
+        const msgs = await getStoredMessages();
         const exists = msgs.some(m => m.messageId === messageId);
         if (!exists) {
           msgs.push({
@@ -86,7 +119,7 @@ module.exports = async function handler(req, res) {
             type: body.type || 'text',
             timestamp: ts
           });
-          saveStoredMessages(msgs);
+          await saveStoredMessages(msgs);
         }
       }
 
@@ -102,4 +135,3 @@ module.exports = async function handler(req, res) {
 
   return res.status(405).json({ error: 'Method not allowed' });
 };
-
