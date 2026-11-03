@@ -1490,7 +1490,12 @@
               <div class="omni-chatlist-header">
                 <div class="omni-chatlist-top-bar">
                   <span class="omni-chatlist-main-title" id="omniChatListHeaderTitle">All chats</span>
-                  <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0 chat</span>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0 chat</span>
+                    <button type="button" class="omni-action-btn" onclick="clearOmniTestChats()" title="Bersihkan riwayat chat uji coba" style="padding:2px 4px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <div class="omni-search-input-wrap">
                   <span class="omni-search-icon">
@@ -1910,6 +1915,6 @@
     </div>
   </div>
 
-  <script src="client.js?v=6.5"></script>
+  <script src="client.js?v=6.6"></script>
 </body>
 </html>

@@ -8962,6 +8962,19 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
   renderOmniInboxModule();
 }
 
+function clearOmniTestChats() {
+  if (confirm('Bersihkan riwayat chat di Inbox?')) {
+    try {
+      localStorage.removeItem('gadgetmart_omni_threads');
+    } catch (e) {}
+    selectedOmniPicKey = null;
+    renderOmniInboxModule();
+    if (typeof showSaveToast === 'function') {
+      showSaveToast('Riwayat chat berhasil dibersihkan.');
+    }
+  }
+}
+
 // Global Window Exports
 window.switchOmniView = switchOmniView;
 window.renderOmniMasterTable = renderOmniMasterTable;
@@ -8980,3 +8993,4 @@ window.saveSingleKeepFeedback = saveSingleKeepFeedback;
 window.sendOmniReply = sendOmniReply;
 window.handleOmniInputKey = handleOmniInputKey;
 window.openWhatsAppChat = openWhatsAppChat;
+window.clearOmniTestChats = clearOmniTestChats;

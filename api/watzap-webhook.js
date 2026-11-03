@@ -6,7 +6,6 @@ const CLOUD_STORE_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a
 const LOCAL_MESSAGES_FILE = path.join(os.tmpdir(), 'watzap_messages.json');
 
 async function getStoredMessages() {
-  // 1. Try cloud store first (persistent across all Vercel instances)
   try {
     const res = await fetch(CLOUD_STORE_URL);
     if (res.ok) {
@@ -17,7 +16,6 @@ async function getStoredMessages() {
     }
   } catch (e) {}
 
-  // 2. Fallback to local file
   try {
     if (fs.existsSync(LOCAL_MESSAGES_FILE)) {
       return JSON.parse(fs.readFileSync(LOCAL_MESSAGES_FILE, 'utf8')) || [];
@@ -30,7 +28,6 @@ async function getStoredMessages() {
 async function saveStoredMessages(list) {
   const trimmed = list.slice(-1000);
 
-  // 1. Save to cloud store
   try {
     await fetch(CLOUD_STORE_URL, {
       method: 'PUT',
@@ -42,7 +39,6 @@ async function saveStoredMessages(list) {
     });
   } catch (e) {}
 
-  // 2. Save to local fallback
   try {
     fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
   } catch (e) {}
@@ -88,20 +84,22 @@ module.exports = async function handler(req, res) {
       const body = req.body || {};
       console.log('📥 [WATZAP WEBHOOK RECEIVED]:', JSON.stringify(body));
 
-      let rawPhone = body.phone || body.from || body.sender || body.phone_no || body.wa_number || '';
-      let text = body.message_text || body.message || body.body || body.text || '';
-      const messageId = body.message_id || body.id || ('wz_' + Date.now());
+      const data = body.data || body;
 
-      if (!rawPhone && body.data) {
-        rawPhone = body.data.phone || body.data.from || body.data.sender || body.data.phone_no || '';
-      }
-      if (!text && body.data) {
-        text = body.data.message_text || body.data.message || body.data.body || body.data.text || '';
-      }
+      // Extract phone number (handling formats like '628xxx@s.whatsapp.net', 'from', 'phone', etc.)
+      let rawPhone = data.phone || data.from || data.sender || data.phone_no || data.wa_number || body.phone || body.from || '';
+      rawPhone = String(rawPhone).replace(/@.*$/, '');
+
+      // Extract text message (WatZap uses message_body for unofficial, message_text for official)
+      let text = data.message_body || data.message_text || data.message || data.body || data.text || body.message_body || body.message_text || body.message || '';
+      if (typeof text !== 'string') text = String(text || '');
+
+      const isFromMe = data.is_from_me === true || body.is_from_me === true;
+      const messageId = data.message_id || data.id || body.message_id || ('wz_' + Date.now());
 
       let ts = Date.now();
-      if (body.timestamp) {
-        const parsed = Number(body.timestamp);
+      if (data.timestamp || body.timestamp) {
+        const parsed = Number(data.timestamp || body.timestamp);
         ts = parsed > 10000000000 ? parsed : parsed * 1000;
       }
 
@@ -115,8 +113,8 @@ module.exports = async function handler(req, res) {
             messageId: messageId,
             phone: cleanPhone,
             message: text,
-            sender: 'PIC',
-            type: body.type || 'text',
+            sender: isFromMe ? 'ADMIN' : 'PIC',
+            type: data.type || data.message_type || body.type || 'text',
             timestamp: ts
           });
           await saveStoredMessages(msgs);
