@@ -607,6 +607,45 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // WatZap Webhook & Send Handlers
+  if (reqPath === '/api/watzap-webhook' || reqPath.startsWith('/api/watzap-webhook')) {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        req.body = body ? JSON.parse(body) : {};
+      } catch (e) {
+        req.body = {};
+      }
+      res.status = (code) => { res.statusCode = code; return res; };
+      res.json = (data) => {
+        res.writeHead(res.statusCode || 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      };
+      await require('./api/watzap-webhook')(req, res);
+    });
+    return;
+  }
+
+  if (reqPath === '/api/watzap-send' || reqPath.startsWith('/api/watzap-send')) {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        req.body = body ? JSON.parse(body) : {};
+      } catch (e) {
+        req.body = {};
+      }
+      res.status = (code) => { res.statusCode = code; return res; };
+      res.json = (data) => {
+        res.writeHead(res.statusCode || 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      };
+      await require('./api/watzap-send')(req, res);
+    });
+    return;
+  }
+
   // API Database Status Check (Untuk Realtime Cross-Device Sync)
   if (reqPath === '/api/database-status') {
     const checkFile = (f) => {

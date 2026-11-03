@@ -8459,6 +8459,7 @@ function getOmniPicChats() {
 }
 
 function renderOmniInboxModule() {
+  startWatzapPolling();
   const allChats = getOmniPicChats();
   const bAll = document.getElementById('omniBadgeAll');
   const bAssigned = document.getElementById('omniBadgeAssigned');
@@ -8663,11 +8664,17 @@ function renderOmniActiveChat(pic) {
   if (stream) stream.scrollTop = stream.scrollHeight;
 }
 
-function sendOmniReply() {
+async function sendOmniReply() {
   const inp = document.getElementById('omniReplyInput');
   if (!inp || !selectedOmniPicKey) return;
   const text = inp.value.trim();
   if (!text) return;
+
+  const allPics = getOmniPicChats();
+  const currentPic = allPics.find(p => p.key === selectedOmniPicKey);
+  const picWA = currentPic ? currentPic.picWA : selectedOmniPicKey;
+  const picName = currentPic ? currentPic.picName : 'PIC FU';
+
   const threads = getOmniThreads();
   if (!threads[selectedOmniPicKey]) threads[selectedOmniPicKey] = [];
   threads[selectedOmniPicKey].push({
@@ -8677,11 +8684,77 @@ function sendOmniReply() {
   });
   saveOmniThreads(threads);
   inp.value = '';
-  const allPics = getOmniPicChats();
-  const currentPic = allPics.find(p => p.key === selectedOmniPicKey);
+
   if (currentPic) {
     renderOmniActiveChat(currentPic);
   }
+
+  // Kirim langsung ke WhatsApp PIC via API WatZap
+  try {
+    const res = await fetch('/api/watzap-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: picWA, message: text })
+    });
+    const json = await res.json();
+    if (json.success) {
+      if (typeof showSaveToast === 'function') {
+        showSaveToast('Pesan terkirim ke WhatsApp ' + picName + '!');
+      }
+    } else {
+      console.warn('WatZap API response:', json);
+    }
+  } catch (err) {
+    console.error('Gagal kirim via WatZap:', err);
+  }
+}
+
+let lastWatzapSyncTime = 0;
+let watzapPollInterval = null;
+
+async function pollWatzapIncomingMessages() {
+  try {
+    const res = await fetch('/api/watzap-webhook?since=' + lastWatzapSyncTime);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.messages) || data.messages.length === 0) return;
+
+    let hasNew = false;
+    const threads = getOmniThreads();
+
+    data.messages.forEach(msg => {
+      if (msg.timestamp > lastWatzapSyncTime) lastWatzapSyncTime = msg.timestamp;
+      const cleanPhone = cleanPhoneDigits(msg.phone);
+      if (!cleanPhone) return;
+
+      const matched = matchPicFromMasterData(cleanPhone, 'PIC ' + cleanPhone, '-');
+      const picKey = matched.wa || cleanPhone;
+
+      if (!threads[picKey]) threads[picKey] = [];
+      const alreadyExists = threads[picKey].some(t => t.timestamp === msg.timestamp && t.text === msg.message);
+      if (!alreadyExists) {
+        threads[picKey].push({
+          sender: msg.sender || 'PIC',
+          text: msg.message,
+          timestamp: msg.timestamp
+        });
+        hasNew = true;
+      }
+    });
+
+    if (hasNew) {
+      saveOmniThreads(threads);
+      if (typeof currentActiveTab !== 'undefined' && currentActiveTab === 9) {
+        renderOmniInboxModule();
+      }
+    }
+  } catch (e) {}
+}
+
+function startWatzapPolling() {
+  if (watzapPollInterval) return;
+  pollWatzapIncomingMessages();
+  watzapPollInterval = setInterval(pollWatzapIncomingMessages, 4000);
 }
 
 function handleOmniInputKey(e) {
