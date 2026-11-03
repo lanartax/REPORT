@@ -5301,7 +5301,7 @@ h1, h2, h3, h4, h5, h6,
   display: flex;
   flex: 1;
   overflow: hidden;
-  height: calc(100% - 54px);
+  height: 100%;
 }
 
 /* 1. LEFT SIDEBAR: INBOX FOLDERS (HANYA 4 MENU) */
@@ -6335,3 +6335,385 @@ h1, h2, h3, h4, h5, h6,
 
 
 
+
+
+/* ==========================================================================
+   MODERN SIDEBAR VIEW SWITCHER & CHATS WRAPPER
+   ========================================================================== */
+.omni-sidebar-view-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.omni-sidebar-nav-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.omni-sidebar-nav-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.omni-sidebar-nav-btn.active {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+  font-weight: 800;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.omni-sidebar-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 6px 0 12px 0;
+}
+
+.omni-chats-wrapper {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   RESOLVE BUTTON IN ACTIVE CHAT HEADER
+   ========================================================================== */
+.omni-btn-resolve {
+  background: #ffffff;
+  border: 1px solid #10b981;
+  color: #059669;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.omni-btn-resolve:hover {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.omni-btn-resolve.is-resolved {
+  background: #ecfdf5;
+  border-color: #059669;
+  color: #047857;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   MODERN ENLARGED INPUT BAR (MATCHING USER SCREENSHOT)
+   ========================================================================== */
+.omni-chatview-footer-modern {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 12px 18px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.omni-input-box-wrapper {
+  width: 100%;
+}
+
+.omni-textarea-modern {
+  width: 100%;
+  min-height: 64px;
+  max-height: 140px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  font-family: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.omni-textarea-modern:focus {
+  outline: none;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05);
+}
+
+.omni-textarea-modern::placeholder {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+.omni-input-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.omni-bottom-left-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.omni-btn-attachment-modern {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.omni-btn-attachment-modern:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.omni-quick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.omni-quick-pill:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.omni-quick-pill.primary {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.omni-quick-pill.primary:hover {
+  background: #dbeafe;
+}
+
+.omni-bottom-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omni-btn-send-modern {
+  background: #e2e8f0;
+  border: none;
+  color: #334155;
+  font-size: 0.80rem;
+  font-weight: 700;
+  padding: 7px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.omni-btn-send-modern:hover,
+.omni-btn-send-modern.active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+/* ==========================================================================
+   MODERN FORMAT KEEP PANEL (PURPLE BOX OVERHAUL)
+   ========================================================================== */
+.omni-details-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.omni-keep-card-modern {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.omni-keep-card-modern:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.omni-keep-card-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.omni-keep-cust-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.omni-keep-cust-phone {
+  font-size: 0.72rem;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 3px;
+  display: inline-block;
+}
+
+.omni-keep-cust-phone:hover {
+  text-decoration: underline;
+}
+
+.omni-keep-date-chip {
+  font-size: 0.66rem;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.omni-keep-info-box {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.omni-keep-info-row {
+  font-size: 0.74rem;
+  color: #334155;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.omni-keep-info-label {
+  color: #64748b;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.omni-keep-form-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.omni-keep-label-modern {
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.omni-keep-select-modern {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.omni-keep-select-modern:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.omni-keep-textarea-modern {
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  font-family: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.omni-keep-textarea-modern:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.omni-btn-save-modern {
+  width: 100%;
+  background: #0f172a;
+  border: none;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.omni-btn-save-modern:hover {
+  background: #2563eb;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}

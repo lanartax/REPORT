@@ -20,7 +20,7 @@
     <script src="lib/html2canvas.min.js"></script>
     <script src="lib/chart.umd.min.js"></script>
     <link rel="icon" type="image/png" href="logo.png">
-    <link rel="stylesheet" href="style.css?v=6.2">
+    <link rel="stylesheet" href="style.css?v=6.9">
 </head>
 
 <body>
@@ -1661,12 +1661,13 @@
                 <!-- ================= TAB 9: OMNICHANNEL INBOX FU (PREVIEW) ================= -->
                 <section id="tabContent9" class="tab-content">
                     <div class="omni-app-container">
-                        <!-- TOP NAVBAR: Clean & Monokrom -->
-                        <header class="omni-top-navbar">
-                            <div class="omni-brand-section">
-                                <div class="omni-brand-logo">Gadget<span class="omni-brand-accent">Mart</span></div>
-                                <div class="omni-view-switcher">
-                                    <button type="button" class="omni-nav-tab-btn active" id="btnOmniTabChats"
+                        <!-- MAIN WORKSPACE BODY (TOP NAVBAR REMOVED & MERGED INTO SIDEBAR) -->
+                        <div class="omni-main-body">
+                            <!-- FOLDERS & NAVIGATION SIDEBAR -->
+                            <aside class="omni-col-sidebar">
+                                <!-- VIEW SWITCHER: RELOCATED FROM NAVBAR -->
+                                <div class="omni-sidebar-view-switcher">
+                                    <button type="button" class="omni-sidebar-nav-btn active" id="btnOmniTabChats"
                                         onclick="switchOmniView('CHATS')">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2">
@@ -1674,7 +1675,7 @@
                                         </svg>
                                         <span>Inbox Percakapan</span>
                                     </button>
-                                    <button type="button" class="omni-nav-tab-btn" id="btnOmniTabMaster"
+                                    <button type="button" class="omni-sidebar-nav-btn" id="btnOmniTabMaster"
                                         onclick="switchOmniView('MASTER')">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2">
@@ -1686,23 +1687,9 @@
                                         <span>Master Data PIC FU</span>
                                     </button>
                                 </div>
-                            </div>
-                            <div class="omni-top-user-section">
-                                <span class="omni-badge-role">SUPERVISOR</span>
-                                <div class="omni-user-profile" title="Profil Admin">
-                                    <div class="omni-user-avatar">Y</div>
-                                    <div class="omni-user-meta">
-                                        <span class="omni-user-name">Yahya</span>
-                                        <span class="omni-user-email">yahya@gadgetmart.id</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </header>
 
-                        <!-- 1. VIEW CHATS: MAIN WORKSPACE -->
-                        <div class="omni-main-body" id="omniViewWorkspaceChats">
-                            <!-- FOLDERS SIDEBAR: HANYA 4 MENU -->
-                            <aside class="omni-col-sidebar">
+                                <div class="omni-sidebar-divider"></div>
+
                                 <div class="omni-inbox-header">
                                     <span class="omni-inbox-title">INBOX</span>
                                 </div>
@@ -1730,113 +1717,115 @@
                                 </div>
                             </aside>
 
-                            <!-- CHAT LIST (ALL CHATS) -->
-                            <div class="omni-col-chatlist">
-                                <div class="omni-chatlist-header">
-                                    <div class="omni-chatlist-top-bar">
-                                        <span class="omni-chatlist-main-title" id="omniChatListHeaderTitle">All
-                                            chats</span>
-                                        <div style="display:flex; align-items:center; gap:8px;">
-                                            <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0
-                                                chat</span>
-                                            <button type="button" class="omni-action-btn" onclick="clearOmniTestChats()"
-                                                title="Bersihkan riwayat chat uji coba" style="padding:2px 4px;">
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            <!-- 1. VIEW CHATS: CHATLIST + CHATVIEW + DETAILS -->
+                            <div class="omni-chats-wrapper" id="omniViewWorkspaceChats">
+                                <!-- CHAT LIST (ALL CHATS) -->
+                                <div class="omni-col-chatlist">
+                                    <div class="omni-chatlist-header">
+                                        <div class="omni-chatlist-top-bar">
+                                            <span class="omni-chatlist-main-title" id="omniChatListHeaderTitle">All
+                                                chats</span>
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0
+                                                    chat</span>
+                                                <button type="button" class="omni-action-btn" onclick="clearOmniTestChats()"
+                                                    title="Bersihkan riwayat chat uji coba" style="padding:2px 4px;">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path
+                                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="omni-search-input-wrap">
+                                            <span class="omni-search-icon">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor" stroke-width="2">
-                                                    <polyline points="3 6 5 6 21 6" />
-                                                    <path
-                                                        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                    <circle cx="11" cy="11" r="8" />
+                                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                                 </svg>
-                                            </button>
+                                            </span>
+                                            <input type="text" id="omniSearchInput" class="omni-search-input"
+                                                placeholder="Search name, phone, message..." oninput="filterOmniChats()">
                                         </div>
                                     </div>
-                                    <div class="omni-search-input-wrap">
-                                        <span class="omni-search-icon">
+
+                                    <div class="omni-chatlist-items" id="omniChatListContainer">
+                                        <!-- Rendered via client.js -->
+                                    </div>
+                                </div>
+
+                                <!-- ROOMCHAT (100% CERMIN WHATSAPP) -->
+                                <main class="omni-col-chatview" id="omniChatViewContainer">
+                                    <!-- Rendered via client.js: PT Sinar Jaya Selular empty state OR WhatsApp Roomchat -->
+                                </main>
+
+                                <!-- PANEL UPDATE FEEDBACK FORMAT KEEP -->
+                                <aside class="omni-col-details" id="omniDetailsPanelContainer">
+                                    <!-- Rendered via client.js -->
+                                </aside>
+                            </div>
+
+                            <!-- 2. VIEW MASTER DATA: DATABASE PIC FU -->
+                            <div class="omni-master-container" id="omniViewWorkspaceMaster" style="display:none;">
+                                <div class="omni-master-header">
+                                    <div>
+                                        <div class="omni-master-title">Master Data PIC Follow-Up</div>
+                                        <div class="omni-master-sub">Pencocokan otomatis nomor WhatsApp dengan Nama Tim
+                                            Follow-Up resmi toko cabang.</div>
+                                    </div>
+                                    <div class="omni-master-actions">
+                                        <div class="omni-master-search-wrap">
+                                            <input type="text" id="omniMasterSearchInput" class="omni-master-search-input"
+                                                placeholder="Cari nama PIC, no WA, atau cabang..."
+                                                oninput="renderOmniMasterTable()">
+                                        </div>
+                                        <button type="button" class="omni-btn-secondary"
+                                            onclick="syncMasterDataFromKeepCSV()"
+                                            title="Tarik nama & nomor PIC FU otomatis dari data keep">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2">
-                                                <circle cx="11" cy="11" r="8" />
-                                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                                <polyline points="23 4 23 10 17 10" />
+                                                <polyline points="1 20 1 14 7 14" />
+                                                <path
+                                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                                             </svg>
-                                        </span>
-                                        <input type="text" id="omniSearchInput" class="omni-search-input"
-                                            placeholder="Search name, phone, message..." oninput="filterOmniChats()">
+                                            <span>Sinkronkan dari Data Keep</span>
+                                        </button>
+                                        <button type="button" class="omni-btn-primary" onclick="openAddPicModal()">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19" />
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            </svg>
+                                            <span>Tambah PIC Baru</span>
+                                        </button>
                                     </div>
                                 </div>
 
-                                <div class="omni-chatlist-items" id="omniChatListContainer">
-                                    <!-- Rendered via client.js -->
+                                <div class="omni-master-table-wrapper">
+                                    <table class="omni-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px;">No</th>
+                                                <th style="width: 170px;">Nomor WhatsApp</th>
+                                                <th>Nama Tim Follow-Up (Resmi)</th>
+                                                <th style="width: 160px;">Cabang Toko</th>
+                                                <th style="width: 130px; text-align: center;">Format Keep Terkait</th>
+                                                <th style="width: 110px; text-align: center;">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="omniMasterTableBody">
+                                            <!-- Rendered via client.js -->
+                                        </tbody>
+                                    </table>
                                 </div>
-                            </div>
-
-                            <!-- ROOMCHAT (100% CERMIN WHATSAPP) -->
-                            <main class="omni-col-chatview" id="omniChatViewContainer">
-                                <!-- Rendered via client.js: PT Sinar Jaya Selular empty state OR WhatsApp Roomchat -->
-                            </main>
-
-                            <!-- PANEL UPDATE FEEDBACK FORMAT KEEP -->
-                            <aside class="omni-col-details" id="omniDetailsPanelContainer">
-                                <!-- Rendered via client.js -->
-                            </aside>
-                        </div>
-
-                        <!-- 2. VIEW MASTER DATA: DATABASE PIC FU -->
-                        <div class="omni-master-container" id="omniViewWorkspaceMaster" style="display:none;">
-                            <div class="omni-master-header">
-                                <div>
-                                    <div class="omni-master-title">Master Data PIC Follow-Up</div>
-                                    <div class="omni-master-sub">Pencocokan otomatis nomor WhatsApp dengan Nama Tim
-                                        Follow-Up resmi toko cabang.</div>
-                                </div>
-                                <div class="omni-master-actions">
-                                    <div class="omni-master-search-wrap">
-                                        <input type="text" id="omniMasterSearchInput" class="omni-master-search-input"
-                                            placeholder="Cari nama PIC, no WA, atau cabang..."
-                                            oninput="renderOmniMasterTable()">
-                                    </div>
-                                    <button type="button" class="omni-btn-secondary"
-                                        onclick="syncMasterDataFromKeepCSV()"
-                                        title="Tarik nama & nomor PIC FU otomatis dari data keep">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor" stroke-width="2">
-                                            <polyline points="23 4 23 10 17 10" />
-                                            <polyline points="1 20 1 14 7 14" />
-                                            <path
-                                                d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                                        </svg>
-                                        <span>Sinkronkan dari Data Keep</span>
-                                    </button>
-                                    <button type="button" class="omni-btn-primary" onclick="openAddPicModal()">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor" stroke-width="2">
-                                            <line x1="12" y1="5" x2="12" y2="19" />
-                                            <line x1="5" y1="12" x2="19" y2="12" />
-                                        </svg>
-                                        <span>Tambah PIC Baru</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="omni-master-table-wrapper">
-                                <table class="omni-table">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 50px;">No</th>
-                                            <th style="width: 170px;">Nomor WhatsApp</th>
-                                            <th>Nama Tim Follow-Up (Resmi)</th>
-                                            <th style="width: 160px;">Cabang Toko</th>
-                                            <th style="width: 130px; text-align: center;">Format Keep Terkait</th>
-                                            <th style="width: 110px; text-align: center;">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="omniMasterTableBody">
-                                        <!-- Rendered via client.js -->
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Modal Tambah / Edit Master Data PIC -->
                     <div id="omniPicModal" class="modal-overlay" style="display:none">
                         <div class="modal-dialog card-tegas" style="max-width: 440px;">
                             <div class="modal-header">
@@ -2275,7 +2264,7 @@
         </div>
     </div>
 
-  <script src="client.js?v=6.7"></script>
+  <script src="client.js?v=6.9"></script>
 </body>
 
 </html>
