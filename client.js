@@ -8774,7 +8774,7 @@ async function pollWatzapIncomingMessages() {
       const cleanPhone = cleanPhoneDigits(msg.phone);
       if (!cleanPhone) return;
 
-      const matched = matchPicFromMasterData(cleanPhone, 'PIC ' + cleanPhone, '-');
+      const matched = matchPicFromMasterData(cleanPhone, msg.senderName || ('PIC ' + cleanPhone), '-');
       const picKey = matched.wa || cleanPhone;
 
       if (!threads[picKey]) threads[picKey] = [];
@@ -8782,6 +8782,7 @@ async function pollWatzapIncomingMessages() {
       if (!alreadyExists) {
         threads[picKey].push({
           sender: msg.sender || 'PIC',
+          senderName: msg.senderName || matched.picName,
           text: msg.message,
           timestamp: msg.timestamp
         });

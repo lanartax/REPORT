@@ -82,28 +82,24 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
-      console.log('📥 [WATZAP WEBHOOK RECEIVED]:', JSON.stringify(body));
-
       const data = body.data || body;
 
-      // Extract phone number (handling formats like '628xxx@s.whatsapp.net', 'from', 'phone', etc.)
-      let rawPhone = data.phone || data.from || data.sender || data.phone_no || data.wa_number || body.phone || body.from || '';
-      rawPhone = String(rawPhone).replace(/@.*$/, '');
+      // Real WatZap field is 'chat_id' (e.g. '628xxx@s.whatsapp.net' or group '@g.us')
+      const rawChatId = data.chat_id || data.phone || data.from || data.sender || data.phone_no || body.phone || '';
+      const isGroup = String(rawChatId).includes('@g.us');
+      const cleanPhone = String(rawChatId).replace(/@.*$/, '').replace(/\D/g, '');
 
-      // Extract text message (WatZap uses message_body for unofficial, message_text for official)
-      let text = data.message_body || data.message_text || data.message || data.body || data.text || body.message_body || body.message_text || body.message || '';
-      if (typeof text !== 'string') text = String(text || '');
-
+      // Real WatZap field is 'message_body'
+      const text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
+      const senderName = data.name || data.pushName || '';
       const isFromMe = data.is_from_me === true || body.is_from_me === true;
-      const messageId = data.message_id || data.id || body.message_id || ('wz_' + Date.now());
+      const messageId = data.message_id || data.id || ('wz_' + Date.now());
 
       let ts = Date.now();
       if (data.timestamp || body.timestamp) {
         const parsed = Number(data.timestamp || body.timestamp);
         ts = parsed > 10000000000 ? parsed : parsed * 1000;
       }
-
-      const cleanPhone = String(rawPhone).replace(/\D/g, '');
 
       if (cleanPhone && text) {
         const msgs = await getStoredMessages();
@@ -114,7 +110,9 @@ module.exports = async function handler(req, res) {
             phone: cleanPhone,
             message: text,
             sender: isFromMe ? 'ADMIN' : 'PIC',
-            type: data.type || data.message_type || body.type || 'text',
+            senderName: senderName,
+            isGroup: isGroup,
+            type: data.type || body.type || 'text',
             timestamp: ts
           });
           await saveStoredMessages(msgs);
