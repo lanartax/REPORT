@@ -5123,6 +5123,1213 @@ h1, h2, h3, h4, h5, h6,
   margin: 0 8px;
 }
 
+/* ==========================================================================
+   OMNICHANNEL INBOX & FOLLOW-UP CONSOLE (PREVIEW MODULE)
+   ========================================================================== */
+.nav-pill-preview {
+  position: relative;
+  border: 1px solid #3b82f6 !important;
+  color: #60a5fa !important;
+}
+
+.preview-tag-pill {
+  font-size: 0.60rem;
+  font-weight: 800;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.preview-badge-dot {
+  width: 7px;
+  height: 7px;
+  background: #3b82f6;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  box-shadow: 0 0 8px #3b82f6;
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* ==========================================================================
+   17. OMNICHANNEL INBOX FU CONSOLE (CLEAN MONOCHROME ENTERPRISE CRM)
+   ========================================================================== */
+
+.omni-app-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 680px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #0f172a;
+}
+
+/* TOP NAVBAR */
+.omni-top-navbar {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.omni-brand-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.omni-brand-logo {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.omni-brand-accent {
+  color: #2563eb;
+}
+
+.omni-view-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.omni-nav-tab-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.omni-nav-tab-btn:hover {
+  color: #0f172a;
+}
+
+.omni-nav-tab-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.omni-top-user-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.omni-badge-role {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.omni-user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omni-user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 800;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+}
+
+.omni-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.omni-user-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.omni-user-email {
+  font-size: 0.66rem;
+  color: #64748b;
+}
+
+/* MAIN WORKSPACE BODY */
+.omni-main-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100% - 54px);
+}
+
+/* 1. LEFT SIDEBAR: INBOX FOLDERS (HANYA 4 MENU) */
+.omni-col-sidebar {
+  width: 190px;
+  min-width: 180px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px;
+  user-select: none;
+}
+
+.omni-inbox-header {
+  padding: 0 6px 12px 6px;
+}
+
+.omni-inbox-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.omni-folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.omni-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 0.80rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.omni-nav-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.omni-nav-item.active {
+  background: #f1f5f9;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.omni-nav-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.omni-nav-item.active .omni-nav-badge {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.omni-nav-badge.badge-unread {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* 2. CHAT LIST (ALL CHATS) */
+.omni-col-chatlist {
+  width: 310px;
+  min-width: 290px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.omni-chatlist-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.omni-chatlist-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.omni-chatlist-main-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.omni-chatlist-total-count {
+  font-size: 0.70rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.omni-search-input-wrap {
+  position: relative;
+}
+
+.omni-search-input {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  padding: 7px 12px 7px 30px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  box-sizing: border-box;
+}
+
+.omni-search-input:focus {
+  outline: none;
+  border-color: #0f172a;
+  background: #ffffff;
+}
+
+.omni-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 8px;
+  color: #94a3b8;
+  display: flex;
+}
+
+.omni-chatlist-items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Chat Card */
+.omni-chat-card {
+  padding: 11px 13px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+}
+
+.omni-chat-card:hover {
+  background: #f8fafc;
+}
+
+.omni-chat-card.active {
+  background: #f1f5f9;
+  border-left: 3px solid #0f172a;
+}
+
+.omni-card-check {
+  margin-top: 7px;
+  accent-color: #0f172a;
+  cursor: pointer;
+}
+
+.omni-card-avatar-wrap {
+  position: relative;
+}
+
+.omni-avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 800;
+  border: 1px solid #e2e8f0;
+}
+
+.omni-badge-wa-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #ffffff;
+}
+
+.omni-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.omni-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.omni-card-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 145px;
+}
+
+.omni-card-time {
+  font-size: 0.68rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.omni-card-snippet {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.omni-card-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.omni-channel-tag {
+  font-size: 0.64rem;
+  color: #94a3b8;
+}
+
+.omni-card-badges-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.omni-red-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.omni-status-tag-assigned {
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+/* 3. CENTER ACTIVE CHAT CONSOLE (100% CERMIN WHATSAPP) */
+.omni-col-chatview {
+  flex: 1;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Empty State PT Sinar Jaya Selular */
+.omni-empty-workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.omni-empty-bubble-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  margin-bottom: 14px;
+  border: 1px solid #e2e8f0;
+}
+
+.omni-empty-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.omni-empty-desc {
+  font-size: 0.80rem;
+  color: #64748b;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* WhatsApp Roomchat Header */
+.omni-chatview-header {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+}
+
+.omni-header-contact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.omni-header-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.80rem;
+  font-weight: 800;
+  border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+.omni-header-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.omni-header-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.omni-badge-fu-tag {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.60rem;
+  font-weight: 700;
+}
+
+.omni-header-meta {
+  font-size: 0.70rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.omni-dot-online {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: inline-block;
+}
+
+.omni-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omni-btn-wa-direct {
+  background: #00a884;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease;
+}
+
+.omni-btn-wa-direct:hover {
+  background: #008f6f;
+}
+
+/* WhatsApp Messages Stream */
+.omni-messages-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #efeae2;
+  background-image: radial-gradient(#d1d5db 0.75px, transparent 0.75px);
+  background-size: 16px 16px;
+}
+
+.omni-date-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0;
+}
+
+.omni-date-pill {
+  font-size: 0.66rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: #64748b;
+  padding: 3px 10px;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Chat Bubbles */
+.omni-msg-row {
+  display: flex;
+  gap: 8px;
+  max-width: 82%;
+}
+
+.omni-msg-bot {
+  align-self: flex-start;
+  max-width: 85%;
+}
+
+.omni-msg-incoming {
+  align-self: flex-start;
+}
+
+.omni-msg-outgoing {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.omni-bubble {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.80rem;
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+  position: relative;
+}
+
+/* WhatsApp Bot Bubble: Dark WhatsApp Green */
+.omni-bubble-bot {
+  background: #025144;
+  color: #ffffff;
+  border-top-left-radius: 2px;
+}
+
+.omni-bubble-bot-text {
+  font-size: 0.78rem;
+  line-height: 1.42;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #f1f5f9;
+}
+
+.omni-bubble-bot-text a {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.omni-bubble-bot .omni-bubble-time {
+  color: #94a3b8;
+}
+
+.omni-bubble-incoming {
+  background: #ffffff;
+  color: #0f172a;
+  border-top-left-radius: 2px;
+}
+
+.omni-bubble-outgoing {
+  background: #d9fdd3;
+  color: #111827;
+  border-top-right-radius: 2px;
+}
+
+.omni-bubble-sender {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 2px;
+}
+
+.omni-bubble-outgoing .omni-bubble-sender {
+  color: #047857;
+  text-align: right;
+}
+
+.omni-bubble-time {
+  font-size: 0.62rem;
+  color: #64748b;
+  margin-top: 4px;
+  text-align: right;
+  display: block;
+}
+
+/* WhatsApp Message Input Bar */
+.omni-chatview-footer {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.omni-quick-replies-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.omni-quick-replies-title {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.omni-btn-quick-reply {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.70rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.omni-btn-quick-reply:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.omni-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omni-input-icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.omni-input-icon-btn:hover {
+  color: #0f172a;
+}
+
+.omni-message-input {
+  flex: 1;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  resize: none;
+  height: 38px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.omni-message-input:focus {
+  outline: none;
+  border-color: #0f172a;
+  background: #ffffff;
+}
+
+.omni-btn-send {
+  background: #0f172a;
+  border: none;
+  color: #ffffff;
+  padding: 0 14px;
+  height: 38px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease;
+}
+
+.omni-btn-send:hover {
+  background: #334155;
+}
+
+/* 4. DEDICATED PANEL: FORMAT KEEP & UPDATE FEEDBACK */
+.omni-col-details {
+  width: 320px;
+  min-width: 300px;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.omni-keep-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.omni-keep-panel-title-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.omni-keep-panel-title {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.omni-keep-pending-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #ef4444;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.omni-keep-tabs-nav {
+  display: flex;
+  gap: 4px;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.omni-keep-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  padding: 5px 6px;
+  border-radius: 4px;
+  font-size: 0.70rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.omni-keep-tab-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Keep Card in Panel */
+.omni-keep-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  transition: all 0.15s ease;
+}
+
+.omni-keep-card:hover {
+  border-color: #cbd5e1;
+}
+
+.omni-keep-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.omni-keep-customer-name {
+  font-size: 0.80rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.omni-keep-customer-wa {
+  font-size: 0.68rem;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.omni-keep-customer-wa:hover {
+  text-decoration: underline;
+}
+
+.omni-keep-barang-row {
+  font-size: 0.74rem;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.omni-keep-barang-row strong {
+  color: #64748b;
+}
+
+.omni-keep-meta-row {
+  font-size: 0.66rem;
+  color: #94a3b8;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.omni-keep-catatan-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  padding: 5px 7px;
+  font-size: 0.70rem;
+  color: #475569;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+/* Keep Form Inside Card */
+.omni-keep-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.omni-keep-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.omni-keep-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  margin-bottom: 3px;
+  box-sizing: border-box;
+}
+
+.omni-keep-select:focus {
+  outline: none;
+  border-color: #0f172a;
+}
+
+.omni-keep-textarea {
+  width: 100%;
+  height: 60px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #0f172a;
+  padding: 6px 8px;
+  font-size: 0.74rem;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.omni-keep-textarea:focus {
+  outline: none;
+  border-color: #0f172a;
+}
+
+.omni-btn-save-keep {
+  width: 100%;
+  background: #0f172a;
+  border: none;
+  color: #ffffff;
+  padding: 7px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s ease;
+}
+
+.omni-btn-save-keep:hover {
+  background: #334155;
+}
+
+.omni-btn-save-keep:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.omni-keep-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 10px;
+  text-align: center;
+}
+
+.omni-keep-empty-icon {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+
+/* 5. MASTER DATA PIC FU VIEW */
+.omni-master-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: #ffffff;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.omni-master-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.omni-master-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.omni-master-sub {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.omni-master-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.omni-master-search-input {
+  width: 250px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+
+.omni-master-search-input:focus {
+  outline: none;
+  border-color: #0f172a;
+  background: #ffffff;
+}
+
+.omni-btn-primary {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease;
+}
+
+.omni-btn-primary:hover {
+  background: #334155;
+}
+
+.omni-btn-secondary {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.omni-btn-secondary:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.omni-master-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.omni-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.omni-table th {
+  background: #f8fafc;
+  padding: 10px 14px;
+  font-weight: 800;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.omni-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+
+.omni-table tr:hover td {
+  background: #f8fafc;
+}
+
+.omni-table-action-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.omni-table-action-btn:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.omni-table-action-delete:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+
+
 
 
 

@@ -3,7 +3,7 @@ const path = require('path');
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
 
-function updateLocalCsv(nomorWA, newStatus) {
+function updateLocalCsv(nomorWA, newStatus, feedback = null) {
   try {
     const csvPath = path.join(process.cwd(), 'keep-data.csv');
     if (!fs.existsSync(csvPath)) return;
@@ -24,8 +24,9 @@ function updateLocalCsv(nomorWA, newStatus) {
       if (cols.length > 7) {
         const rowWA = String(cols[7] || '').replace(/\D/g, '');
         if (rowWA === targetWA || (rowWA.length >= 9 && rowWA.slice(-9) === targetLast9)) {
-          while (cols.length < 22) cols.push('');
-          cols[21] = String(newStatus || '').trim();
+          while (cols.length < 23) cols.push('');
+          if (newStatus !== null && newStatus !== undefined) cols[21] = String(newStatus).trim();
+          if (feedback !== null && feedback !== undefined) cols[22] = String(feedback).trim();
           lines[i] = cols.join(',');
           updated = true;
           break;
@@ -53,15 +54,18 @@ module.exports = async function handler(req, res) {
   try {
     let nomorWA = '';
     let status = '';
+    let feedback = '';
 
     if (req.method === 'POST') {
       const body = req.body || {};
       nomorWA = body.nomorWA || '';
       status = body.status || '';
+      feedback = body.feedback || '';
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       nomorWA = urlParams.searchParams.get('nomorWA') || (req.query && req.query.nomorWA) || '';
       status = urlParams.searchParams.get('status') || (req.query && req.query.status) || '';
+      feedback = urlParams.searchParams.get('feedback') || (req.query && req.query.feedback) || '';
     }
 
     if (!nomorWA) {
@@ -69,9 +73,12 @@ module.exports = async function handler(req, res) {
     }
 
     const cleanWA = String(nomorWA).replace(/\D/g, '');
-    updateLocalCsv(cleanWA, status);
+    updateLocalCsv(cleanWA, status, feedback);
 
-    const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(cleanWA)}&status=${encodeURIComponent(status)}`;
+    let targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(cleanWA)}&status=${encodeURIComponent(status || '')}`;
+    if (feedback) {
+      targetUrl += `&feedback=${encodeURIComponent(feedback)}`;
+    }
     const gasRes = await fetch(targetUrl, { redirect: 'follow' });
     const gasJson = await gasRes.json();
 

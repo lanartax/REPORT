@@ -82,7 +82,7 @@ function stringifyCsvSimple(arr) {
 }
 
 // 1. Helper update status keep di file keep-data.csv lokal (0ms)
-function updateLocalKeepCsvStatus(nomorWA, newStatus) {
+function updateLocalKeepCsvStatus(nomorWA, newStatus, feedback = null) {
   try {
     const cachePath = path.join(PUBLIC_DIR, 'keep-data.csv');
     if (!fs.existsSync(cachePath)) return false;
@@ -97,8 +97,10 @@ function updateLocalKeepCsvStatus(nomorWA, newStatus) {
     const headers = arr[0];
     let waCol = headers.findIndex(h => h.trim().toLowerCase().includes('nomor wa') || h.trim().toLowerCase() === 'wa');
     let statusCol = headers.findIndex(h => h.trim().toLowerCase() === 'status');
+    let fbCol = headers.findIndex(h => h.trim().toLowerCase().includes('feedback'));
     if (waCol === -1) waCol = 7;
     if (statusCol === -1) statusCol = 21;
+    if (fbCol === -1) fbCol = 22;
 
     let modified = false;
     for (let i = arr.length - 1; i >= 1; i--) {
@@ -106,8 +108,10 @@ function updateLocalKeepCsvStatus(nomorWA, newStatus) {
       if (r[waCol]) {
         const rowWA = r[waCol].replace(/\D/g, '');
         if (rowWA === cleanWA || (rowWA.length >= 9 && cleanWA.endsWith(rowWA)) || (cleanWA.length >= 9 && rowWA.endsWith(cleanWA))) {
-          while (r.length <= statusCol) r.push('');
-          r[statusCol] = newStatus;
+          const maxTargetCol = Math.max(statusCol, fbCol);
+          while (r.length <= maxTargetCol) r.push('');
+          if (newStatus !== null && newStatus !== undefined) r[statusCol] = newStatus;
+          if (feedback !== null && feedback !== undefined) r[fbCol] = feedback;
           modified = true;
           break;
         }
@@ -116,9 +120,9 @@ function updateLocalKeepCsvStatus(nomorWA, newStatus) {
 
     if (modified) {
       fs.writeFileSync(cachePath, stringifyCsvSimple(arr), 'utf8');
-      console.log(`⚡ [Cache Lokal] keep-data.csv diupdate: WA=${nomorWA} -> Status=${newStatus}`);
+      console.log(`⚡ [Cache Lokal] keep-data.csv diupdate: WA=${nomorWA} -> Status=${newStatus || '-'}, Feedback=${feedback || '-'}`);
       // SIARAN LANGSUNG KE SEMUA LAPTOP LAN
-      broadcastLiveEvent('KEEP_STATUS_UPDATED', { nomorWA: cleanWA, status: newStatus, timestamp: Date.now() });
+      broadcastLiveEvent('KEEP_STATUS_UPDATED', { nomorWA: cleanWA, status: newStatus, feedback: feedback, timestamp: Date.now() });
       return true;
     }
   } catch (err) {
@@ -277,21 +281,24 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 3. API Update Keep Status to Google Sheets via Google Apps Script Web App
+  // 3. API Update Keep Status & Feedback to Google Sheets via Google Apps Script Web App
   if (reqPath === '/api/update-keep-status') {
-    const handleUpdateStatus = async (nomorWA, status) => {
-      if (!nomorWA || !status) {
+    const handleUpdateStatus = async (nomorWA, status, feedback = '') => {
+      if (!nomorWA) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'nomorWA dan status harus diisi' }));
+        res.end(JSON.stringify({ success: false, error: 'nomorWA harus diisi' }));
         return;
       }
 
       // Perbarui file lokal keep-data.csv seketika & siarkan via SSE (0ms)
-      updateLocalKeepCsvStatus(nomorWA, status);
+      updateLocalKeepCsvStatus(nomorWA, status, feedback);
 
-      console.log(`📤 Mengirim update status ke Google Sheets: WA=${nomorWA}, Status=${status}`);
+      console.log(`📤 Mengirim update status/feedback ke Google Sheets: WA=${nomorWA}, Status=${status || '-'}, Feedback=${feedback || '-'}`);
       try {
-        const targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status)}`;
+        let targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status || '')}`;
+        if (feedback) {
+          targetUrl += `&feedback=${encodeURIComponent(feedback)}`;
+        }
         const gasRes = await fetch(targetUrl, { redirect: 'follow' });
         const gasJson = await gasRes.json();
         console.log('📥 Respon Google Apps Script:', gasJson);
@@ -310,7 +317,7 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-          await handleUpdateStatus(body.nomorWA || '', body.status || '');
+          await handleUpdateStatus(body.nomorWA || '', body.status || '', body.feedback || '');
         } catch (e) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Format JSON tidak valid' }));
@@ -319,7 +326,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host}`);
-      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '');
+      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '', urlParams.searchParams.get('feedback') || '');
       return;
     }
   }
