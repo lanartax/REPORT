@@ -8058,6 +8058,16 @@ const OMNI_STATUS_PALETTE = {
   'TAKE OUT': { bg: '#fff1f2', text: '#9f1239', border: '#f43f5e' }
 };
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function cleanPhoneDigits(raw) {
   if (!raw) return '';
   return String(raw).replace(/\D/g, '');
@@ -8397,65 +8407,102 @@ function filterOmniChats() {
 }
 
 function getOmniPicChats() {
-  if (!Array.isArray(rawKeepRows) || rawKeepRows.length === 0) return [];
-  const picMap = {};
-  for (let i = rawKeepRows.length - 1; i >= 0; i--) {
-    const r = rawKeepRows[i];
-    const customerWA = cleanPhoneDigits(r['Nomor WA'] || '');
-    if (!customerWA || customerWA.length < 8) continue;
-    const rawPicWA = cleanPhoneDigits(r['Nomor Follow Up'] || r['Nomor FU'] || '');
-    const rawPicName = (r['Nama Tim Follow Up'] || r['Nama Tim FU'] || '').trim();
-    const rawCabang = (r['Cabang'] || '-').trim();
-    const sender = (r['Sender'] || '-').trim();
-    const matched = matchPicFromMasterData(rawPicWA || customerWA, rawPicName, rawCabang);
-    const picWA = matched.wa || rawPicWA || customerWA;
-    const picName = matched.picName;
-    const cabang = matched.cabang || rawCabang;
-    const picKey = picWA || picName.toLowerCase().replace(/\s+/g, '_');
-    const customerName = (r['Nama'] || 'Customer').trim();
-    const barang = (r['Barang Keep'] || '-').trim();
-    const catatan = (r['Catatan'] || '-').trim();
-    const status = (r['Status'] || 'BELUM DIINPUT').trim() || 'BELUM DIINPUT';
-    const feedback = (r['Feedback Tim FU'] || '').trim();
-    const timestamp = r['Timestamp'] || '';
-    const remarks = (r['Remarks'] || r['Kode Sosmed'] || sender || '-').trim();
-    const isPending = (!feedback || feedback === '-' || feedback === '""') || status === 'BELUM DIINPUT' || !status;
-    if (!picMap[picKey]) {
-      picMap[picKey] = {
-        key: picKey,
-        picName: picName,
-        picWA: picWA,
+  const threads = getOmniThreads();
+  const activeKeys = Object.keys(threads).filter(k => Array.isArray(threads[k]) && threads[k].length > 0);
+
+  // Jika belum ada pesan masuk dari webhook atau balasan baru, mulai dari 0 chat
+  if (activeKeys.length === 0) return [];
+
+  // Index seluruh keep rows berdasarkan nomor/PIC untuk lookup instan
+  const picKeepsMap = {};
+  if (Array.isArray(rawKeepRows)) {
+    for (let i = rawKeepRows.length - 1; i >= 0; i--) {
+      const r = rawKeepRows[i];
+      const customerWA = cleanPhoneDigits(r['Nomor WA'] || '');
+      if (!customerWA || customerWA.length < 8) continue;
+
+      const rawPicWA = cleanPhoneDigits(r['Nomor Follow Up'] || r['Nomor FU'] || '');
+      const rawPicName = (r['Nama Tim Follow Up'] || r['Nama Tim FU'] || '').trim();
+      const rawCabang = (r['Cabang'] || '-').trim();
+      const sender = (r['Sender'] || '-').trim();
+
+      const matched = matchPicFromMasterData(rawPicWA || customerWA, rawPicName, rawCabang);
+      const picWA = matched.wa || rawPicWA || customerWA;
+      const picName = matched.picName;
+      const cabang = matched.cabang || rawCabang;
+      const picKey = picWA || picName.toLowerCase().replace(/\s+/g, '_');
+
+      const customerName = (r['Nama'] || 'Customer').trim();
+      const barang = (r['Barang Keep'] || '-').trim();
+      const catatan = (r['Catatan'] || '-').trim();
+      const status = (r['Status'] || 'BELUM DIINPUT').trim() || 'BELUM DIINPUT';
+      const feedback = (r['Feedback Tim FU'] || '').trim();
+      const timestamp = r['Timestamp'] || '';
+      const remarks = (r['Remarks'] || r['Kode Sosmed'] || sender || '-').trim();
+      const isPending = (!feedback || feedback === '-' || feedback === '""') || status === 'BELUM DIINPUT' || !status;
+
+      const keepItem = {
+        customerWA: customerWA,
+        customerName: customerName,
+        barang: barang,
+        catatan: catatan,
         cabang: cabang,
         sender: sender,
-        keeps: [],
-        pendingCount: 0,
-        resolvedCount: 0,
-        latestTimestamp: timestamp,
-        latestSnippet: feedback ? feedback : ('Format Keep: ' + customerName + ' (' + barang + ')')
+        remarks: remarks,
+        status: status,
+        feedback: feedback,
+        timestamp: timestamp,
+        isPending: isPending,
+        rawRow: r
       };
-    }
-    const keepItem = {
-      customerWA: customerWA,
-      customerName: customerName,
-      barang: barang,
-      catatan: catatan,
-      cabang: cabang,
-      sender: sender,
-      remarks: remarks,
-      status: status,
-      feedback: feedback,
-      timestamp: timestamp,
-      isPending: isPending,
-      rawRow: r
-    };
-    picMap[picKey].keeps.push(keepItem);
-    if (isPending) {
-      picMap[picKey].pendingCount++;
-    } else {
-      picMap[picKey].resolvedCount++;
+
+      if (!picKeepsMap[picKey]) picKeepsMap[picKey] = [];
+      picKeepsMap[picKey].push(keepItem);
+
+      if (picWA) {
+        if (!picKeepsMap[picWA]) picKeepsMap[picWA] = picKeepsMap[picKey];
+        const last9 = picWA.slice(-9);
+        if (last9.length >= 9 && !picKeepsMap[last9]) picKeepsMap[last9] = picKeepsMap[picKey];
+      }
     }
   }
-  return Object.values(picMap);
+
+  // Bangun daftar chat HANYA untuk kontak yang memiliki percakapan aktif di threads
+  const result = [];
+  activeKeys.forEach(key => {
+    const chatMsgs = threads[key] || [];
+    const lastMsg = chatMsgs[chatMsgs.length - 1];
+
+    const matched = matchPicFromMasterData(key, 'PIC ' + key, '-');
+    const picWA = matched.wa || key;
+    const picName = matched.picName;
+    const cabang = matched.cabang || '-';
+
+    const last9 = picWA.slice(-9);
+    const keeps = picKeepsMap[key] || picKeepsMap[picWA] || (last9.length >= 9 ? picKeepsMap[last9] : []) || [];
+    const pendingCount = keeps.filter(k => k.isPending).length;
+    const resolvedCount = keeps.filter(k => !k.isPending).length;
+
+    let latestTimestamp = '';
+    if (lastMsg && lastMsg.timestamp) {
+      const d = new Date(lastMsg.timestamp);
+      latestTimestamp = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    result.push({
+      key: key,
+      picName: picName,
+      picWA: picWA,
+      cabang: cabang,
+      keeps: keeps,
+      pendingCount: pendingCount,
+      resolvedCount: resolvedCount,
+      latestTimestamp: latestTimestamp,
+      latestSnippet: lastMsg ? (lastMsg.sender === 'ADMIN' ? 'Anda: ' + lastMsg.text : lastMsg.text) : 'Percakapan baru'
+    });
+  });
+
+  return result;
 }
 
 function renderOmniInboxModule() {
@@ -8480,17 +8527,17 @@ function renderOmniInboxModule() {
     filtered = allChats.filter(p => p.pendingCount === 0 && p.resolvedCount > 0);
   }
   const searchInp = document.getElementById('omniSearchInput');
-  const query = searchInp ? searchInp.value.toLowerCase().trim() : '';
+  const query = (searchInp && searchInp.value) ? String(searchInp.value).toLowerCase().trim() : '';
   if (query) {
     filtered = filtered.filter(pic => {
-      const matchName = pic.picName.toLowerCase().includes(query);
-      const matchWA = pic.picWA.includes(query);
-      const matchCabang = pic.cabang.toLowerCase().includes(query);
-      const matchKeep = pic.keeps.some(k =>
-        k.customerName.toLowerCase().includes(query) ||
-        k.barang.toLowerCase().includes(query) ||
-        k.customerWA.includes(query) ||
-        (k.feedback && k.feedback.toLowerCase().includes(query))
+      const matchName = String(pic.picName || '').toLowerCase().includes(query);
+      const matchWA = String(pic.picWA || '').includes(query);
+      const matchCabang = String(pic.cabang || '').toLowerCase().includes(query);
+      const matchKeep = (pic.keeps || []).some(k =>
+        String(k.customerName || '').toLowerCase().includes(query) ||
+        String(k.barang || '').toLowerCase().includes(query) ||
+        String(k.customerWA || '').includes(query) ||
+        (k.feedback && String(k.feedback).toLowerCase().includes(query))
       );
       return matchName || matchWA || matchCabang || matchKeep;
     });
@@ -8500,7 +8547,7 @@ function renderOmniInboxModule() {
   const listContainer = document.getElementById('omniChatListContainer');
   if (!listContainer) return;
   if (filtered.length === 0) {
-    listContainer.innerHTML = '<div style="padding: 30px 16px; text-align: center; color: #64748b; font-size: 0.78rem;">Tidak ada percakapan PIC FU yang sesuai.</div>';
+    listContainer.innerHTML = '<div style="padding: 36px 18px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">Belum ada percakapan masuk.<br><span style="font-size:0.72rem; color:#94a3b8;">Pesan dari WhatsApp Bot atau balasan PIC FU setelah webhook aktif akan otomatis masuk ke sini.</span></div>';
     const chatView = document.getElementById('omniChatViewContainer');
     const detailsView = document.getElementById('omniDetailsPanelContainer');
     if (chatView && !selectedOmniPicKey) {
