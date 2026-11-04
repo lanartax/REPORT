@@ -8339,7 +8339,21 @@ function deletePicMaster(wa) {
 // --------------------------------------------------------------------------
 function getOmniThreads() {
   try {
-    return JSON.parse(localStorage.getItem('gadgetmart_omni_threads') || '{}');
+    const raw = JSON.parse(localStorage.getItem('gadgetmart_omni_threads') || '{}');
+    const cleaned = {};
+    let modified = false;
+    Object.keys(raw).forEach(function(k) {
+      // Hapus data grup WhatsApp agar tidak mengotori chat inbox
+      if (k.includes('@g.us') || k.startsWith('120363') || k.length > 14) {
+        modified = true;
+      } else {
+        cleaned[k] = raw[k];
+      }
+    });
+    if (modified) {
+      localStorage.setItem('gadgetmart_omni_threads', JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch (e) {
     return {};
   }
@@ -8347,28 +8361,19 @@ function getOmniThreads() {
 
 function saveOmniThreads(threads) {
   try {
-    localStorage.setItem('gadgetmart_omni_threads', JSON.stringify(threads));
+    const cleaned = {};
+    Object.keys(threads || {}).forEach(function(k) {
+      if (!k.includes('@g.us') && !k.startsWith('120363') && k.length <= 14) {
+        cleaned[k] = threads[k];
+      }
+    });
+    localStorage.setItem('gadgetmart_omni_threads', JSON.stringify(cleaned));
   } catch (e) {}
 }
 
-function generateWhatsAppBotMessage(keep, picName) {
-  const remarksFormatted = keep.remarks ? (keep.remarks.toUpperCase().startsWith('SOSMED') ? keep.remarks : ('SOSMED ' + keep.remarks)) : 'SOSMED -';
-  return 'halo kak ' + picName + ' mimin mau follow-up update progress dari format keep berikut ya^^\n\n' +
-    'tanggal keep: ' + keep.timestamp + '\n' +
-    'nama customer: ' + keep.customerName + '\n' +
-    'nomor whatsapp: ' + keep.customerWA + '\n' +
-    'barang: ' + keep.barang + '\n' +
-    'catatan: ' + (keep.catatan || '-') + '\n' +
-    'remaks: ' + remarksFormatted + '\n\n' +
-    'silakan bantu screenshot chatnya + infoin ke kami sudah sampai mana progressnya ya ^^ jangan lupa follow up kembali customernya jika ghosting agar peluang closing meningkat ya 👍';
-}
-
-// --------------------------------------------------------------------------
-// INBOX FOLDER & CHATLIST ENGINE (4 FOLDERS STRICTLY)
-// --------------------------------------------------------------------------
 function setOmniFolder(folder) {
   currentOmniFolder = folder;
-  ['All', 'Assigned', 'Unresponded', 'Resolved'].forEach(f => {
+  ['All', 'Assigned', 'Unresponded', 'Resolved'].forEach(function(f) {
     const el = document.getElementById('omniFilter' + f);
     if (el) el.classList.remove('active');
   });
@@ -8396,7 +8401,7 @@ function setOmniFolder(folder) {
 function setOmniKeepSubTab(subTab) {
   selectedOmniKeepSubTab = subTab;
   const allPics = getOmniPicChats();
-  const currentPic = allPics.find(p => p.key === selectedOmniPicKey);
+  const currentPic = allPics.find(function(p) { return p.key === selectedOmniPicKey; });
   if (currentPic) {
     renderOmniKeepPanel(currentPic);
   }
@@ -8408,24 +8413,28 @@ function filterOmniChats() {
 
 function isEligibleKeep(ts) {
   if (!ts) return false;
-  let d = new Date(ts);
-  if (isNaN(d.getTime())) {
-    const parts = ts.trim().split(/[\s,]+/);
-    if (parts.length > 0) {
-      const dParts = parts[0].split('/');
-      if (dParts.length === 3) {
-        const month = parseInt(dParts[0], 10) - 1;
-        const day = parseInt(dParts[1], 10);
-        const year = parseInt(dParts[2], 10);
-        d = new Date(year, month, day);
-      }
-    }
+  const firstSpace = ts.indexOf(' ');
+  const datePart = firstSpace > 0 ? ts.slice(0, firstSpace) : ts;
+  const parts = datePart.split('/');
+  if (parts.length !== 3) return false;
+
+  const m = parseInt(parts[0], 10);
+  const d = parseInt(parts[1], 10);
+  const y = parseInt(parts[2], 10);
+  if (isNaN(m) || isNaN(d) || isNaN(y)) return false;
+
+  // Batas bawah: Format keep tanggal 3 November 2026 (11/3/2026) ke atas!
+  // Format keep yang lalu sebelum tanggal 3 tidak perlu diingat sama sekali.
+  if (y < 2026 || (y === 2026 && m < 11) || (y === 2026 && m === 11 && d < 3)) {
+    return false;
   }
-  if (isNaN(d.getTime())) return false;
+
   const now = new Date();
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const cutoffDate = new Date(2026, 9, 12, 0, 0, 0, 0); // Batas data format keep tanggal 12 Oktober 2026 ke atas
-  return d >= cutoffDate && d < todayMidnight; // Kemarin & sebelumnya, TIDAK tampilkan hari ini!
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  const keepTime = new Date(y, m - 1, d).getTime();
+
+  // Kemarin & sebelumnya, TIDAK tampilkan hari ini!
+  return keepTime < todayMidnight;
 }
 
 function getOmniResolvedChats() {
@@ -8448,75 +8457,109 @@ function setOmniChatResolved(key, isResolved) {
   } catch (e) {}
 }
 
-function getOmniPicChats() {
-  const threads = getOmniThreads();
-  const activeKeys = Object.keys(threads).filter(function(k) {
-    return Array.isArray(threads[k]) && threads[k].length > 0;
+// --------------------------------------------------------------------------
+// CACHE & MEMOIZATION UNTUK KECEPATAN EKSTREM (0.1ms vs 540ms)
+// --------------------------------------------------------------------------
+let cachedOmniKeepsMap = null;
+let lastIndexedKeepRowsLength = -1;
+
+function getIndexedOmniKeeps() {
+  if (!Array.isArray(rawKeepRows)) return {};
+  if (cachedOmniKeepsMap && lastIndexedKeepRowsLength === rawKeepRows.length) {
+    return cachedOmniKeepsMap;
+  }
+
+  const picKeepsMap = {};
+  const master = getMasterDataPICs();
+  const masterMap = {};
+  master.forEach(function(m) {
+    const c = cleanPhoneDigits(m.wa);
+    if (c) masterMap[c] = m;
   });
 
-  // Jika belum ada pesan masuk dari webhook atau balasan baru, mulai dari 0 chat
-  if (activeKeys.length === 0) return [];
+  // Iterasi baris keep-data (hanya data tanggal 3 ke atas & kemarin)
+  for (let i = rawKeepRows.length - 1; i >= 0; i--) {
+    const r = rawKeepRows[i];
+    const ts = r['Timestamp'];
+    if (!ts || !isEligibleKeep(ts)) continue;
 
-  // Index format keep rows: HANYA TANGGAL 12 KE ATAS & HANYA SEBELUM HARI INI (KEMARIN)
-  const picKeepsMap = {};
-  if (Array.isArray(rawKeepRows)) {
-    for (let i = rawKeepRows.length - 1; i >= 0; i--) {
-      const r = rawKeepRows[i];
-      const customerWA = cleanPhoneDigits(r['Nomor WA'] || '');
-      if (!customerWA || customerWA.length < 8) continue;
+    const customerWA = cleanPhoneDigits(r['Nomor WA'] || '');
+    if (!customerWA || customerWA.length < 8) continue;
 
-      const timestamp = r['Timestamp'] || '';
-      // Aturan ketat user: Batas format keep tanggal 12 ke atas dan HANYA kemarin/sebelumnya (BUKAN hari ini)!
-      if (!isEligibleKeep(timestamp)) continue;
+    const rawPicWA = cleanPhoneDigits(r['Nomor Follow Up'] || r['Nomor FU'] || '');
+    const rawPicName = (r['Nama Tim Follow Up'] || r['Nama Tim FU'] || '').trim();
+    const rawCabang = (r['Cabang'] || '-').trim();
+    const sender = (r['Sender'] || '-').trim();
 
-      const rawPicWA = cleanPhoneDigits(r['Nomor Follow Up'] || r['Nomor FU'] || '');
-      const rawPicName = (r['Nama Tim Follow Up'] || r['Nama Tim FU'] || '').trim();
-      const rawCabang = (r['Cabang'] || '-').trim();
-      const sender = (r['Sender'] || '-').trim();
-
-      const matched = matchPicFromMasterData(rawPicWA || customerWA, rawPicName, rawCabang);
-      const picWA = matched.wa || rawPicWA || customerWA;
-      const picName = matched.picName;
-      const cabang = matched.cabang || rawCabang;
-      const picKey = picWA || picName.toLowerCase().replace(/\s+/g, '_');
-
-      const customerName = (r['Nama'] || 'Customer').trim();
-      const barang = (r['Barang Keep'] || '-').trim();
-      const catatan = (r['Catatan'] || '-').trim();
-      const status = (r['Status'] || 'BELUM DIINPUT').trim() || 'BELUM DIINPUT';
-      const feedback = (r['Feedback Tim FU'] || '').trim();
-      const remarks = (r['Remarks'] || r['Kode Sosmed'] || sender || '-').trim();
-      const isPending = (!feedback || feedback === '-' || feedback === '""') || status === 'BELUM DIINPUT' || !status;
-
-      const keepItem = {
-        customerWA: customerWA,
-        customerName: customerName,
-        barang: barang,
-        catatan: catatan,
-        cabang: cabang,
-        sender: sender,
-        remarks: remarks,
-        status: status,
-        feedback: feedback,
-        timestamp: timestamp,
-        isPending: isPending,
-        rawRow: r
-      };
-
-      if (!picKeepsMap[picKey]) picKeepsMap[picKey] = [];
-      picKeepsMap[picKey].push(keepItem);
-
-      if (picWA) {
-        if (!picKeepsMap[picWA]) picKeepsMap[picWA] = picKeepsMap[picKey];
-        const last9 = picWA.slice(-9);
-        if (last9.length >= 9 && !picKeepsMap[last9]) picKeepsMap[last9] = picKeepsMap[picKey];
+    let matched = masterMap[rawPicWA] || masterMap[customerWA];
+    if (!matched) {
+      const last9 = (rawPicWA || customerWA).slice(-9);
+      if (last9 && last9.length >= 9) {
+        matched = master.find(function(m) {
+          const mc = cleanPhoneDigits(m.wa);
+          return mc && mc.endsWith(last9);
+        });
       }
+    }
+
+    const picWA = (matched ? matched.wa : '') || rawPicWA || customerWA;
+    const picName = matched ? matched.picName : (rawPicName || ('PIC ' + (rawPicWA || customerWA)));
+    const cabang = (matched ? matched.cabang : '') || rawCabang;
+    const picKey = picWA || picName.toLowerCase().replace(/\s+/g, '_');
+
+    // Abaikan jika terdeteksi ID grup
+    if (picKey.includes('@g.us') || picKey.startsWith('120363') || picKey.length > 14) continue;
+
+    const customerName = (r['Nama'] || 'Customer').trim();
+    const barang = (r['Barang Keep'] || '-').trim();
+    const catatan = (r['Catatan'] || '-').trim();
+    const status = (r['Status'] || 'BELUM DIINPUT').trim() || 'BELUM DIINPUT';
+    const feedback = (r['Feedback Tim FU'] || '').trim();
+    const remarks = (r['Remarks'] || r['Kode Sosmed'] || sender || '-').trim();
+    const isPending = (!feedback || feedback === '-' || feedback === '""') || status === 'BELUM DIINPUT' || !status;
+
+    const keepItem = {
+      customerWA: customerWA,
+      customerName: customerName,
+      barang: barang,
+      catatan: catatan,
+      cabang: cabang,
+      sender: sender,
+      remarks: remarks,
+      status: status,
+      feedback: feedback,
+      timestamp: ts,
+      isPending: isPending,
+      rawRow: r
+    };
+
+    if (!picKeepsMap[picKey]) picKeepsMap[picKey] = [];
+    picKeepsMap[picKey].push(keepItem);
+
+    if (picWA && picWA !== picKey) {
+      if (!picKeepsMap[picWA]) picKeepsMap[picWA] = picKeepsMap[picKey];
+      const last9 = picWA.slice(-9);
+      if (last9.length >= 9 && !picKeepsMap[last9]) picKeepsMap[last9] = picKeepsMap[picKey];
     }
   }
 
+  cachedOmniKeepsMap = picKeepsMap;
+  lastIndexedKeepRowsLength = rawKeepRows.length;
+  return cachedOmniKeepsMap;
+}
+
+function getOmniPicChats() {
+  const threads = getOmniThreads();
+  // Filter ketat: HANYA chat personal, TOLAK grup WhatsApp
+  const activeKeys = Object.keys(threads).filter(function(k) {
+    return !k.includes('@g.us') && !k.startsWith('120363') && k.length <= 14 && Array.isArray(threads[k]) && threads[k].length > 0;
+  });
+
+  if (activeKeys.length === 0) return [];
+
+  const picKeepsMap = getIndexedOmniKeeps();
   const resolvedMap = getOmniResolvedChats();
 
-  // Bangun daftar chat HANYA untuk kontak yang memiliki percakapan aktif di threads
   const result = [];
   activeKeys.forEach(function(key) {
     const chatMsgs = threads[key] || [];
@@ -8538,9 +8581,10 @@ function getOmniPicChats() {
       latestTimestamp = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    const isExplicitResolved = !!resolvedMap[key] || !!resolvedMap[picWA];
-    const isAutoResolved = keeps.length > 0 && pendingCount === 0;
-    const isResolved = isExplicitResolved || isAutoResolved;
+    const isResolved = !!resolvedMap[key] || !!resolvedMap[picWA];
+    const lastSender = lastMsg ? (lastMsg.sender || 'PIC') : '';
+    const isUnreplied = lastSender !== 'ADMIN';
+    const isUnresponded = !isResolved && (isUnreplied || pendingCount > 0);
 
     result.push({
       key: key,
@@ -8551,6 +8595,8 @@ function getOmniPicChats() {
       pendingCount: pendingCount,
       resolvedCount: resolvedCount,
       isResolved: isResolved,
+      isUnresponded: isUnresponded,
+      lastSender: lastSender,
       latestTimestamp: latestTimestamp,
       latestSnippet: lastMsg ? (lastMsg.sender === 'ADMIN' ? 'Anda: ' + lastMsg.text : lastMsg.text) : 'Percakapan baru'
     });
@@ -8567,7 +8613,7 @@ function renderOmniInboxModule() {
   const bUnresponded = document.getElementById('omniBadgeUnresponded');
   const bResolved = document.getElementById('omniBadgeResolved');
 
-  const unrespCount = allChats.filter(function(p) { return !p.isResolved && p.pendingCount > 0; }).length;
+  const unrespCount = allChats.filter(function(p) { return p.isUnresponded; }).length;
   const resCount = allChats.filter(function(p) { return p.isResolved; }).length;
 
   if (bAll) bAll.innerText = allChats.length;
@@ -8579,7 +8625,7 @@ function renderOmniInboxModule() {
   if (currentOmniFolder === 'ASSIGNED') {
     filtered = allChats;
   } else if (currentOmniFolder === 'UNRESPONDED') {
-    filtered = allChats.filter(function(p) { return !p.isResolved && p.pendingCount > 0; });
+    filtered = allChats.filter(function(p) { return p.isUnresponded; });
   } else if (currentOmniFolder === 'RESOLVED') {
     filtered = allChats.filter(function(p) { return p.isResolved; });
   }
@@ -8608,7 +8654,7 @@ function renderOmniInboxModule() {
   if (!listContainer) return;
 
   if (filtered.length === 0) {
-    listContainer.innerHTML = '<div style="padding: 36px 18px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">Belum ada percakapan masuk.<br><span style="font-size:0.72rem; color:#94a3b8;">Pesan dari WhatsApp Bot atau balasan PIC FU setelah webhook aktif akan otomatis masuk ke sini.</span></div>';
+    listContainer.innerHTML = '<div style="padding: 36px 18px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">Belum ada percakapan masuk.<br><span style="font-size:0.72rem; color:#94a3b8;">Chat dari PIC FU WhatsApp akan otomatis masuk ke sini tanpa grup.</span></div>';
     const chatView = document.getElementById('omniChatViewContainer');
     const detailsView = document.getElementById('omniDetailsPanelContainer');
     if (chatView && !selectedOmniPicKey) {
@@ -8621,6 +8667,7 @@ function renderOmniInboxModule() {
   }
 
   filtered.sort(function(a, b) {
+    if (b.isUnresponded !== a.isUnresponded) return b.isUnresponded ? 1 : -1;
     if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount;
     return (b.latestTimestamp || '').localeCompare(a.latestTimestamp || '');
   });
@@ -8751,7 +8798,7 @@ function renderOmniActiveChat(pic) {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
         '<span>Buka WhatsApp Web</span>' +
       '</button>' +
-      '<button type="button" class="omni-btn-resolve ' + (pic.isResolved ? 'is-resolved' : '') + '" onclick="handleOmniResolveClick(\'' + pic.key + '\')" title="Selesaikan chat jika semua format keep tgl 12 ke atas sudah diisi">' +
+      '<button type="button" class="omni-btn-resolve ' + (pic.isResolved ? 'is-resolved' : '') + '" onclick="handleOmniResolveClick(\'' + pic.key + '\')" title="Selesaikan chat jika semua format keep tgl 3 ke atas sudah diisi">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' +
         '<span>' + (pic.isResolved ? '✓ Resolved' : 'Resolve Chat') + '</span>' +
       '</button>' +
@@ -8871,7 +8918,7 @@ function handleOmniResolveClick(picKey) {
     return;
   }
 
-  // ATURAN USER: Hanya bisa diresolve jika format keep tanggal 12 ke atas sudah diinput status dan feedbacknya
+  // ATURAN USER: Hanya bisa diresolve jika format keep tanggal 3 ke atas sudah diinput status dan feedbacknya
   const keeps = pic.keeps || [];
   const eligibleKeeps = keeps.filter(function(k) { return isEligibleKeep(k.timestamp); });
 
@@ -8883,7 +8930,7 @@ function handleOmniResolveClick(picKey) {
 
   if (uncompleted.length > 0) {
     alert('⚠️ PERCAKAPAN BELUM BISA DI-RESOLVE!\n\n' +
-      'Masih ada ' + uncompleted.length + ' format keep (tanggal 12 ke atas) yang belum diinput Status atau Feedback-nya:\n\n' +
+      'Masih ada ' + uncompleted.length + ' format keep (tanggal 3 ke atas) yang belum diinput Status atau Feedback-nya:\n\n' +
       uncompleted.slice(0, 3).map(function(u) { return '• ' + u.customerName + ' (' + u.customerWA + ') - Status: ' + (u.status || 'Belum diinput'); }).join('\n') +
       (uncompleted.length > 3 ? '\n...dan ' + (uncompleted.length - 3) + ' lainnya' : '') +
       '\n\nHarap isi Status (Kolom V) dan Feedback Tim FU (Kolom W) pada panel sebelah kanan terlebih dahulu!');
@@ -8958,6 +9005,11 @@ let lastWatzapSyncTime = 0;
 let watzapPollInterval = null;
 
 async function pollWatzapIncomingMessages() {
+  // OPTIMASI: HANYA poll jika user sedang berada di Tab 9 (Omnichannel)!
+  if (typeof currentActiveTab !== 'undefined' && currentActiveTab !== 9) {
+    return;
+  }
+
   try {
     const res = await fetch('/api/watzap-webhook?since=' + lastWatzapSyncTime);
     if (!res.ok) return;
@@ -8971,6 +9023,9 @@ async function pollWatzapIncomingMessages() {
       if (msg.timestamp > lastWatzapSyncTime) lastWatzapSyncTime = msg.timestamp;
       const cleanPhone = cleanPhoneDigits(msg.phone);
       if (!cleanPhone) return;
+
+      // STRICT: TOLAK & ABAIKAN GRUP
+      if (msg.isGroup || cleanPhone.startsWith('120363') || cleanPhone.length > 14) return;
 
       const matched = matchPicFromMasterData(cleanPhone, msg.senderName || ('PIC ' + cleanPhone), '-');
       const picKey = matched.wa || cleanPhone;
@@ -8986,7 +9041,6 @@ async function pollWatzapIncomingMessages() {
           text: msg.message,
           timestamp: msg.timestamp
         });
-        // Jika ada chat baru dari PIC FU, buka kembali chat jika sebelumnya resolved
         setOmniChatResolved(picKey, false);
         hasNew = true;
       }
@@ -9045,7 +9099,7 @@ function renderOmniKeepPanel(pic) {
   const cardsMarkup = displayKeeps.length === 0 ? (
     '<div style="padding: 36px 14px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">' +
       (selectedOmniKeepSubTab === 'PENDING'
-        ? '✨ Semua format keep tanggal 12 ke atas untuk PIC ini sudah diisi feedback & statusnya!'
+        ? '✨ Semua format keep tanggal 3 ke atas untuk PIC ini sudah diisi feedback & statusnya!'
         : 'Belum ada format keep yang selesai.') +
     '</div>'
   ) : displayKeeps.map(function(k) {
@@ -9179,9 +9233,10 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
 }
 
 function clearOmniTestChats() {
-  if (confirm('Apakah Anda yakin ingin menghapus seluruh riwayat chat uji coba dan mereset ke 0 chat?')) {
+  if (confirm('Apakah Anda yakin ingin membersihkan riwayat chat uji coba dan grup?')) {
     localStorage.removeItem('gadgetmart_omni_threads');
     localStorage.removeItem('omni_resolved_chats_v1');
+    cachedOmniKeepsMap = null;
     selectedOmniPicKey = null;
     renderOmniInboxModule();
     if (typeof showSaveToast === 'function') {

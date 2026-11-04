@@ -25,23 +25,41 @@ async function getStoredMessages() {
   return [];
 }
 
-async function saveStoredMessages(list) {
-  const trimmed = list.slice(-1000);
+async function appendStoredMessage(newMsg) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const currentList = await getStoredMessages();
+      const exists = currentList.some(m => m.messageId === newMsg.messageId);
+      if (exists) return true;
 
-  try {
-    await fetch(CLOUD_STORE_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'gadgetmart_watzap_inbox',
-        data: { messages: trimmed }
-      })
-    });
-  } catch (e) {}
+      // Filter out any legacy group messages if present
+      const personalOnly = currentList.filter(m => {
+        const p = String(m.phone || '');
+        return !m.isGroup && !p.startsWith('120363') && p.length <= 14;
+      });
 
-  try {
-    fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
-  } catch (e) {}
+      personalOnly.push(newMsg);
+      const trimmed = personalOnly.slice(-1000);
+
+      const res = await fetch(CLOUD_STORE_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'gadgetmart_watzap_inbox',
+          data: { messages: trimmed }
+        })
+      });
+
+      try {
+        fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
+      } catch (e) {}
+
+      if (res.ok) return true;
+    } catch (e) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+  return false;
 }
 
 module.exports = async function handler(req, res) {
@@ -53,13 +71,19 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // GET: Fetch incoming messages for frontend sync
+  // GET: Fetch incoming messages for frontend sync (HANYA CHAT PERSONAL)
   if (req.method === 'GET') {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const since = parseInt(url.searchParams.get('since') || '0', 10);
     const phoneFilter = (url.searchParams.get('phone') || '').replace(/\D/g, '');
 
     let msgs = await getStoredMessages();
+    // Strict filter: abaikan grup
+    msgs = msgs.filter(m => {
+      const p = String(m.phone || '');
+      return !m.isGroup && !p.startsWith('120363') && p.length <= 14;
+    });
+
     if (since > 0) {
       msgs = msgs.filter(m => (m.timestamp || 0) > since);
     }
@@ -84,16 +108,27 @@ module.exports = async function handler(req, res) {
       const body = req.body || {};
       const data = body.data || body;
 
-      // Real WatZap field is 'chat_id' (e.g. '628xxx@s.whatsapp.net' or group '@g.us')
-      const rawChatId = data.chat_id || data.phone || data.from || data.sender || data.phone_no || body.phone || '';
-      const isGroup = String(rawChatId).includes('@g.us');
-      const cleanPhone = String(rawChatId).replace(/@.*$/, '').replace(/\D/g, '');
+      const rawChatId = String(data.chat_id || data.phone || data.from || data.sender || data.phone_no || body.phone || '');
+      const cleanPhone = rawChatId.replace(/@.*$/, '').replace(/\D/g, '');
 
-      // Real WatZap field is 'message_body'
+      // DETEKSI GRUP WHATSAPP: TOLAK & ABAIKAN GRUP
+      const isGroup = rawChatId.includes('@g.us') || cleanPhone.startsWith('120363') || cleanPhone.length > 14;
+      if (isGroup) {
+        return res.status(200).json({
+          status: 200,
+          message: 'Group message ignored (Personal PIC chats only)'
+        });
+      }
+
+      // Validasi nomor WhatsApp personal (minimal 9 digit, maksimal 14 digit)
+      if (!cleanPhone || cleanPhone.length < 9) {
+        return res.status(200).json({ status: 200, message: 'Invalid phone ignored' });
+      }
+
       const text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
       const senderName = data.name || data.pushName || '';
       const isFromMe = data.is_from_me === true || body.is_from_me === true;
-      const messageId = data.message_id || data.id || ('wz_' + Date.now());
+      const messageId = data.message_id || data.id || ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
 
       let ts = Date.now();
       if (data.timestamp || body.timestamp) {
@@ -101,27 +136,22 @@ module.exports = async function handler(req, res) {
         ts = parsed > 10000000000 ? parsed : parsed * 1000;
       }
 
-      if (cleanPhone && text) {
-        const msgs = await getStoredMessages();
-        const exists = msgs.some(m => m.messageId === messageId);
-        if (!exists) {
-          msgs.push({
-            messageId: messageId,
-            phone: cleanPhone,
-            message: text,
-            sender: isFromMe ? 'ADMIN' : 'PIC',
-            senderName: senderName,
-            isGroup: isGroup,
-            type: data.type || body.type || 'text',
-            timestamp: ts
-          });
-          await saveStoredMessages(msgs);
-        }
+      if (text) {
+        await appendStoredMessage({
+          messageId: messageId,
+          phone: cleanPhone,
+          message: text,
+          sender: isFromMe ? 'ADMIN' : 'PIC',
+          senderName: senderName,
+          isGroup: false,
+          type: data.type || body.type || 'text',
+          timestamp: ts
+        });
       }
 
       return res.status(200).json({
         status: 200,
-        message: 'Webhook processed successfully'
+        message: 'Personal chat processed successfully'
       });
     } catch (err) {
       console.error('Webhook error:', err);
