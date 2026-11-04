@@ -17,7 +17,12 @@ function getLocalMessages() {
 function appendLocalMessage(msg) {
   try {
     const list = getLocalMessages();
-    list.push(msg);
+    const existingIdx = list.findIndex(m => m.messageId && m.messageId === msg.messageId);
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...msg };
+    } else {
+      list.push(msg);
+    }
     fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(list.slice(-500), null, 2), 'utf8');
   } catch (e) { }
 }
@@ -64,6 +69,80 @@ function parseQuotedFromText(rawText) {
   }
 
   return { cleanText: rawText, replyTo: null };
+}
+
+// Cache & resolver untuk memetakan WhatsApp LID (@lid) menjadi nomor telepon asli (@c.us)
+const wahaLidCache = new Map();
+const wahaContactNameCache = new Map();
+
+async function resolveWahaLidToPhone(lidJid) {
+  if (!lidJid) return '';
+  const str = String(lidJid).trim();
+  if (!str.endsWith('@lid')) {
+    let p = str.replace(/@.*$/, '').replace(/\D/g, '');
+    if (p.startsWith('08')) p = '62' + p.slice(1);
+    else if (p.startsWith('8')) p = '62' + p;
+    return p;
+  }
+
+  if (wahaLidCache.has(str)) {
+    return wahaLidCache.get(str);
+  }
+
+  try {
+    const res = await fetch(`http://178.83.188.100:3088/api/contacts?session=default&contactId=${encodeURIComponent(str)}`, {
+      headers: { 'X-Api-Key': 'gadgetmart123' },
+      signal: AbortSignal.timeout(3500)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const rawNum = data.id || '';
+      let clean = String(rawNum).replace(/@.*$/, '').replace(/\D/g, '');
+      if (clean && clean.length >= 9 && clean.length <= 15) {
+        if (clean.startsWith('08')) clean = '62' + clean.slice(1);
+        else if (clean.startsWith('8')) clean = '62' + clean;
+        wahaLidCache.set(str, clean);
+        const cName = String(data.pushname || data.name || data.shortName || '').trim();
+        if (cName) {
+          wahaContactNameCache.set(str, cName);
+          wahaContactNameCache.set(clean, cName);
+        }
+        return clean;
+      }
+    }
+  } catch (e) {
+    console.warn('LID resolve warning:', e.message);
+  }
+
+  let fallback = str.replace(/@.*$/, '').replace(/\D/g, '');
+  if (fallback.startsWith('08')) fallback = '62' + fallback.slice(1);
+  else if (fallback.startsWith('8')) fallback = '62' + fallback;
+  return fallback;
+}
+
+// Helper untuk men-download gambar dari WAHA VPS dan mengubahnya menjadi Base64 Data URI permanen
+async function fetchAndEncodeMedia(url, fallbackMime = 'image/jpeg') {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('data:')) return url;
+
+  // Ganti localhost:3000 jika ada ke VPS IP 178.83.188.100:3088
+  let targetUrl = url.replace(/http:\/\/localhost:3000/g, 'http://178.83.188.100:3088');
+
+  try {
+    const res = await fetch(targetUrl, {
+      headers: { 'X-Api-Key': 'gadgetmart123' },
+      signal: AbortSignal.timeout(7000)
+    });
+    if (res.ok) {
+      const mime = res.headers.get('content-type') || fallbackMime;
+      const arrayBuf = await res.arrayBuffer();
+      const base64 = Buffer.from(arrayBuf).toString('base64');
+      return `data:${mime};base64,${base64}`;
+    }
+  } catch (e) {
+    console.warn('fetchAndEncodeMedia warning:', e.message);
+  }
+  return targetUrl;
 }
 
 module.exports = async function handler(req, res) {
@@ -251,32 +330,63 @@ module.exports = async function handler(req, res) {
       // =========================================================================
       if (body.event && (body.event === 'message' || body.event === 'message.any') && body.payload) {
         const p = body.payload;
-        const fromJid = String(p.from || '');
-        let cleanPhone = fromJid.replace(/@.*$/, '').replace(/\D/g, '');
-        if (cleanPhone.startsWith('08')) cleanPhone = '62' + cleanPhone.slice(1);
-        else if (cleanPhone.startsWith('8')) cleanPhone = '62' + cleanPhone;
+        const isFromMe = Boolean(p.fromMe);
+        const senderType = isFromMe ? 'ADMIN' : 'PIC';
+
+        // Tentukan JID lawan bicara (PIC/Customer)
+        // Jika dikirim dari bot/admin (fromMe=true), lawan bicaranya ada di p.to / remote
+        // Jika pesan masuk (fromMe=false), lawan bicaranya ada di p.from / remote
+        const targetJid = isFromMe
+          ? String(p.to || p._data?.id?.remote || p._data?.to || '')
+          : String(p.from || p._data?.id?.remote || '');
 
         // Abaikan grup WhatsApp
-        const isGroup = fromJid.includes('@g.us') || cleanPhone.startsWith('120363') || cleanPhone.length > 14;
+        const isGroup = targetJid.includes('@g.us') ||
+          String(p.from || '').includes('@g.us') ||
+          String(p.to || '').includes('@g.us');
+
         if (isGroup) {
           return res.status(200).json({ status: 200, message: 'Group ignored' });
         }
 
+        // Resolusi nomor telepon asli dari WhatsApp LID (@lid -> @c.us)
+        let cleanPhone = await resolveWahaLidToPhone(targetJid);
+        if (!cleanPhone || cleanPhone.length < 9) {
+          cleanPhone = targetJid.replace(/@.*$/, '').replace(/\D/g, '');
+        }
+        if (cleanPhone.startsWith('08')) cleanPhone = '62' + cleanPhone.slice(1);
+        else if (cleanPhone.startsWith('8')) cleanPhone = '62' + cleanPhone;
+
         const messageId = String(p.id || ('waha_' + Date.now()));
-        const isFromMe = Boolean(p.fromMe);
-        const senderType = isFromMe ? 'ADMIN' : 'PIC';
-        const senderName = String(p._data?.notifyName || p.author || '').trim();
+
+        // Tentukan nama pengirim
+        let senderName = '';
+        if (isFromMe) {
+          senderName = 'Admin';
+        } else {
+          senderName = String(p._data?.notifyName || p.pushname || p.author || '').trim();
+          if (!senderName) {
+            senderName = wahaContactNameCache.get(targetJid) || wahaContactNameCache.get(cleanPhone) || 'PIC';
+          }
+        }
 
         let ts = Date.now();
         if (p.timestamp) {
           ts = Number(p.timestamp) > 10000000000 ? Number(p.timestamp) : Number(p.timestamp) * 1000;
         }
 
+        // Ekstraksi & resolusi media gambar/foto agar menjadi Data URI permanen
         let mediaUrl = '';
         if (p.hasMedia && p.media) {
           if (typeof p.media === 'string') mediaUrl = p.media;
           else if (p.media.url) mediaUrl = p.media.url;
-          else if (p.media.data) mediaUrl = p.media.data;
+          else if (p.media.data) {
+            const mime = p.media.mimetype || 'image/jpeg';
+            mediaUrl = `data:${mime};base64,${p.media.data}`;
+          }
+        }
+        if (mediaUrl && !mediaUrl.startsWith('data:')) {
+          mediaUrl = await fetchAndEncodeMedia(mediaUrl, p.media?.mimetype || 'image/jpeg');
         }
 
         const isImage = Boolean(p.hasMedia || mediaUrl);
@@ -288,8 +398,17 @@ module.exports = async function handler(req, res) {
         let replyTo = null;
         if (p.replyTo && (p.replyTo.body || p.replyTo.id)) {
           const quotedSenderJid = String(p.replyTo.participant || '');
-          const quotedCleanPhone = quotedSenderJid.replace(/@.*$/, '').replace(/\D/g, '');
-          const quotedSender = quotedCleanPhone === cleanPhone ? (senderName || 'PIC') : 'Admin';
+          let quotedCleanPhone = '';
+          if (quotedSenderJid) {
+            quotedCleanPhone = await resolveWahaLidToPhone(quotedSenderJid);
+          }
+          let quotedSender = 'Admin';
+          if (quotedCleanPhone) {
+            quotedSender = quotedCleanPhone === cleanPhone ? (senderName || 'PIC') : 'Admin';
+          } else {
+            quotedSender = isFromMe ? (senderName || 'PIC') : 'Admin';
+          }
+
           replyTo = {
             senderName: quotedSender,
             text: String(p.replyTo.body || '').trim() || 'Pesan'
@@ -302,9 +421,11 @@ module.exports = async function handler(req, res) {
             INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type, reply_to, raw_payload)
             VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts}, ${mediaUrl || null}, ${messageType}, ${replyTo ? JSON.stringify(replyTo) : null}, ${JSON.stringify(body)})
             ON CONFLICT (message_id) DO UPDATE SET
+              phone = EXCLUDED.phone,
               media_url = COALESCE(EXCLUDED.media_url, watzap_inbox.media_url),
               message_type = EXCLUDED.message_type,
-              reply_to = COALESCE(EXCLUDED.reply_to, watzap_inbox.reply_to)
+              reply_to = COALESCE(EXCLUDED.reply_to, watzap_inbox.reply_to),
+              sender_name = COALESCE(EXCLUDED.sender_name, watzap_inbox.sender_name)
           `;
         }
 
