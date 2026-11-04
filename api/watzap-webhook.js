@@ -246,6 +246,91 @@ module.exports = async function handler(req, res) {
         } catch (logErr) { }
       }
 
+      // =========================================================================
+      // DUKUNGAN RESMI WAHA (WhatsApp HTTP API di VPS) DENGAN FULL QUOTED REPLY
+      // =========================================================================
+      if (body.event && (body.event === 'message' || body.event === 'message.any') && body.payload) {
+        const p = body.payload;
+        const fromJid = String(p.from || '');
+        let cleanPhone = fromJid.replace(/@.*$/, '').replace(/\D/g, '');
+        if (cleanPhone.startsWith('08')) cleanPhone = '62' + cleanPhone.slice(1);
+        else if (cleanPhone.startsWith('8')) cleanPhone = '62' + cleanPhone;
+
+        // Abaikan grup WhatsApp
+        const isGroup = fromJid.includes('@g.us') || cleanPhone.startsWith('120363') || cleanPhone.length > 14;
+        if (isGroup) {
+          return res.status(200).json({ status: 200, message: 'Group ignored' });
+        }
+
+        const messageId = String(p.id || ('waha_' + Date.now()));
+        const isFromMe = Boolean(p.fromMe);
+        const senderType = isFromMe ? 'ADMIN' : 'PIC';
+        const senderName = String(p._data?.notifyName || p.author || '').trim();
+
+        let ts = Date.now();
+        if (p.timestamp) {
+          ts = Number(p.timestamp) > 10000000000 ? Number(p.timestamp) : Number(p.timestamp) * 1000;
+        }
+
+        let mediaUrl = '';
+        if (p.hasMedia && p.media) {
+          if (typeof p.media === 'string') mediaUrl = p.media;
+          else if (p.media.url) mediaUrl = p.media.url;
+          else if (p.media.data) mediaUrl = p.media.data;
+        }
+
+        const isImage = Boolean(p.hasMedia || mediaUrl);
+        const messageType = isImage ? 'image' : 'text';
+        let text = String(p.body || '').trim();
+        if (!text && isImage) text = '[Foto/Gambar]';
+
+        // QUOTE RESMI DARI WAHA (100% Mengambil Teks yang Di-quote Pengirim!)
+        let replyTo = null;
+        if (p.replyTo && (p.replyTo.body || p.replyTo.id)) {
+          const quotedSenderJid = String(p.replyTo.participant || '');
+          const quotedCleanPhone = quotedSenderJid.replace(/@.*$/, '').replace(/\D/g, '');
+          const quotedSender = quotedCleanPhone === cleanPhone ? (senderName || 'PIC') : 'Admin';
+          replyTo = {
+            senderName: quotedSender,
+            text: String(p.replyTo.body || '').trim() || 'Pesan'
+          };
+        }
+
+        if (sql) {
+          await initDb(sql);
+          await sql`
+            INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type, reply_to, raw_payload)
+            VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts}, ${mediaUrl || null}, ${messageType}, ${replyTo ? JSON.stringify(replyTo) : null}, ${JSON.stringify(body)})
+            ON CONFLICT (message_id) DO UPDATE SET
+              media_url = COALESCE(EXCLUDED.media_url, watzap_inbox.media_url),
+              message_type = EXCLUDED.message_type,
+              reply_to = COALESCE(EXCLUDED.reply_to, watzap_inbox.reply_to)
+          `;
+        }
+
+        appendLocalMessage({
+          messageId: messageId,
+          phone: cleanPhone,
+          message: text,
+          sender: senderType,
+          senderName: senderName,
+          isGroup: false,
+          timestamp: ts,
+          mediaUrl: mediaUrl,
+          messageType: messageType,
+          replyTo: replyTo
+        });
+
+        return res.status(200).json({
+          status: 200,
+          source: 'WAHA',
+          message: 'WAHA chat processed successfully',
+          messageId: messageId,
+          hasReply: Boolean(replyTo),
+          hasMedia: Boolean(mediaUrl)
+        });
+      }
+
       // Deteksi format Meta WABA vs WatZap Unofficial
       let msgItem = data;
       let contactName = '';
