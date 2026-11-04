@@ -19,6 +19,7 @@ app.all('/api/get-excel', (req, res) => require('./api/get-excel')(req, res));
 app.all('/api/database-status', (req, res) => require('./api/database-status')(req, res));
 app.all('/api/watzap-webhook', (req, res) => require('./api/watzap-webhook')(req, res));
 app.all('/api/watzap-send', (req, res) => require('./api/watzap-send')(req, res));
+app.all('/api/omni-resolve', (req, res) => require('./api/omni-resolve')(req, res));
 
 // 2. Serve all static assets (CSS, JS, images, fonts, XLSX, CSV)
 app.use(express.static(__dirname));
