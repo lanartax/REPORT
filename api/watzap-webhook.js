@@ -22,6 +22,50 @@ function appendLocalMessage(msg) {
   } catch (e) { }
 }
 
+// Parser cerdas untuk mendeteksi kutipan teks WhatsApp (> *Pengirim*:\n> Isi...)
+function parseQuotedFromText(rawText) {
+  if (!rawText || typeof rawText !== 'string') return { cleanText: rawText || '', replyTo: null };
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith('>')) return { cleanText: rawText, replyTo: null };
+
+  // Format 1: > *Sender*:\n> Quoted message\n\nActual reply
+  const m1 = trimmed.match(/^>(?: \*(.*?)\*:?)?\s*([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m1) {
+    const sender = (m1[1] || 'Pesan').trim();
+    const quoted = m1[2].replace(/^>\s?/gm, '').trim();
+    const actual = m1[3].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: sender, text: quoted }
+    };
+  }
+
+  // Format 2: > [Sender] Quoted message\n\nActual reply
+  const m2 = trimmed.match(/^> \[(.*?)\]\s*([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m2) {
+    const sender = (m2[1] || 'Pesan').trim();
+    const quoted = m2[2].replace(/^>\s?/gm, '').trim();
+    const actual = m2[3].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: sender, text: quoted }
+    };
+  }
+
+  // Format 3: > Quoted message\n\nActual reply
+  const m3 = trimmed.match(/^> ([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m3) {
+    const quoted = m3[1].replace(/^>\s?/gm, '').trim();
+    const actual = m3[2].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: 'Pesan', text: quoted }
+    };
+  }
+
+  return { cleanText: rawText, replyTo: null };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -47,7 +91,7 @@ module.exports = async function handler(req, res) {
           if (phoneFilter) {
             const last9 = phoneFilter.slice(-9);
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType", reply_to as "replyTo"
               FROM watzap_inbox
               WHERE is_group = FALSE 
                 AND created_at > ${since}
@@ -57,7 +101,7 @@ module.exports = async function handler(req, res) {
             `;
           } else {
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType", reply_to as "replyTo"
               FROM watzap_inbox
               WHERE is_group = FALSE AND created_at > ${since}
               ORDER BY created_at ASC
@@ -69,7 +113,7 @@ module.exports = async function handler(req, res) {
           if (phoneFilter) {
             const last9 = phoneFilter.slice(-9);
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType", reply_to as "replyTo"
               FROM watzap_inbox
               WHERE is_group = FALSE AND (phone = ${phoneFilter} OR phone LIKE ${'%' + last9})
               ORDER BY created_at DESC
@@ -77,7 +121,7 @@ module.exports = async function handler(req, res) {
             `;
           } else {
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType", reply_to as "replyTo"
               FROM watzap_inbox
               WHERE is_group = FALSE
               ORDER BY created_at DESC
@@ -104,12 +148,28 @@ module.exports = async function handler(req, res) {
       let p = String(m.phone || '').replace(/\D/g, '');
       if (p.startsWith('08')) p = '62' + p.slice(1);
       else if (p.startsWith('8')) p = '62' + p;
+
+      let replyToObj = m.replyTo || null;
+      let msgText = m.message || '';
+
+      // Parsing otomatis kutipan jika ada di dalam teks
+      if (!replyToObj && msgText.startsWith('>')) {
+        const parsed = parseQuotedFromText(msgText);
+        if (parsed.replyTo) {
+          replyToObj = parsed.replyTo;
+          msgText = parsed.cleanText;
+        }
+      }
+
       return {
         ...m,
         phone: p,
+        message: msgText,
+        text: msgText,
         timestamp: Number(m.timestamp || m.created_at || Date.now()),
         mediaUrl: m.mediaUrl || m.media_url || '',
-        messageType: m.messageType || m.message_type || 'text'
+        messageType: m.messageType || m.message_type || (m.mediaUrl || m.media_url ? 'image' : 'text'),
+        replyTo: replyToObj
       };
     });
 
@@ -126,7 +186,35 @@ module.exports = async function handler(req, res) {
       const body = req.body || {};
       const data = body.data || body;
 
-      const rawChatId = String(data.chat_id || data.phone || data.from || data.sender || data.phone_no || body.phone || '');
+      // Debug logger: Simpan raw webhook payload ke watzap_webhook_logs untuk analisa real-time
+      if (sql) {
+        try {
+          await initDb(sql);
+          await sql`
+            INSERT INTO watzap_webhook_logs (payload, created_at)
+            VALUES (${JSON.stringify(body)}, ${Date.now()})
+          `;
+        } catch (logErr) { }
+      }
+
+      // Deteksi format Meta WABA vs WatZap Unofficial
+      let msgItem = data;
+      let contactName = '';
+      if (body.entry && body.entry[0] && body.entry[0].changes && body.entry[0].changes[0] && body.entry[0].changes[0].value) {
+        const val = body.entry[0].changes[0].value;
+        if (Array.isArray(val.messages) && val.messages.length > 0) {
+          msgItem = val.messages[0];
+          if (Array.isArray(val.contacts) && val.contacts[0] && val.contacts[0].profile) {
+            contactName = val.contacts[0].profile.name || '';
+          }
+        }
+      }
+
+      const rawChatId = String(
+        msgItem.chat_id || msgItem.phone || msgItem.from || msgItem.sender || msgItem.phone_no ||
+        data.chat_id || data.phone || data.from || data.sender || data.phone_no ||
+        body.phone || body.from || ''
+      );
       let cleanPhone = rawChatId.replace(/@.*$/, '').replace(/\D/g, '');
 
       // DETEKSI GRUP WHATSAPP: TOLAK & ABAIKAN GRUP
@@ -150,57 +238,117 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ status: 200, message: 'Invalid phone ignored' });
       }
 
-      const mediaUrl = String(
-        data.image || data.media_url || data.url || data.file_url ||
-        (data.media && data.media.url) || body.image || body.media_url || ''
+      // 1. Ekstraksi Gambar / Media URL
+      let mediaUrl = '';
+      if (typeof msgItem.image === 'string') mediaUrl = msgItem.image;
+      else if (msgItem.image && (msgItem.image.url || msgItem.image.link)) mediaUrl = msgItem.image.url || msgItem.image.link;
+
+      if (!mediaUrl && typeof data.image === 'string') mediaUrl = data.image;
+      else if (!mediaUrl && data.image && (data.image.url || data.image.link)) mediaUrl = data.image.url || data.image.link;
+
+      if (!mediaUrl) {
+        mediaUrl = String(
+          msgItem.media_url || msgItem.url || msgItem.file_url || msgItem.link || msgItem.file ||
+          data.media_url || data.url || data.file_url || data.link || data.file ||
+          (data.media && (data.media.url || data.media.link || data.media)) ||
+          (data.message_payload && String(data.message_payload).startsWith('http') ? data.message_payload : '') ||
+          body.image || body.media_url || body.url || ''
+        ).trim();
+      }
+
+      // 2. Ekstraksi Tipe Pesan
+      const rawType = String(
+        msgItem.type || msgItem.message_type || data.message_type || data.type || body.message_type ||
+        (mediaUrl ? 'image' : 'text')
+      ).toLowerCase();
+      const isImage = rawType.includes('image') || rawType.includes('foto') || Boolean(mediaUrl) || String(data.message_body) === '[Image]';
+      const messageType = isImage ? 'image' : 'text';
+
+      // 3. Ekstraksi Pesan Teks
+      let text = String(
+        msgItem.text?.body || msgItem.message_body || msgItem.message ||
+        data.message_body || data.message_text || data.message || data.body || data.text ||
+        body.message || ''
       ).trim();
-      const messageType = String(data.message_type || (mediaUrl ? 'image' : 'text')).toLowerCase();
-      let text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
-      if (!text && mediaUrl) {
+
+      if (!text && isImage) {
         text = '[Foto/Gambar]';
       }
 
-      const senderName = String(data.name || data.pushName || '').trim();
-      const isFromMe = data.is_from_me === true || body.is_from_me === true;
-      const messageId = String(data.message_id || data.id || ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
+      // 4. Ekstraksi Quoted Reply (Context)
+      let replyTo = null;
+      const ctx = msgItem.context || data.context || data.quoted || data.quoted_message || data.quoted_body || data.reply_to || null;
+      if (ctx && typeof ctx === 'object') {
+        const quotedText = ctx.body || ctx.message || ctx.text || ctx.quoted_body || '';
+        const quotedSender = ctx.name || ctx.sender_name || ctx.sender || (ctx.from === cleanPhone ? (data.name || 'PIC') : 'Admin');
+        if (quotedText) {
+          replyTo = { senderName: quotedSender, text: quotedText };
+        }
+      }
+
+      // Jika tidak ada context object, cek apakah pesan teks menggunakan format kutipan WhatsApp (> *Nama*: ...)
+      if (!replyTo && text.startsWith('>')) {
+        const parsed = parseQuotedFromText(text);
+        if (parsed.replyTo) {
+          replyTo = parsed.replyTo;
+          text = parsed.cleanText;
+        }
+      }
+
+      const senderName = String(contactName || data.name || data.pushName || msgItem.name || '').trim();
+      const isFromMe = data.is_from_me === true || body.is_from_me === true || msgItem.from_me === true;
+      const messageId = String(
+        msgItem.id || data.message_id || data.id || body.messageId ||
+        ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7))
+      );
 
       let ts = Date.now();
-      if (data.timestamp || body.timestamp) {
-        const parsed = Number(data.timestamp || body.timestamp);
+      if (msgItem.timestamp || data.timestamp || body.timestamp) {
+        const parsed = Number(msgItem.timestamp || data.timestamp || body.timestamp);
         ts = parsed > 10000000000 ? parsed : parsed * 1000;
       }
 
       const senderType = isFromMe ? 'ADMIN' : 'PIC';
 
-      if (text || mediaUrl) {
-        if (sql) {
-          try {
-            await initDb(sql);
-            await sql`
-              INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type)
-              VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts}, ${mediaUrl || null}, ${messageType})
-              ON CONFLICT (message_id) DO NOTHING
-            `;
-          } catch (dbErr) {
-            console.error('Neon DB POST Insert Error:', dbErr);
-          }
+      // Pastikan pesan selalu disimpan
+      if (!text) text = isImage ? '[Foto/Gambar]' : '[Pesan Masuk]';
+
+      if (sql) {
+        try {
+          await initDb(sql);
+          await sql`
+            INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type, reply_to, raw_payload)
+            VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts}, ${mediaUrl || null}, ${messageType}, ${replyTo ? JSON.stringify(replyTo) : null}, ${JSON.stringify(body)})
+            ON CONFLICT (message_id) DO UPDATE SET
+              media_url = COALESCE(EXCLUDED.media_url, watzap_inbox.media_url),
+              message_type = EXCLUDED.message_type,
+              reply_to = COALESCE(EXCLUDED.reply_to, watzap_inbox.reply_to)
+          `;
+        } catch (dbErr) {
+          console.error('Neon DB POST Insert Error:', dbErr);
         }
-        appendLocalMessage({
-          messageId: messageId,
-          phone: cleanPhone,
-          message: text,
-          sender: senderType,
-          senderName: senderName,
-          isGroup: false,
-          timestamp: ts,
-          mediaUrl: mediaUrl,
-          messageType: messageType
-        });
       }
+
+      appendLocalMessage({
+        messageId: messageId,
+        phone: cleanPhone,
+        message: text,
+        sender: senderType,
+        senderName: senderName,
+        isGroup: false,
+        timestamp: ts,
+        mediaUrl: mediaUrl,
+        messageType: messageType,
+        replyTo: replyTo
+      });
 
       return res.status(200).json({
         status: 200,
-        message: 'Personal chat processed successfully'
+        message: 'Personal chat processed successfully',
+        messageId: messageId,
+        messageType: messageType,
+        hasMedia: Boolean(mediaUrl),
+        hasReply: Boolean(replyTo)
       });
     } catch (err) {
       console.error('Webhook error:', err);

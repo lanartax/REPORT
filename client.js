@@ -8103,6 +8103,46 @@ function generateBotAvatarSvg(identifier, size) {
 // QUOTED REPLY & IMAGE LIGHTBOX STATE
 let activeQuotedMsg = null; // { text: '...', senderName: '...' }
 
+function parseQuotedFromText(rawText) {
+  if (!rawText || typeof rawText !== 'string') return { cleanText: rawText || '', replyTo: null };
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith('>')) return { cleanText: rawText, replyTo: null };
+
+  const m1 = trimmed.match(/^>(?: \*(.*?)\*:?)?\s*([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m1) {
+    const sender = (m1[1] || 'Pesan').trim();
+    const quoted = m1[2].replace(/^>\s?/gm, '').trim();
+    const actual = m1[3].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: sender, text: quoted }
+    };
+  }
+
+  const m2 = trimmed.match(/^> \[(.*?)\]\s*([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m2) {
+    const sender = (m2[1] || 'Pesan').trim();
+    const quoted = m2[2].replace(/^>\s?/gm, '').trim();
+    const actual = m2[3].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: sender, text: quoted }
+    };
+  }
+
+  const m3 = trimmed.match(/^> ([\s\S]*?)\n\n([\s\S]*)$/);
+  if (m3) {
+    const quoted = m3[1].replace(/^>\s?/gm, '').trim();
+    const actual = m3[2].trim();
+    return {
+      cleanText: actual,
+      replyTo: { senderName: 'Pesan', text: quoted }
+    };
+  }
+
+  return { cleanText: rawText, replyTo: null };
+}
+
 function startOmniQuotedReply(text, senderName) {
   activeQuotedMsg = { text: text, senderName: senderName };
   const bar = document.getElementById('omniQuotedReplyBar');
@@ -8998,18 +9038,34 @@ function renderOmniActiveChat(pic) {
       '</span>'
     ) : '';
 
-    const quotedBlock = msg.replyTo ? (
+    let replyToObj = msg.replyTo || null;
+    let displayText = msg.text || '';
+    if (!replyToObj && displayText.startsWith('>')) {
+      const parsed = parseQuotedFromText(displayText);
+      if (parsed.replyTo) {
+        replyToObj = parsed.replyTo;
+        displayText = parsed.cleanText;
+      }
+    }
+
+    const quotedBlock = replyToObj ? (
       '<div class="omni-bubble-reply-block">' +
-        '<div class="omni-reply-block-sender">' + escapeHtml(msg.replyTo.senderName || 'Balasan') + '</div>' +
-        '<div class="omni-reply-block-text">' + escapeHtml(msg.replyTo.text || '') + '</div>' +
+        '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
+        '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
       '</div>'
     ) : '';
 
-    const mediaImg = (msg.mediaUrl || msg.image) ? (
+    const hasImage = Boolean(msg.mediaUrl || msg.image);
+    const mediaImg = hasImage ? (
       '<div class="omni-bubble-media" onclick="openOmniImageModal(\'' + escapeHtml(msg.mediaUrl || msg.image) + '\')">' +
         '<img src="' + escapeHtml(msg.mediaUrl || msg.image) + '" alt="WhatsApp Image" class="omni-chat-image" loading="lazy">' +
       '</div>'
-    ) : '';
+    ) : (msg.messageType === 'image' ? (
+      '<div class="omni-bubble-media-placeholder">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' +
+        '<span>📷 Foto / Gambar WhatsApp</span>' +
+      '</div>'
+    ) : '');
 
     const senderDisplayName = isOutgoing ? 'Admin (Anda)' : escapeHtml(pic.picName || 'PIC');
     const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -9076,28 +9132,12 @@ function renderOmniActiveChat(pic) {
       '<button type="button" class="omni-quoted-close-btn" onclick="cancelOmniQuotedReply()">&times;</button>' +
     '</div>' +
     '<div class="omni-input-box-wrapper">' +
-      '<textarea id="omniReplyInput" class="omni-textarea-modern" rows="2" placeholder="Type &quot;shift + enter&quot; to add a new line. Type &quot;/&quot; to use quick reply" onkeydown="handleOmniInputKey(event)" oninput="handleOmniInputTyping(this)"></textarea>' +
+      '<textarea id="omniReplyInput" class="omni-textarea-modern" rows="2" placeholder="Ketik pesan balasan... (Tekan Enter untuk kirim, Shift + Enter untuk baris baru)" onkeydown="handleOmniInputKey(event)" oninput="handleOmniInputTyping(this)"></textarea>' +
     '</div>' +
     '<div class="omni-input-bottom-bar">' +
       '<div class="omni-bottom-left-actions">' +
         '<button type="button" class="omni-btn-attachment-modern" title="Kirim Lampiran / Screenshot" onclick="handleOmniAttachmentClick()">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>' +
-        '</button>' +
-        '<button type="button" class="omni-quick-pill primary" onclick="insertQuickReply(\'promo\')">' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' +
-          '<span>Share Promo</span>' +
-        '</button>' +
-        '<button type="button" class="omni-quick-pill" onclick="insertQuickReply(\'katalog\')">' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>' +
-          '<span>Cek Katalog</span>' +
-        '</button>' +
-        '<button type="button" class="omni-quick-pill" onclick="insertQuickReply(\'cicilan\')">' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>' +
-          '<span>Simulasi Cicilan</span>' +
-        '</button>' +
-        '<button type="button" class="omni-quick-pill" onclick="insertQuickReply(\'shopee\')">' +
-          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' +
-          '<span>Shopee</span>' +
         '</button>' +
       '</div>' +
       '<div class="omni-bottom-right-actions">' +
@@ -9271,18 +9311,34 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
     '</span>'
   ) : '';
 
-  const quotedBlock = msg.replyTo ? (
+  let replyToObj = msg.replyTo || null;
+  let displayText = msg.text || msg.message || '';
+  if (!replyToObj && displayText.startsWith('>')) {
+    const parsed = parseQuotedFromText(displayText);
+    if (parsed.replyTo) {
+      replyToObj = parsed.replyTo;
+      displayText = parsed.cleanText;
+    }
+  }
+
+  const quotedBlock = replyToObj ? (
     '<div class="omni-bubble-reply-block">' +
-      '<div class="omni-reply-block-sender">' + escapeHtml(msg.replyTo.senderName || 'Balasan') + '</div>' +
-      '<div class="omni-reply-block-text">' + escapeHtml(msg.replyTo.text || '') + '</div>' +
+      '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
+      '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
     '</div>'
   ) : '';
 
-  const mediaImg = (msg.mediaUrl || msg.image) ? (
+  const hasImage = Boolean(msg.mediaUrl || msg.image);
+  const mediaImg = hasImage ? (
     '<div class="omni-bubble-media" onclick="openOmniImageModal(\'' + escapeHtml(msg.mediaUrl || msg.image) + '\')">' +
       '<img src="' + escapeHtml(msg.mediaUrl || msg.image) + '" alt="WhatsApp Image" class="omni-chat-image" loading="lazy">' +
     '</div>'
-  ) : '';
+  ) : (msg.messageType === 'image' ? (
+    '<div class="omni-bubble-media-placeholder">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' +
+      '<span>📷 Foto / Gambar WhatsApp</span>' +
+    '</div>'
+  ) : '');
 
   const senderNameText = isOutgoing ? 'Admin (Anda)' : (senderDisplayName || 'PIC');
   const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -9393,7 +9449,7 @@ async function sendOmniReply() {
     const res = await fetch('/api/watzap-send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: picWA, message: textToSend, messageId: msgId, timestamp: now })
+      body: JSON.stringify({ phone: picWA, message: textToSend, messageId: msgId, timestamp: now, replyTo: outgoingMsg.replyTo || null })
     });
     const json = await res.json();
     if (json.success) {
@@ -9459,15 +9515,26 @@ async function pollWatzapIncomingMessages() {
       });
 
       if (!alreadyExists) {
+        let replyToObj = msg.replyTo || null;
+        let cleanMsgText = text;
+        if (!replyToObj && cleanMsgText.startsWith('>')) {
+          const parsed = parseQuotedFromText(cleanMsgText);
+          if (parsed.replyTo) {
+            replyToObj = parsed.replyTo;
+            cleanMsgText = parsed.cleanText;
+          }
+        }
+
         const newMsgObj = {
           id: msg.messageId || ('in_' + ts),
           sender: msg.sender || 'PIC',
           senderName: msg.senderName || matched.picName,
-          text: text,
+          text: cleanMsgText,
           timestamp: ts,
           status: 'sent',
           mediaUrl: msg.mediaUrl || msg.media_url || msg.image || msg.url || '',
-          messageType: msg.messageType || (msg.mediaUrl || msg.media_url || msg.image ? 'image' : 'text')
+          messageType: msg.messageType || (msg.mediaUrl || msg.media_url || msg.image ? 'image' : 'text'),
+          replyTo: replyToObj
         };
         threads[picKey].push(newMsgObj);
         setOmniChatResolved(picKey, false);

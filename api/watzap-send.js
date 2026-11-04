@@ -15,7 +15,7 @@ function appendStoredMessage(msg) {
     list.push(msg);
     const trimmed = list.slice(-500);
     fs.writeFileSync(MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
-  } catch (e) {}
+  } catch (e) { }
 }
 
 module.exports = async function handler(req, res) {
@@ -48,6 +48,7 @@ module.exports = async function handler(req, res) {
     }
 
     const mediaUrl = body.mediaUrl || body.imageUrl || '';
+    const replyTo = body.replyTo || null;
     const endpoint = mediaUrl ? 'https://api.watzap.id/v1/send_image_url' : 'https://api.watzap.id/v1/send_message';
 
     const payload = mediaUrl ? {
@@ -85,8 +86,8 @@ module.exports = async function handler(req, res) {
       try {
         await initDb(sql);
         await sql`
-          INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type)
-          VALUES (${msgId}, ${cleanPhone}, 'Admin', ${message}, 'ADMIN', FALSE, ${now}, ${mediaUrl || null}, ${mediaUrl ? 'image' : 'text'})
+          INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type, reply_to)
+          VALUES (${msgId}, ${cleanPhone}, 'Admin', ${message}, 'ADMIN', FALSE, ${now}, ${mediaUrl || null}, ${mediaUrl ? 'image' : 'text'}, ${replyTo ? JSON.stringify(replyTo) : null})
           ON CONFLICT (message_id) DO NOTHING
         `;
       } catch (dbErr) {
@@ -101,7 +102,9 @@ module.exports = async function handler(req, res) {
       message: message,
       sender: 'ADMIN',
       type: 'text',
-      timestamp: now
+      timestamp: now,
+      mediaUrl: mediaUrl,
+      replyTo: replyTo
     });
 
     return res.status(200).json({
