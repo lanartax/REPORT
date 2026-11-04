@@ -30,5 +30,15 @@
     "sender": "ADMIN",
     "type": "text",
     "timestamp": 1793771369346
+  },
+  {
+    "messageId": "out_1793771722762_7afn3",
+    "phone": "6285134641258",
+    "message": "boleh bantu info sudah sampai mana progressnya ya mba, terimakasihh ^^",
+    "sender": "ADMIN",
+    "type": "text",
+    "timestamp": 1793771722762,
+    "mediaUrl": "",
+    "replyTo": null
   }
 ]
