@@ -20,7 +20,7 @@
     <script src="lib/html2canvas.min.js"></script>
     <script src="lib/chart.umd.min.js"></script>
     <link rel="icon" type="image/png" href="logo.png">
-    <link rel="stylesheet" href="style.css?v=7.5">
+    <link rel="stylesheet" href="style.css?v=7.7">
 </head>
 
 <body>
@@ -1695,11 +1695,7 @@
                                 </div>
 
                                 <div class="omni-folder-list">
-                                    <div class="omni-nav-item active" id="omniFilterAll" onclick="setOmniFolder('ALL')">
-                                        <span class="omni-nav-name">All chats</span>
-                                        <span class="omni-nav-badge" id="omniBadgeAll">0</span>
-                                    </div>
-                                    <div class="omni-nav-item" id="omniFilterAssigned"
+                                    <div class="omni-nav-item active" id="omniFilterAssigned"
                                         onclick="setOmniFolder('ASSIGNED')">
                                         <span class="omni-nav-name">Assigned chats</span>
                                         <span class="omni-nav-badge" id="omniBadgeAssigned">0</span>
@@ -1719,15 +1715,13 @@
 
                             <!-- 1. VIEW CHATS: CHATLIST + CHATVIEW + DETAILS -->
                             <div class="omni-chats-wrapper" id="omniViewWorkspaceChats">
-                                <!-- CHAT LIST (ALL CHATS) -->
+                                <!-- CHAT LIST -->
                                 <div class="omni-col-chatlist">
                                     <div class="omni-chatlist-header">
                                         <div class="omni-chatlist-top-bar">
-                                            <span class="omni-chatlist-main-title" id="omniChatListHeaderTitle">All
-                                                chats</span>
+                                            <span class="omni-chatlist-main-title" id="omniChatListHeaderTitle">Assigned chats</span>
                                             <div style="display:flex; align-items:center; gap:8px;">
-                                                <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0
-                                                    chat</span>
+                                                <span class="omni-chatlist-total-count" id="omniChatListTotalCount">0 chat</span>
                                                 <button type="button" class="omni-action-btn" onclick="clearOmniTestChats()"
                                                     title="Bersihkan riwayat chat uji coba" style="padding:2px 4px;">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
@@ -1748,6 +1742,15 @@
                                                 </svg>
                                             </span>
                                             <input type="text" id="omniSearchInput" class="omni-search-input"
+                                                placeholder="Search name, phone, message..." oninput="filterOmniChats()">
+                                        </div>
+                                        <!-- FILTER CABANG (Sesuai Permintaan) -->
+                                        <div class="omni-branch-filter-wrap" style="margin-top: 8px;">
+                                            <select id="omniBranchFilterSelect" class="omni-branch-select" onchange="filterOmniChats()">
+                                                <option value="ALL">🏢 Semua Cabang (All Branches)</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                                 placeholder="Search name, phone, message..." oninput="filterOmniChats()">
                                         </div>
                                     </div>
@@ -2264,7 +2267,21 @@
         </div>
     </div>
 
-  <script src="client.js?v=7.5"></script>
+  
+    <!-- Omnichannel Image Lightbox Modal -->
+    <div id="omniImageModal" class="omni-img-modal" style="display:none;" onclick="closeOmniImageModal()">
+        <div class="omni-img-modal-dialog" onclick="event.stopPropagation()">
+            <button type="button" class="omni-img-modal-close" onclick="closeOmniImageModal()">&times;</button>
+            <img id="omniImageModalImg" src="" alt="WhatsApp Media Preview" class="omni-img-modal-image">
+            <div style="text-align:center; margin-top:12px;">
+                <a id="omniImageModalDownload" href="#" target="_blank" download="whatsapp_image.jpg" class="btn btn-outline btn-sm" style="background:#ffffff; color:#0f172a; font-size:0.75rem;">
+                    💾 Buka / Unduh Gambar Resolusi Penuh
+                </a>
+            </div>
+        </div>
+    </div>
+
+  <script src="client.js?v=7.7"></script>
 </body>
 
 </html>

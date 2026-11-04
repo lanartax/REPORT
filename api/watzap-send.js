@@ -47,7 +47,17 @@ module.exports = async function handler(req, res) {
       cleanPhone = '62' + cleanPhone;
     }
 
-    const payload = {
+    const mediaUrl = body.mediaUrl || body.imageUrl || '';
+    const endpoint = mediaUrl ? 'https://api.watzap.id/v1/send_image_url' : 'https://api.watzap.id/v1/send_message';
+
+    const payload = mediaUrl ? {
+      api_key: WATZAP_API_KEY,
+      number_key: WATZAP_NUMBER_KEY,
+      phone_no: cleanPhone,
+      url: mediaUrl,
+      message: message,
+      wait_until_send: '0'
+    } : {
       api_key: WATZAP_API_KEY,
       number_key: WATZAP_NUMBER_KEY,
       phone_no: cleanPhone,
@@ -55,16 +65,16 @@ module.exports = async function handler(req, res) {
       wait_until_send: '0'
     };
 
-    console.log(`📤 [WATZAP SENDING MESSAGE] To: ${cleanPhone}`);
+    console.log(`📤 [WATZAP SENDING MESSAGE] To: ${cleanPhone} (${mediaUrl ? 'Image' : 'Text'})`);
 
-    const wzRes = await fetch('https://api.watzap.id/v1/send_message', {
+    const wzRes = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
     const wzJson = await wzRes.json();
-    console.log('WatZap send_message result:', wzJson);
+    console.log('WatZap send result:', wzJson);
 
     const now = Number(body.timestamp) || Date.now();
     const msgId = String(body.messageId || ('out_' + now + '_' + Math.random().toString(36).slice(2, 7)));
@@ -75,8 +85,8 @@ module.exports = async function handler(req, res) {
       try {
         await initDb(sql);
         await sql`
-          INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at)
-          VALUES (${msgId}, ${cleanPhone}, 'Admin', ${message}, 'ADMIN', FALSE, ${now})
+          INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type)
+          VALUES (${msgId}, ${cleanPhone}, 'Admin', ${message}, 'ADMIN', FALSE, ${now}, ${mediaUrl || null}, ${mediaUrl ? 'image' : 'text'})
           ON CONFLICT (message_id) DO NOTHING
         `;
       } catch (dbErr) {

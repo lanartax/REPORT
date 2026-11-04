@@ -8047,8 +8047,100 @@ document.addEventListener('keydown', (e) => {
 // ==========================================================================
 // 17. OMNICHANNEL INBOX FU CONSOLE (LIGHT CRM ENGINE - CLEAN MONOCHROME)
 // ==========================================================================
+
+// GEOMETRIC BOT AVATAR GENERATOR (Ringan, Unik per Pengirim Sesuai Referensi)
+function generateBotAvatarSvg(identifier, size) {
+  size = size || 36;
+  let hash = 0;
+  const str = String(identifier || 'PIC');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const absHash = Math.abs(hash);
+  const colors = [
+    '#f97316', '#ef4444', '#10b981', '#3b82f6',
+    '#8b5cf6', '#ec4899', '#d97706', '#06b6d4',
+    '#64748b', '#14b8a6', '#f43f5e', '#84cc16'
+  ];
+  const color = colors[absHash % colors.length];
+  const shapeIndex = Math.floor(absHash / colors.length) % 7;
+
+  let shapePath = '';
+  let eyes = '<circle cx="16" cy="19" r="2.6" fill="#0f172a"/><circle cx="24" cy="19" r="2.6" fill="#0f172a"/>';
+
+  if (shapeIndex === 0) {
+    // Circle
+    shapePath = '<circle cx="20" cy="20" r="18" fill="' + color + '"/>';
+  } else if (shapeIndex === 1) {
+    // Squircle (Rounded Square)
+    shapePath = '<rect x="3" y="3" width="34" height="34" rx="10" fill="' + color + '"/>';
+  } else if (shapeIndex === 2) {
+    // Pill / Stadium
+    shapePath = '<rect x="2" y="8" width="36" height="24" rx="12" fill="' + color + '"/>';
+    eyes = '<circle cx="16" cy="20" r="2.6" fill="#0f172a"/><circle cx="24" cy="20" r="2.6" fill="#0f172a"/>';
+  } else if (shapeIndex === 3) {
+    // Rounded Triangle
+    shapePath = '<path d="M 18 5.5 C 19 3.5 21 3.5 22 5.5 L 36.5 30 C 37.5 32 36.5 35 34 35 L 6 35 C 3.5 35 2.5 32 3.5 30 Z" fill="' + color + '"/>';
+    eyes = '<circle cx="16" cy="24" r="2.5" fill="#0f172a"/><circle cx="24" cy="24" r="2.5" fill="#0f172a"/>';
+  } else if (shapeIndex === 4) {
+    // Hexagon
+    shapePath = '<path d="M 20 3 L 34.5 11 C 36 12 37 14 37 16 L 37 24 C 37 26 36 28 34.5 29 L 20 37 C 19 37.5 17 37.5 16 37 L 5.5 29 C 4 28 3 26 3 24 L 3 16 C 3 14 4 12 5.5 11 Z" fill="' + color + '"/>';
+    eyes = '<circle cx="16" cy="20" r="2.6" fill="#0f172a"/><circle cx="24" cy="20" r="2.6" fill="#0f172a"/>';
+  } else if (shapeIndex === 5) {
+    // Cloud
+    shapePath = '<path d="M 10 32 L 30 32 A 6 6 0 0 0 36 26 A 5 5 0 0 0 33 18 A 8 8 0 0 0 18 13 A 6 6 0 0 0 8 19 A 5 5 0 0 0 4 25 A 6 6 0 0 0 10 32 Z" fill="' + color + '"/>';
+    eyes = '<circle cx="17" cy="23" r="2.4" fill="#0f172a"/><circle cx="23" cy="23" r="2.4" fill="#0f172a"/>';
+  } else {
+    // Droplet / Teardrop
+    shapePath = '<path d="M 20 3 C 20 3 35 18 35 26 C 35 33.5 28.5 37 20 37 C 11.5 37 5 33.5 5 26 C 5 18 20 3 20 3 Z" fill="' + color + '"/>';
+    eyes = '<circle cx="16" cy="25" r="2.5" fill="#0f172a"/><circle cx="24" cy="25" r="2.5" fill="#0f172a"/>';
+  }
+
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 40 40" style="display:block;">' + shapePath + eyes + '</svg>';
+}
+
+// QUOTED REPLY & IMAGE LIGHTBOX STATE
+let activeQuotedMsg = null; // { text: '...', senderName: '...' }
+
+function startOmniQuotedReply(text, senderName) {
+  activeQuotedMsg = { text: text, senderName: senderName };
+  const bar = document.getElementById('omniQuotedReplyBar');
+  const titleSpan = document.getElementById('omniQuotedSenderName');
+  const snippetDiv = document.getElementById('omniQuotedSnippet');
+  if (bar && titleSpan && snippetDiv) {
+    titleSpan.innerText = senderName;
+    snippetDiv.innerText = text;
+    bar.style.display = 'flex';
+  }
+  const inp = document.getElementById('omniReplyInput');
+  if (inp) inp.focus();
+}
+
+function cancelOmniQuotedReply() {
+  activeQuotedMsg = null;
+  const bar = document.getElementById('omniQuotedReplyBar');
+  if (bar) bar.style.display = 'none';
+}
+
+function openOmniImageModal(src) {
+  const modal = document.getElementById('omniImageModal');
+  const img = document.getElementById('omniImageModalImg');
+  const dl = document.getElementById('omniImageModalDownload');
+  if (modal && img) {
+    img.src = src;
+    if (dl) dl.href = src;
+    modal.style.display = 'flex';
+  }
+}
+
+function closeOmniImageModal() {
+  const modal = document.getElementById('omniImageModal');
+  if (modal) modal.style.display = 'none';
+}
+
 let currentOmniView = 'CHATS'; // 'CHATS' or 'MASTER'
-let currentOmniFolder = 'ALL'; // 'ALL', 'ASSIGNED', 'UNRESPONDED', 'RESOLVED'
+let currentOmniFolder = 'ASSIGNED'; // 'ASSIGNED', 'UNRESPONDED', 'RESOLVED' (All chats dibuang)
 let selectedOmniPicKey = null; // Key (clean WA or picKey) of active PIC FU
 let selectedOmniKeepSubTab = 'PENDING'; // 'PENDING' (Belum Diisi) | 'RESOLVED' (Sudah Selesai)
 
@@ -8426,13 +8518,12 @@ function saveOmniThreads(threads) {
 }
 
 function setOmniFolder(folder) {
-  currentOmniFolder = folder;
-  ['All', 'Assigned', 'Unresponded', 'Resolved'].forEach(function(f) {
+  currentOmniFolder = folder || 'ASSIGNED';
+  ['Assigned', 'Unresponded', 'Resolved'].forEach(function(f) {
     const el = document.getElementById('omniFilter' + f);
     if (el) el.classList.remove('active');
   });
   const map = {
-    'ALL': 'omniFilterAll',
     'ASSIGNED': 'omniFilterAssigned',
     'UNRESPONDED': 'omniFilterUnresponded',
     'RESOLVED': 'omniFilterResolved'
@@ -8442,12 +8533,11 @@ function setOmniFolder(folder) {
   const titleEl = document.getElementById('omniChatListHeaderTitle');
   if (titleEl) {
     const titleMap = {
-      'ALL': 'All chats',
       'ASSIGNED': 'Assigned chats',
       'UNRESPONDED': 'Unresponded',
       'RESOLVED': 'Resolved'
     };
-    titleEl.innerText = titleMap[folder] || 'All chats';
+    titleEl.innerText = titleMap[folder] || 'Assigned chats';
   }
   renderOmniInboxModule();
 }
@@ -8669,21 +8759,47 @@ function renderOmniInboxModule() {
   const bUnresponded = document.getElementById('omniBadgeUnresponded');
   const bResolved = document.getElementById('omniBadgeResolved');
 
-  const unrespCount = allChats.filter(function(p) { return p.isUnresponded; }).length;
+  const unrespCount = allChats.filter(function(p) { return p.isUnresponded && !p.isResolved; }).length;
+  const assignedCount = allChats.filter(function(p) { return !p.isResolved; }).length;
   const resCount = allChats.filter(function(p) { return p.isResolved; }).length;
 
-  if (bAll) bAll.innerText = allChats.length;
-  if (bAssigned) bAssigned.innerText = allChats.length;
+  if (bAssigned) bAssigned.innerText = assignedCount;
   if (bUnresponded) bUnresponded.innerText = unrespCount;
   if (bResolved) bResolved.innerText = resCount;
 
   let filtered = allChats;
   if (currentOmniFolder === 'ASSIGNED') {
-    filtered = allChats;
+    filtered = allChats.filter(function(p) { return !p.isResolved; });
   } else if (currentOmniFolder === 'UNRESPONDED') {
-    filtered = allChats.filter(function(p) { return p.isUnresponded; });
+    filtered = allChats.filter(function(p) { return p.isUnresponded && !p.isResolved; });
   } else if (currentOmniFolder === 'RESOLVED') {
     filtered = allChats.filter(function(p) { return p.isResolved; });
+  }
+
+  // POPULATE DROPDOWN FILTER CABANG (Sesuai Permintaan)
+  const branchSelect = document.getElementById('omniBranchFilterSelect');
+  if (branchSelect) {
+    const existingVal = branchSelect.value || 'ALL';
+    const branchesSet = new Set();
+    allChats.forEach(function(c) {
+      if (c.cabang && c.cabang !== '-' && c.cabang !== 'undefined') {
+        branchesSet.add(c.cabang.toUpperCase().trim());
+      }
+    });
+    const sortedBranches = Array.from(branchesSet).sort();
+    let branchOptionsMarkup = '<option value="ALL">🏢 Semua Cabang (' + sortedBranches.length + ' Cabang)</option>';
+    sortedBranches.forEach(function(b) {
+      branchOptionsMarkup += '<option value="' + b + '" ' + (b === existingVal ? 'selected' : '') + '>' + b + '</option>';
+    });
+    branchSelect.innerHTML = branchOptionsMarkup;
+
+    // Filter berdasarkan cabang yang dipilih
+    const curBranch = branchSelect.value;
+    if (curBranch && curBranch !== 'ALL') {
+      filtered = filtered.filter(function(p) {
+        return (p.cabang || '').toUpperCase().trim() === curBranch;
+      });
+    }
   }
 
   const searchInp = document.getElementById('omniSearchInput');
@@ -8710,7 +8826,7 @@ function renderOmniInboxModule() {
   if (!listContainer) return;
 
   if (filtered.length === 0) {
-    listContainer.innerHTML = '<div style="padding: 36px 18px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">Belum ada percakapan masuk.<br><span style="font-size:0.72rem; color:#94a3b8;">Chat dari PIC FU WhatsApp akan otomatis masuk ke sini tanpa grup.</span></div>';
+    listContainer.innerHTML = '<div style="padding: 36px 18px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">Tidak ada percakapan pada folder ini.<br><span style="font-size:0.72rem; color:#94a3b8;">Chat dari PIC FU WhatsApp akan otomatis masuk ke sini tanpa grup.</span></div>';
     const chatView = document.getElementById('omniChatViewContainer');
     const detailsView = document.getElementById('omniDetailsPanelContainer');
     if (chatView && !selectedOmniPicKey) {
@@ -8729,7 +8845,7 @@ function renderOmniInboxModule() {
 
   listContainer.innerHTML = filtered.map(function(pic) {
     const isSelected = pic.key === selectedOmniPicKey;
-    const initial = (pic.picName || 'P').charAt(0).toUpperCase();
+    const botAvatar = generateBotAvatarSvg(pic.picWA || pic.key, 36);
     let timeDisplay = '';
     if (pic.latestTimestamp) {
       const parts = pic.latestTimestamp.split(' ');
@@ -8738,7 +8854,7 @@ function renderOmniInboxModule() {
 
     return '<div class="omni-chat-card ' + (isSelected ? 'active' : '') + '" onclick="selectOmniPic(\'' + pic.key + '\')">' +
       '<div class="omni-card-avatar-wrap">' +
-        '<div class="omni-avatar-circle">' + initial + '</div>' +
+        '<div class="omni-avatar-circle">' + botAvatar + '</div>' +
         '<span class="omni-badge-wa-dot"></span>' +
       '</div>' +
       '<div class="omni-card-body">' +
@@ -8761,14 +8877,23 @@ function renderOmniInboxModule() {
   }).join('');
 
   if (selectedOmniPicKey) {
-    const currentPic = allChats.find(function(p) {
+    const isSelectedInFiltered = filtered.some(function(p) {
       return p.key === selectedOmniPicKey || normalizeWhatsAppPhone(p.picWA) === selectedOmniPicKey || (p.key && p.key.endsWith(selectedOmniPicKey.slice(-9)));
     });
-    if (currentPic) {
+    if (isSelectedInFiltered) {
+      const currentPic = filtered.find(function(p) {
+        return p.key === selectedOmniPicKey || normalizeWhatsAppPhone(p.picWA) === selectedOmniPicKey || (p.key && p.key.endsWith(selectedOmniPicKey.slice(-9)));
+      });
       renderOmniActiveChat(currentPic);
       renderOmniKeepPanel(currentPic);
     } else if (filtered.length > 0) {
       selectOmniPic(filtered[0].key);
+    } else {
+      selectedOmniPicKey = null;
+      const chatView = document.getElementById('omniChatViewContainer');
+      const detailsView = document.getElementById('omniDetailsPanelContainer');
+      if (chatView) chatView.innerHTML = renderOmniEmptyState();
+      if (detailsView) detailsView.innerHTML = '';
     }
   } else if (filtered.length > 0) {
     selectOmniPic(filtered[0].key);
@@ -8873,10 +8998,31 @@ function renderOmniActiveChat(pic) {
       '</span>'
     ) : '';
 
+    const quotedBlock = msg.replyTo ? (
+      '<div class="omni-bubble-reply-block">' +
+        '<div class="omni-reply-block-sender">' + escapeHtml(msg.replyTo.senderName || 'Balasan') + '</div>' +
+        '<div class="omni-reply-block-text">' + escapeHtml(msg.replyTo.text || '') + '</div>' +
+      '</div>'
+    ) : '';
+
+    const mediaImg = (msg.mediaUrl || msg.image) ? (
+      '<div class="omni-bubble-media" onclick="openOmniImageModal(\'' + escapeHtml(msg.mediaUrl || msg.image) + '\')">' +
+        '<img src="' + escapeHtml(msg.mediaUrl || msg.image) + '" alt="WhatsApp Image" class="omni-chat-image" loading="lazy">' +
+      '</div>'
+    ) : '';
+
+    const senderDisplayName = isOutgoing ? 'Admin (Anda)' : escapeHtml(pic.picName || 'PIC');
+    const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeSender = escapeHtml(senderDisplayName).replace(/'/g, "\\'");
+    const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
+
     return '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '">' +
+      replyBtn +
       '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
-        '<div class="omni-bubble-sender">' + (isOutgoing ? 'Admin (Anda)' : escapeHtml(pic.picName)) + '</div>' +
-        '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text) + '</div>' +
+        '<div class="omni-bubble-sender">' + senderDisplayName + '</div>' +
+        quotedBlock +
+        mediaImg +
+        '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || '') + '</div>' +
         '<span class="omni-bubble-time">' + timeStr + tickMarkup + '</span>' +
       '</div>' +
     '</div>';
@@ -8884,8 +9030,8 @@ function renderOmniActiveChat(pic) {
 
   container.innerHTML = '<div class="omni-chatview-header">' +
     '<div class="omni-header-contact">' +
-      '<div class="omni-header-avatar">' +
-        initial +
+      '<div class="omni-header-avatar" style="background:transparent; border:none; padding:0;">' +
+        generateBotAvatarSvg(pic.picWA || pic.key, 38) +
         '<span class="omni-badge-wa-dot"></span>' +
       '</div>' +
       '<div class="omni-header-info">' +
@@ -8922,6 +9068,13 @@ function renderOmniActiveChat(pic) {
     '<span>Pesan Baru</span>' +
   '</button>' +
   '<div class="omni-chatview-footer-modern">' +
+    '<div id="omniQuotedReplyBar" class="omni-quoted-reply-bar" style="display:none;">' +
+      '<div class="omni-quoted-bar-left">' +
+        '<div class="omni-quoted-reply-title">Membalas ke <span id="omniQuotedSenderName"></span></div>' +
+        '<div class="omni-quoted-reply-snippet" id="omniQuotedSnippet"></div>' +
+      '</div>' +
+      '<button type="button" class="omni-quoted-close-btn" onclick="cancelOmniQuotedReply()">&times;</button>' +
+    '</div>' +
     '<div class="omni-input-box-wrapper">' +
       '<textarea id="omniReplyInput" class="omni-textarea-modern" rows="2" placeholder="Type &quot;shift + enter&quot; to add a new line. Type &quot;/&quot; to use quick reply" onkeydown="handleOmniInputKey(event)" oninput="handleOmniInputTyping(this)"></textarea>' +
     '</div>' +
@@ -9118,11 +9271,32 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
     '</span>'
   ) : '';
 
-  row.innerHTML = '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
-    '<div class="omni-bubble-sender">' + (isOutgoing ? 'Admin (Anda)' : escapeHtml(senderDisplayName || 'PIC')) + '</div>' +
-    '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || msg.message || '') + '</div>' +
-    '<span class="omni-bubble-time">' + timeStr + tickSvg + '</span>' +
-  '</div>';
+  const quotedBlock = msg.replyTo ? (
+    '<div class="omni-bubble-reply-block">' +
+      '<div class="omni-reply-block-sender">' + escapeHtml(msg.replyTo.senderName || 'Balasan') + '</div>' +
+      '<div class="omni-reply-block-text">' + escapeHtml(msg.replyTo.text || '') + '</div>' +
+    '</div>'
+  ) : '';
+
+  const mediaImg = (msg.mediaUrl || msg.image) ? (
+    '<div class="omni-bubble-media" onclick="openOmniImageModal(\'' + escapeHtml(msg.mediaUrl || msg.image) + '\')">' +
+      '<img src="' + escapeHtml(msg.mediaUrl || msg.image) + '" alt="WhatsApp Image" class="omni-chat-image" loading="lazy">' +
+    '</div>'
+  ) : '';
+
+  const senderNameText = isOutgoing ? 'Admin (Anda)' : (senderDisplayName || 'PIC');
+  const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const safeSender = escapeHtml(senderNameText).replace(/'/g, "\\'");
+  const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
+
+  row.innerHTML = replyBtn +
+    '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
+      '<div class="omni-bubble-sender">' + escapeHtml(senderNameText) + '</div>' +
+      quotedBlock +
+      mediaImg +
+      '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || msg.message || '') + '</div>' +
+      '<span class="omni-bubble-time">' + timeStr + tickSvg + '</span>' +
+    '</div>';
   stream.appendChild(row);
 
   // Smart Auto-Scroll
@@ -9179,6 +9353,7 @@ async function sendOmniReply() {
 
   const now = Date.now();
   const msgId = 'out_' + now + '_' + Math.random().toString(36).slice(2, 7);
+  let textToSend = text;
   const outgoingMsg = {
     id: msgId,
     sender: 'ADMIN',
@@ -9186,6 +9361,16 @@ async function sendOmniReply() {
     timestamp: now,
     status: 'sending'
   };
+
+  // Cek jika sedang mereply pesan tertentu (Quoted Reply)
+  if (activeQuotedMsg) {
+    outgoingMsg.replyTo = {
+      text: activeQuotedMsg.text,
+      senderName: activeQuotedMsg.senderName
+    };
+    textToSend = '> *' + (activeQuotedMsg.senderName || 'Pesan') + '*:\n> ' + activeQuotedMsg.text.replace(/\n/g, '\n> ') + '\n\n' + text;
+    cancelOmniQuotedReply();
+  }
 
   const threads = getOmniThreads();
   if (!threads[selectedOmniPicKey]) threads[selectedOmniPicKey] = [];
@@ -9208,7 +9393,7 @@ async function sendOmniReply() {
     const res = await fetch('/api/watzap-send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: picWA, message: text, messageId: msgId, timestamp: now })
+      body: JSON.stringify({ phone: picWA, message: textToSend, messageId: msgId, timestamp: now })
     });
     const json = await res.json();
     if (json.success) {
@@ -9280,7 +9465,9 @@ async function pollWatzapIncomingMessages() {
           senderName: msg.senderName || matched.picName,
           text: text,
           timestamp: ts,
-          status: 'sent'
+          status: 'sent',
+          mediaUrl: msg.mediaUrl || msg.media_url || msg.image || msg.url || '',
+          messageType: msg.messageType || (msg.mediaUrl || msg.media_url || msg.image ? 'image' : 'text')
         };
         threads[picKey].push(newMsgObj);
         setOmniChatResolved(picKey, false);
@@ -9322,13 +9509,15 @@ async function pollWatzapIncomingMessages() {
         if (allChats.length !== currentCardsCount) {
           renderOmniInboxModule();
         } else {
-          const bAll = document.getElementById('omniBadgeAll');
           const bAssigned = document.getElementById('omniBadgeAssigned');
           const bUnresponded = document.getElementById('omniBadgeUnresponded');
-          const unrespCount = allChats.filter(function(p) { return p.isUnresponded; }).length;
-          if (bAll) bAll.innerText = allChats.length;
-          if (bAssigned) bAssigned.innerText = allChats.length;
+          const bResolved = document.getElementById('omniBadgeResolved');
+          const unrespCount = allChats.filter(function(p) { return p.isUnresponded && !p.isResolved; }).length;
+          const assignedCount = allChats.filter(function(p) { return !p.isResolved; }).length;
+          const resCount = allChats.filter(function(p) { return p.isResolved; }).length;
+          if (bAssigned) bAssigned.innerText = assignedCount;
           if (bUnresponded) bUnresponded.innerText = unrespCount;
+          if (bResolved) bResolved.innerText = resCount;
         }
       }
     }
@@ -9573,3 +9762,8 @@ window.handleOmniAttachmentClick = handleOmniAttachmentClick;
 window.handleOmniResolveClick = handleOmniResolveClick;
 window.openWhatsAppChat = openWhatsAppChat;
 window.clearOmniTestChats = clearOmniTestChats;
+window.generateBotAvatarSvg = generateBotAvatarSvg;
+window.startOmniQuotedReply = startOmniQuotedReply;
+window.cancelOmniQuotedReply = cancelOmniQuotedReply;
+window.openOmniImageModal = openOmniImageModal;
+window.closeOmniImageModal = closeOmniImageModal;

@@ -10,7 +10,7 @@ function getLocalMessages() {
     if (fs.existsSync(LOCAL_MESSAGES_FILE)) {
       return JSON.parse(fs.readFileSync(LOCAL_MESSAGES_FILE, 'utf8')) || [];
     }
-  } catch (e) {}
+  } catch (e) { }
   return [];
 }
 
@@ -19,7 +19,7 @@ function appendLocalMessage(msg) {
     const list = getLocalMessages();
     list.push(msg);
     fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(list.slice(-500), null, 2), 'utf8');
-  } catch (e) {}
+  } catch (e) { }
 }
 
 module.exports = async function handler(req, res) {
@@ -47,7 +47,7 @@ module.exports = async function handler(req, res) {
           if (phoneFilter) {
             const last9 = phoneFilter.slice(-9);
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
               FROM watzap_inbox
               WHERE is_group = FALSE 
                 AND created_at > ${since}
@@ -57,7 +57,7 @@ module.exports = async function handler(req, res) {
             `;
           } else {
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
               FROM watzap_inbox
               WHERE is_group = FALSE AND created_at > ${since}
               ORDER BY created_at ASC
@@ -69,7 +69,7 @@ module.exports = async function handler(req, res) {
           if (phoneFilter) {
             const last9 = phoneFilter.slice(-9);
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
               FROM watzap_inbox
               WHERE is_group = FALSE AND (phone = ${phoneFilter} OR phone LIKE ${'%' + last9})
               ORDER BY created_at DESC
@@ -77,7 +77,7 @@ module.exports = async function handler(req, res) {
             `;
           } else {
             msgs = await sql`
-              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp", media_url as "mediaUrl", message_type as "messageType"
               FROM watzap_inbox
               WHERE is_group = FALSE
               ORDER BY created_at DESC
@@ -107,7 +107,9 @@ module.exports = async function handler(req, res) {
       return {
         ...m,
         phone: p,
-        timestamp: Number(m.timestamp || m.created_at || Date.now())
+        timestamp: Number(m.timestamp || m.created_at || Date.now()),
+        mediaUrl: m.mediaUrl || m.media_url || '',
+        messageType: m.messageType || m.message_type || 'text'
       };
     });
 
@@ -148,7 +150,16 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ status: 200, message: 'Invalid phone ignored' });
       }
 
-      const text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
+      const mediaUrl = String(
+        data.image || data.media_url || data.url || data.file_url ||
+        (data.media && data.media.url) || body.image || body.media_url || ''
+      ).trim();
+      const messageType = String(data.message_type || (mediaUrl ? 'image' : 'text')).toLowerCase();
+      let text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
+      if (!text && mediaUrl) {
+        text = '[Foto/Gambar]';
+      }
+
       const senderName = String(data.name || data.pushName || '').trim();
       const isFromMe = data.is_from_me === true || body.is_from_me === true;
       const messageId = String(data.message_id || data.id || ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
@@ -161,13 +172,13 @@ module.exports = async function handler(req, res) {
 
       const senderType = isFromMe ? 'ADMIN' : 'PIC';
 
-      if (text) {
+      if (text || mediaUrl) {
         if (sql) {
           try {
             await initDb(sql);
             await sql`
-              INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at)
-              VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts})
+              INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at, media_url, message_type)
+              VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts}, ${mediaUrl || null}, ${messageType})
               ON CONFLICT (message_id) DO NOTHING
             `;
           } catch (dbErr) {
@@ -181,7 +192,9 @@ module.exports = async function handler(req, res) {
           sender: senderType,
           senderName: senderName,
           isGroup: false,
-          timestamp: ts
+          timestamp: ts,
+          mediaUrl: mediaUrl,
+          messageType: messageType
         });
       }
 

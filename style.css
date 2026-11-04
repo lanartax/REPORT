@@ -6751,3 +6751,253 @@ h1, h2, h3, h4, h5, h6,
   background: #2563eb;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
+
+/* ==========================================================================
+   OMNICHANNEL V2 ENHANCEMENTS: BRANCH FILTER, BOT AVATARS, REPLY BUBBLE & MEDIA
+   ========================================================================== */
+
+/* Branch Filter Dropdown */
+.omni-branch-filter-wrap {
+  width: 100%;
+}
+
+.omni-branch-select {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.omni-branch-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+/* Geometric Bot Avatar Adjustments */
+.omni-avatar-circle {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.omni-avatar-circle svg {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+  transition: transform 0.15s ease;
+}
+
+.omni-chat-card:hover .omni-avatar-circle svg {
+  transform: scale(1.06);
+}
+
+/* Reply Action Button on Bubble Hover */
+.omni-msg-row {
+  position: relative;
+}
+
+.omni-btn-bubble-reply {
+  opacity: 0;
+  pointer-events: none;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease;
+  align-self: center;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.omni-msg-row:hover .omni-btn-bubble-reply {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.omni-btn-bubble-reply:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: scale(1.1);
+}
+
+/* Quoted Reply Block inside Bubble */
+.omni-bubble-reply-block {
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3.5px solid #25d366;
+  border-radius: 4px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.omni-bubble-outgoing .omni-bubble-reply-block {
+  background: rgba(0, 0, 0, 0.06);
+  border-left-color: #059669;
+}
+
+.omni-reply-block-sender {
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 2px;
+}
+
+.omni-bubble-incoming .omni-reply-block-sender {
+  color: #2563eb;
+}
+
+.omni-reply-block-text {
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+/* Quoted Reply Banner above Textarea Input */
+.omni-quoted-reply-bar {
+  background: #f8fafc;
+  border-left: 4px solid #25d366;
+  border-radius: 6px 6px 0 0;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  animation: slideDown 0.15s ease-out;
+}
+
+.omni-quoted-bar-left {
+  flex: 1;
+  overflow: hidden;
+}
+
+.omni-quoted-reply-title {
+  font-size: 0.70rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.omni-quoted-reply-snippet {
+  font-size: 0.74rem;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omni-quoted-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.omni-quoted-close-btn:hover {
+  color: #e11d48;
+  background: #ffe4e6;
+}
+
+/* WhatsApp Chat Media Image */
+.omni-bubble-media {
+  max-width: 260px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.omni-chat-image {
+  width: 100%;
+  height: auto;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.omni-chat-image:hover {
+  filter: brightness(0.95);
+  transform: scale(1.02);
+}
+
+/* Image Lightbox Modal */
+.omni-img-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.omni-img-modal-dialog {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.omni-img-modal-image {
+  max-width: 85vw;
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.omni-img-modal-close {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0f172a;
+  border: none;
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+
+.omni-img-modal-close:hover {
+  transform: scale(1.1);
+  background: #fee2e2;
+  color: #dc2626;
+}
