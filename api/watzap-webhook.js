@@ -65,14 +65,14 @@ module.exports = async function handler(req, res) {
             `;
           }
         } else {
-          // Fetch initial recent messages
+          // Fetch initial recent messages (ambil 500 pesan TERBARU, lalu urutkan ASC untuk playback)
           if (phoneFilter) {
             const last9 = phoneFilter.slice(-9);
             msgs = await sql`
               SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
               FROM watzap_inbox
               WHERE is_group = FALSE AND (phone = ${phoneFilter} OR phone LIKE ${'%' + last9})
-              ORDER BY created_at ASC
+              ORDER BY created_at DESC
               LIMIT 500
             `;
           } else {
@@ -80,10 +80,11 @@ module.exports = async function handler(req, res) {
               SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
               FROM watzap_inbox
               WHERE is_group = FALSE
-              ORDER BY created_at ASC
+              ORDER BY created_at DESC
               LIMIT 500
             `;
           }
+          if (Array.isArray(msgs)) msgs.reverse();
         }
       } catch (dbErr) {
         console.error('Neon DB GET Error, falling back to local:', dbErr);
@@ -95,14 +96,20 @@ module.exports = async function handler(req, res) {
       if (since > 0) msgs = msgs.filter(m => (m.timestamp || 0) > since);
     }
 
-    // Strict filter: pastikan bukan grup dan jadikan timestamp sebagai Number
+    // Strict filter: pastikan bukan grup dan jadikan timestamp sebagai Number & phone ternormalisasi
     const filtered = (msgs || []).filter(m => {
       const p = String(m.phone || '');
       return !m.isGroup && !p.startsWith('120363') && p.length <= 14;
-    }).map(m => ({
-      ...m,
-      timestamp: Number(m.timestamp || m.created_at || Date.now())
-    }));
+    }).map(m => {
+      let p = String(m.phone || '').replace(/\D/g, '');
+      if (p.startsWith('08')) p = '62' + p.slice(1);
+      else if (p.startsWith('8')) p = '62' + p;
+      return {
+        ...m,
+        phone: p,
+        timestamp: Number(m.timestamp || m.created_at || Date.now())
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -118,7 +125,7 @@ module.exports = async function handler(req, res) {
       const data = body.data || body;
 
       const rawChatId = String(data.chat_id || data.phone || data.from || data.sender || data.phone_no || body.phone || '');
-      const cleanPhone = rawChatId.replace(/@.*$/, '').replace(/\D/g, '');
+      let cleanPhone = rawChatId.replace(/@.*$/, '').replace(/\D/g, '');
 
       // DETEKSI GRUP WHATSAPP: TOLAK & ABAIKAN GRUP
       const isGroup = rawChatId.includes('@g.us') || cleanPhone.startsWith('120363') || cleanPhone.length > 14;
@@ -127,6 +134,13 @@ module.exports = async function handler(req, res) {
           status: 200,
           message: 'Group message ignored (Personal PIC chats only)'
         });
+      }
+
+      // Normalisasi nomor ke format 628...
+      if (cleanPhone.startsWith('08')) {
+        cleanPhone = '62' + cleanPhone.slice(1);
+      } else if (cleanPhone.startsWith('8') && cleanPhone.length >= 9 && cleanPhone.length <= 13) {
+        cleanPhone = '62' + cleanPhone;
       }
 
       // Validasi nomor WhatsApp personal (minimal 9 digit, maksimal 14 digit)

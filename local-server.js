@@ -623,6 +623,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify(data));
       };
       await require('./api/watzap-webhook')(req, res);
+      if (req.method === 'POST') {
+        broadcastLiveEvent('WATZAP_MESSAGE_RECEIVED', { timestamp: Date.now() });
+      }
     });
     return;
   }
@@ -642,6 +645,9 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify(data));
       };
       await require('./api/watzap-send')(req, res);
+      if (req.method === 'POST') {
+        broadcastLiveEvent('WATZAP_MESSAGE_RECEIVED', { timestamp: Date.now() });
+      }
     });
     return;
   }

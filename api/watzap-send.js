@@ -52,7 +52,7 @@ module.exports = async function handler(req, res) {
       number_key: WATZAP_NUMBER_KEY,
       phone_no: cleanPhone,
       message: message,
-      wait_until_send: '1'
+      wait_until_send: '0'
     };
 
     console.log(`📤 [WATZAP SENDING MESSAGE] To: ${cleanPhone}`);
@@ -66,8 +66,8 @@ module.exports = async function handler(req, res) {
     const wzJson = await wzRes.json();
     console.log('WatZap send_message result:', wzJson);
 
-    const now = Date.now();
-    const msgId = 'out_' + now + '_' + Math.random().toString(36).slice(2, 7);
+    const now = Number(body.timestamp) || Date.now();
+    const msgId = String(body.messageId || ('out_' + now + '_' + Math.random().toString(36).slice(2, 7)));
 
     // Simpan ke database Neon PostgreSQL secara realtime
     const sql = getDb();
