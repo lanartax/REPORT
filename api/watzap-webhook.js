@@ -1,65 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { getDb, initDb } = require('../lib/db');
 
-const CLOUD_STORE_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a1a032afdb18bc';
 const LOCAL_MESSAGES_FILE = path.join(os.tmpdir(), 'watzap_messages.json');
 
-async function getStoredMessages() {
-  try {
-    const res = await fetch(CLOUD_STORE_URL);
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.data && Array.isArray(json.data.messages)) {
-        return json.data.messages;
-      }
-    }
-  } catch (e) {}
-
+function getLocalMessages() {
   try {
     if (fs.existsSync(LOCAL_MESSAGES_FILE)) {
       return JSON.parse(fs.readFileSync(LOCAL_MESSAGES_FILE, 'utf8')) || [];
     }
   } catch (e) {}
-
   return [];
 }
 
-async function appendStoredMessage(newMsg) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const currentList = await getStoredMessages();
-      const exists = currentList.some(m => m.messageId === newMsg.messageId);
-      if (exists) return true;
-
-      // Filter out any legacy group messages if present
-      const personalOnly = currentList.filter(m => {
-        const p = String(m.phone || '');
-        return !m.isGroup && !p.startsWith('120363') && p.length <= 14;
-      });
-
-      personalOnly.push(newMsg);
-      const trimmed = personalOnly.slice(-1000);
-
-      const res = await fetch(CLOUD_STORE_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'gadgetmart_watzap_inbox',
-          data: { messages: trimmed }
-        })
-      });
-
-      try {
-        fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
-      } catch (e) {}
-
-      if (res.ok) return true;
-    } catch (e) {
-      await new Promise(r => setTimeout(r, 200));
-    }
-  }
-  return false;
+function appendLocalMessage(msg) {
+  try {
+    const list = getLocalMessages();
+    list.push(msg);
+    fs.writeFileSync(LOCAL_MESSAGES_FILE, JSON.stringify(list.slice(-500), null, 2), 'utf8');
+  } catch (e) {}
 }
 
 module.exports = async function handler(req, res) {
@@ -71,38 +31,87 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
-  // GET: Fetch incoming messages for frontend sync (HANYA CHAT PERSONAL)
+  const sql = getDb();
+
+  // GET: Sinkronisasi pesan masuk untuk frontend (Ultra-fast Neon Postgres)
   if (req.method === 'GET') {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const since = parseInt(url.searchParams.get('since') || '0', 10);
     const phoneFilter = (url.searchParams.get('phone') || '').replace(/\D/g, '');
 
-    let msgs = await getStoredMessages();
-    // Strict filter: abaikan grup
-    msgs = msgs.filter(m => {
+    let msgs = [];
+    if (sql) {
+      try {
+        await initDb(sql);
+        if (since > 0) {
+          if (phoneFilter) {
+            const last9 = phoneFilter.slice(-9);
+            msgs = await sql`
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              FROM watzap_inbox
+              WHERE is_group = FALSE 
+                AND created_at > ${since}
+                AND (phone = ${phoneFilter} OR phone LIKE ${'%' + last9})
+              ORDER BY created_at ASC
+              LIMIT 200
+            `;
+          } else {
+            msgs = await sql`
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              FROM watzap_inbox
+              WHERE is_group = FALSE AND created_at > ${since}
+              ORDER BY created_at ASC
+              LIMIT 200
+            `;
+          }
+        } else {
+          // Fetch initial recent messages
+          if (phoneFilter) {
+            const last9 = phoneFilter.slice(-9);
+            msgs = await sql`
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              FROM watzap_inbox
+              WHERE is_group = FALSE AND (phone = ${phoneFilter} OR phone LIKE ${'%' + last9})
+              ORDER BY created_at ASC
+              LIMIT 500
+            `;
+          } else {
+            msgs = await sql`
+              SELECT message_id as "messageId", phone, sender_name as "senderName", message, sender, is_group as "isGroup", created_at as "timestamp"
+              FROM watzap_inbox
+              WHERE is_group = FALSE
+              ORDER BY created_at ASC
+              LIMIT 500
+            `;
+          }
+        }
+      } catch (dbErr) {
+        console.error('Neon DB GET Error, falling back to local:', dbErr);
+        msgs = getLocalMessages();
+        if (since > 0) msgs = msgs.filter(m => (m.timestamp || 0) > since);
+      }
+    } else {
+      msgs = getLocalMessages();
+      if (since > 0) msgs = msgs.filter(m => (m.timestamp || 0) > since);
+    }
+
+    // Strict filter: pastikan bukan grup dan jadikan timestamp sebagai Number
+    const filtered = (msgs || []).filter(m => {
       const p = String(m.phone || '');
       return !m.isGroup && !p.startsWith('120363') && p.length <= 14;
-    });
-
-    if (since > 0) {
-      msgs = msgs.filter(m => (m.timestamp || 0) > since);
-    }
-    if (phoneFilter) {
-      const last9 = phoneFilter.slice(-9);
-      msgs = msgs.filter(m => {
-        const clean = String(m.phone || '').replace(/\D/g, '');
-        return clean === phoneFilter || (last9 && clean.endsWith(last9));
-      });
-    }
+    }).map(m => ({
+      ...m,
+      timestamp: Number(m.timestamp || m.created_at || Date.now())
+    }));
 
     return res.status(200).json({
       success: true,
-      count: msgs.length,
-      messages: msgs
+      count: filtered.length,
+      messages: filtered
     });
   }
 
-  // POST: Webhook payload from WatZap
+  // POST: Webhook payload dari WatZap saat ada chat masuk
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
@@ -126,9 +135,9 @@ module.exports = async function handler(req, res) {
       }
 
       const text = String(data.message_body || data.message_text || data.message || data.body || data.text || body.message || '').trim();
-      const senderName = data.name || data.pushName || '';
+      const senderName = String(data.name || data.pushName || '').trim();
       const isFromMe = data.is_from_me === true || body.is_from_me === true;
-      const messageId = data.message_id || data.id || ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+      const messageId = String(data.message_id || data.id || ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
 
       let ts = Date.now();
       if (data.timestamp || body.timestamp) {
@@ -136,15 +145,28 @@ module.exports = async function handler(req, res) {
         ts = parsed > 10000000000 ? parsed : parsed * 1000;
       }
 
+      const senderType = isFromMe ? 'ADMIN' : 'PIC';
+
       if (text) {
-        await appendStoredMessage({
+        if (sql) {
+          try {
+            await initDb(sql);
+            await sql`
+              INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at)
+              VALUES (${messageId}, ${cleanPhone}, ${senderName}, ${text}, ${senderType}, FALSE, ${ts})
+              ON CONFLICT (message_id) DO NOTHING
+            `;
+          } catch (dbErr) {
+            console.error('Neon DB POST Insert Error:', dbErr);
+          }
+        }
+        appendLocalMessage({
           messageId: messageId,
           phone: cleanPhone,
           message: text,
-          sender: isFromMe ? 'ADMIN' : 'PIC',
+          sender: senderType,
           senderName: senderName,
           isGroup: false,
-          type: data.type || body.type || 'text',
           timestamp: ts
         });
       }

@@ -8953,6 +8953,74 @@ function handleOmniResolveClick(picKey) {
   renderOmniInboxModule();
 }
 
+function playOmniMessageChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.22);
+  } catch (e) {}
+}
+
+function appendOmniBubbleToStream(msg, senderDisplayName) {
+  const stream = document.getElementById('omniMessagesStream');
+  if (!stream) return;
+
+  const isOutgoing = msg.sender === 'ADMIN';
+  const timeStr = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const row = document.createElement('div');
+  row.className = 'omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming');
+  row.style.animation = 'fadeIn 0.2s ease-in-out';
+  row.innerHTML = '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
+    '<div class="omni-bubble-sender">' + (isOutgoing ? 'Admin (Anda)' : escapeHtml(senderDisplayName || 'PIC')) + '</div>' +
+    '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || msg.message || '') + '</div>' +
+    '<span class="omni-bubble-time">' + timeStr + '</span>' +
+  '</div>';
+  stream.appendChild(row);
+  setTimeout(function() {
+    stream.scrollTop = stream.scrollHeight;
+  }, 10);
+}
+
+function updateOmniCardInSidebar(picKey, lastMsg, picName, picCabang) {
+  const listContainer = document.getElementById('omniChatListContainer');
+  if (!listContainer) return;
+
+  const cards = listContainer.querySelectorAll('.omni-chat-card');
+  let targetCard = null;
+  cards.forEach(function(card) {
+    const oc = card.getAttribute('onclick') || '';
+    if (oc.includes("'" + picKey + "'") || oc.includes('"' + picKey + '"')) {
+      targetCard = card;
+    }
+  });
+
+  const timeStr = lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const snippet = lastMsg ? (lastMsg.sender === 'ADMIN' ? 'Anda: ' + lastMsg.text : lastMsg.text) : '';
+
+  if (targetCard) {
+    const snippetEl = targetCard.querySelector('.omni-card-snippet');
+    if (snippetEl) snippetEl.innerText = snippet;
+    const timeEl = targetCard.querySelector('.omni-card-time');
+    if (timeEl) timeEl.innerText = timeStr;
+    if (listContainer.firstChild !== targetCard) {
+      listContainer.insertBefore(targetCard, listContainer.firstChild);
+    }
+  } else {
+    renderOmniInboxModule();
+  }
+}
+
 async function sendOmniReply() {
   const inp = document.getElementById('omniReplyInput');
   if (!inp || !selectedOmniPicKey) return;
@@ -8964,24 +9032,29 @@ async function sendOmniReply() {
   const picWA = currentPic ? currentPic.picWA : selectedOmniPicKey;
   const picName = currentPic ? currentPic.picName : 'PIC FU';
 
-  const threads = getOmniThreads();
-  if (!threads[selectedOmniPicKey]) threads[selectedOmniPicKey] = [];
-  threads[selectedOmniPicKey].push({
+  const now = Date.now();
+  const outgoingMsg = {
     sender: 'ADMIN',
     text: text,
-    timestamp: Date.now()
-  });
+    timestamp: now
+  };
+
+  const threads = getOmniThreads();
+  if (!threads[selectedOmniPicKey]) threads[selectedOmniPicKey] = [];
+  threads[selectedOmniPicKey].push(outgoingMsg);
   saveOmniThreads(threads);
+
+  // Clear input immediately (0ms UI latency)
   inp.value = '';
   inp.style.height = 'auto';
   const sendBtn = document.getElementById('omniBtnSend');
   if (sendBtn) sendBtn.classList.remove('active');
 
-  if (currentPic) {
-    renderOmniActiveChat(currentPic);
-  }
+  // Optimistic UI: langsung tempel bubble ke obrolan secara instan!
+  appendOmniBubbleToStream(outgoingMsg, 'Admin (Anda)');
+  updateOmniCardInSidebar(selectedOmniPicKey, outgoingMsg, picName, currentPic ? currentPic.cabang : '-');
 
-  // Kirim langsung ke WhatsApp PIC via API WatZap
+  // Kirim langsung ke WhatsApp PIC via API WatZap di latar belakang
   try {
     const res = await fetch('/api/watzap-send', {
       method: 'POST',
@@ -9002,6 +9075,7 @@ async function sendOmniReply() {
 }
 
 let lastWatzapSyncTime = 0;
+let isPollingWatzap = false;
 let watzapPollInterval = null;
 
 async function pollWatzapIncomingMessages() {
@@ -9009,6 +9083,8 @@ async function pollWatzapIncomingMessages() {
   if (typeof currentActiveTab !== 'undefined' && currentActiveTab !== 9) {
     return;
   }
+  if (isPollingWatzap) return;
+  isPollingWatzap = true;
 
   try {
     const res = await fetch('/api/watzap-webhook?since=' + lastWatzapSyncTime);
@@ -9017,10 +9093,13 @@ async function pollWatzapIncomingMessages() {
     if (!data.success || !Array.isArray(data.messages) || data.messages.length === 0) return;
 
     let hasNew = false;
+    let playedSound = false;
     const threads = getOmniThreads();
 
     data.messages.forEach(function(msg) {
-      if (msg.timestamp > lastWatzapSyncTime) lastWatzapSyncTime = msg.timestamp;
+      const ts = Number(msg.timestamp || 0);
+      if (ts > lastWatzapSyncTime) lastWatzapSyncTime = ts;
+
       const cleanPhone = cleanPhoneDigits(msg.phone);
       if (!cleanPhone) return;
 
@@ -9029,36 +9108,73 @@ async function pollWatzapIncomingMessages() {
 
       const matched = matchPicFromMasterData(cleanPhone, msg.senderName || ('PIC ' + cleanPhone), '-');
       const picKey = matched.wa || cleanPhone;
+      const text = msg.message || msg.text || '';
 
       if (!threads[picKey]) threads[picKey] = [];
       const alreadyExists = threads[picKey].some(function(t) {
-        return t.timestamp === msg.timestamp && t.text === msg.message;
+        return t.timestamp === ts && t.text === text;
       });
+
       if (!alreadyExists) {
-        threads[picKey].push({
+        const newMsgObj = {
           sender: msg.sender || 'PIC',
           senderName: msg.senderName || matched.picName,
-          text: msg.message,
-          timestamp: msg.timestamp
-        });
+          text: text,
+          timestamp: ts
+        };
+        threads[picKey].push(newMsgObj);
         setOmniChatResolved(picKey, false);
         hasNew = true;
+
+        // INCREMENTAL UPDATE: Jika chat ini sedang dibuka di layar, langsung tempel bubble!
+        const isCurrentChat = (selectedOmniPicKey === picKey || 
+          cleanPhoneDigits(selectedOmniPicKey) === cleanPhone || 
+          (matched.wa && cleanPhoneDigits(selectedOmniPicKey) === cleanPhoneDigits(matched.wa)));
+
+        if (isCurrentChat) {
+          appendOmniBubbleToStream(newMsgObj, matched.picName);
+        }
+
+        // Perbarui kartu di sidebar kiri
+        updateOmniCardInSidebar(picKey, newMsgObj, matched.picName, matched.cabang);
+
+        // Mainkan notifikasi chime lembut jika pesan masuk dari PIC
+        if (msg.sender !== 'ADMIN' && !playedSound) {
+          playOmniMessageChime();
+          playedSound = true;
+        }
       }
     });
 
     if (hasNew) {
       saveOmniThreads(threads);
-      if (typeof currentActiveTab !== 'undefined' && currentActiveTab === 9) {
-        renderOmniInboxModule();
-      }
+      const allChats = getOmniPicChats();
+      const bAll = document.getElementById('omniBadgeAll');
+      const bAssigned = document.getElementById('omniBadgeAssigned');
+      const bUnresponded = document.getElementById('omniBadgeUnresponded');
+      const unrespCount = allChats.filter(function(p) { return p.isUnresponded; }).length;
+      if (bAll) bAll.innerText = allChats.length;
+      if (bAssigned) bAssigned.innerText = allChats.length;
+      if (bUnresponded) bUnresponded.innerText = unrespCount;
     }
-  } catch (e) {}
+  } catch (e) {
+  } finally {
+    isPollingWatzap = false;
+  }
 }
 
 function startWatzapPolling() {
   if (watzapPollInterval) return;
   pollWatzapIncomingMessages();
-  watzapPollInterval = setInterval(pollWatzapIncomingMessages, 4000);
+  // Polling super cepat (1.2 detik) langsung ke Neon PostgreSQL
+  watzapPollInterval = setInterval(pollWatzapIncomingMessages, 1200);
+
+  // Saat user berpindah window (Alt+Tab) dan kembali, langsung sinkronkan tanpa refresh
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && typeof currentActiveTab !== 'undefined' && currentActiveTab === 9) {
+      pollWatzapIncomingMessages();
+    }
+  });
 }
 
 function handleOmniInputKey(e) {

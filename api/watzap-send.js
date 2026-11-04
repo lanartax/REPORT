@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getDb, initDb } = require('../lib/db');
 
 const WATZAP_API_KEY = 'VMUXOT68QD5TQ84V';
 const WATZAP_NUMBER_KEY = 'gqLbEDAZ4lReCCME';
@@ -12,7 +13,7 @@ function appendStoredMessage(msg) {
       list = JSON.parse(fs.readFileSync(MESSAGES_FILE, 'utf8')) || [];
     }
     list.push(msg);
-    const trimmed = list.slice(-1000);
+    const trimmed = list.slice(-500);
     fs.writeFileSync(MESSAGES_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
   } catch (e) {}
 }
@@ -65,24 +66,43 @@ module.exports = async function handler(req, res) {
     const wzJson = await wzRes.json();
     console.log('WatZap send_message result:', wzJson);
 
-    // Record to local message log
+    const now = Date.now();
+    const msgId = 'out_' + now + '_' + Math.random().toString(36).slice(2, 7);
+
+    // Simpan ke database Neon PostgreSQL secara realtime
+    const sql = getDb();
+    if (sql) {
+      try {
+        await initDb(sql);
+        await sql`
+          INSERT INTO watzap_inbox (message_id, phone, sender_name, message, sender, is_group, created_at)
+          VALUES (${msgId}, ${cleanPhone}, 'Admin', ${message}, 'ADMIN', FALSE, ${now})
+          ON CONFLICT (message_id) DO NOTHING
+        `;
+      } catch (dbErr) {
+        console.error('Neon DB Outgoing Insert Error:', dbErr);
+      }
+    }
+
+    // Backup ke local messages file
     appendStoredMessage({
-      messageId: 'out_' + Date.now(),
+      messageId: msgId,
       phone: cleanPhone,
       message: message,
       sender: 'ADMIN',
       type: 'text',
-      timestamp: Date.now()
+      timestamp: now
     });
 
     return res.status(200).json({
       success: wzJson.status === '200' || wzJson.status === 200 || wzJson.ack === 'successfully',
       watzap: wzJson,
-      phone: cleanPhone
+      phone: cleanPhone,
+      messageId: msgId,
+      timestamp: now
     });
   } catch (err) {
     console.error('Error sending WatZap message:', err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };
-
