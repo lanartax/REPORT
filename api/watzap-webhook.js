@@ -173,10 +173,29 @@ module.exports = async function handler(req, res) {
       };
     });
 
+    let resolvedChatsMap = {};
+    if (sql) {
+      try {
+        const statusRows = await sql`
+          SELECT phone, is_resolved, resolved_at, resolved_by
+          FROM omni_chat_status
+          WHERE is_resolved = TRUE
+        `;
+        for (const row of statusRows) {
+          resolvedChatsMap[row.phone] = {
+            isResolved: true,
+            resolvedAt: Number(row.resolved_at || Date.now()),
+            resolvedBy: row.resolved_by || 'Admin'
+          };
+        }
+      } catch (statusErr) {}
+    }
+
     return res.status(200).json({
       success: true,
       count: filtered.length,
-      messages: filtered
+      messages: filtered,
+      resolvedChats: resolvedChatsMap
     });
   }
 
@@ -184,6 +203,36 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
+
+      // Cek apakah aksi untuk resolve / unresolve chat secara permanen
+      if (body.action === 'resolve_chat' || body.action === 'unresolve_chat') {
+        let targetPhone = String(body.phone || body.picKey || '').replace(/\D/g, '');
+        if (targetPhone.startsWith('08')) targetPhone = '62' + targetPhone.slice(1);
+        else if (targetPhone.startsWith('8')) targetPhone = '62' + targetPhone;
+
+        const isResolved = body.action === 'resolve_chat' || body.isResolved === true;
+        const resolvedBy = String(body.resolvedBy || 'Admin').trim();
+        const now = Date.now();
+
+        if (sql && targetPhone) {
+          try {
+            await initDb(sql);
+            await sql`
+              INSERT INTO omni_chat_status (phone, is_resolved, resolved_at, resolved_by, updated_at)
+              VALUES (${targetPhone}, ${isResolved}, ${now}, ${resolvedBy}, ${now})
+              ON CONFLICT (phone) DO UPDATE SET
+                is_resolved = EXCLUDED.is_resolved,
+                resolved_at = EXCLUDED.resolved_at,
+                resolved_by = EXCLUDED.resolved_by,
+                updated_at = EXCLUDED.updated_at
+            `;
+          } catch (dbErr) {
+            console.error('Neon DB resolve_chat Error:', dbErr);
+          }
+        }
+        return res.status(200).json({ success: true, phone: targetPhone, isResolved, resolvedAt: now });
+      }
+
       const data = body.data || body;
 
       // Debug logger: Simpan raw webhook payload ke watzap_webhook_logs untuk analisa real-time
@@ -238,6 +287,11 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ status: 200, message: 'Invalid phone ignored' });
       }
 
+      const messageId = String(
+        msgItem.id || data.message_id || data.id || body.messageId ||
+        ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7))
+      );
+
       // 1. Ekstraksi Gambar / Media URL
       let mediaUrl = '';
       if (typeof msgItem.image === 'string') mediaUrl = msgItem.image;
@@ -256,15 +310,41 @@ module.exports = async function handler(req, res) {
         ).trim();
       }
 
-      // 2. Ekstraksi Tipe Pesan
+      // 2. Ekstraksi Tipe Pesan & Deteksi Media
+      const hasMediaFlag = data.has_media === true || body.has_media === true || msgItem.has_media === true;
+      const mediaMime = String(data.media_mime || msgItem.media_mime || body.media_mime || '').toLowerCase();
       const rawType = String(
         msgItem.type || msgItem.message_type || data.message_type || data.type || body.message_type ||
         (mediaUrl ? 'image' : 'text')
       ).toLowerCase();
-      const isImage = rawType.includes('image') || rawType.includes('foto') || Boolean(mediaUrl) || String(data.message_body) === '[Image]';
+      const isImage = rawType.includes('image') || rawType.includes('foto') || hasMediaFlag || mediaMime.includes('image') || Boolean(mediaUrl) || String(data.message_body) === '[Image]';
       const messageType = isImage ? 'image' : 'text';
 
-      // 3. Ekstraksi Pesan Teks
+      // 3. JIKA WATZAP MENGIRIM MEDIA TANPA URL -> LANGSUNG UNDUH VIA API /v1/download_media
+      if (isImage && !mediaUrl && messageId) {
+        try {
+          const downloadPayload = {
+            api_key: process.env.WATZAP_API_KEY || 'VMUXOT68QD5TQ84V',
+            number_key: data.number_key || body.number_key || process.env.WATZAP_NUMBER_KEY || 'gqLbEDAZ4lReCCME',
+            chat_id: rawChatId || `${cleanPhone}@s.whatsapp.net`,
+            message_id: messageId
+          };
+          const dlRes = await fetch('https://api.watzap.id/v1/download_media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(downloadPayload)
+          });
+          const dlData = await dlRes.json();
+          if (dlData && dlData.url) {
+            mediaUrl = dlData.url;
+            console.log(`📸 [WatZap Webhook] Berhasil unduh media untuk ${cleanPhone} (${mediaUrl.length} chars)`);
+          }
+        } catch (dlErr) {
+          console.error('⚠️ [WatZap Webhook] Gagal download media dari WatZap:', dlErr.message);
+        }
+      }
+
+      // 4. Ekstraksi Pesan Teks
       let text = String(
         msgItem.text?.body || msgItem.message_body || msgItem.message ||
         data.message_body || data.message_text || data.message || data.body || data.text ||
@@ -275,7 +355,7 @@ module.exports = async function handler(req, res) {
         text = '[Foto/Gambar]';
       }
 
-      // 4. Ekstraksi Quoted Reply (Context)
+      // 5. Ekstraksi Quoted Reply (Hanya jika asli ada di context atau format tanda kutip >)
       let replyTo = null;
       const ctx = msgItem.context || data.context || data.quoted || data.quoted_message || data.quoted_body || data.reply_to || null;
       if (ctx && typeof ctx === 'object') {
@@ -286,7 +366,7 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Jika tidak ada context object, cek apakah pesan teks menggunakan format kutipan WhatsApp (> *Nama*: ...)
+      // Jika pesan teks menggunakan format kutipan WhatsApp bawaan (> *Nama*: ...)
       if (!replyTo && text.startsWith('>')) {
         const parsed = parseQuotedFromText(text);
         if (parsed.replyTo) {
@@ -297,10 +377,6 @@ module.exports = async function handler(req, res) {
 
       const senderName = String(contactName || data.name || data.pushName || msgItem.name || '').trim();
       const isFromMe = data.is_from_me === true || body.is_from_me === true || msgItem.from_me === true;
-      const messageId = String(
-        msgItem.id || data.message_id || data.id || body.messageId ||
-        ('wz_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7))
-      );
 
       let ts = Date.now();
       if (msgItem.timestamp || data.timestamp || body.timestamp) {

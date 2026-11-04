@@ -8614,9 +8614,16 @@ function isEligibleKeep(ts) {
   return keepMidnight >= yesterdayMidnight;
 }
 
+window.omniResolvedDbMap = null;
+
 function getOmniResolvedChats() {
+  if (window.omniResolvedDbMap && typeof window.omniResolvedDbMap === 'object') {
+    return window.omniResolvedDbMap;
+  }
   try {
-    return JSON.parse(localStorage.getItem('omni_resolved_chats_v1') || '{}');
+    const local = JSON.parse(localStorage.getItem('omni_resolved_chats_v1') || '{}');
+    window.omniResolvedDbMap = local;
+    return local;
   } catch (e) {
     return {};
   }
@@ -8630,9 +8637,51 @@ function setOmniChatResolved(key, isResolved) {
   } else {
     delete map[normKey];
   }
+  window.omniResolvedDbMap = map;
   try {
     localStorage.setItem('omni_resolved_chats_v1', JSON.stringify(map));
   } catch (e) {}
+
+  // SINKRONISASI PERMANEN KE NEON POSTGRESQL (Tidak akan hilang saat redeploy / beda device)
+  try {
+    fetch('/api/omni-resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: normKey,
+        isResolved: Boolean(isResolved),
+        resolvedBy: 'Admin'
+      })
+    }).catch(function(err) {
+      console.warn('Gagal sinkron status resolve ke PostgreSQL:', err);
+    });
+  } catch (e) {}
+}
+
+async function fetchOmniResolvedStatuses() {
+  try {
+    const res = await fetch('/api/omni-resolve');
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json && json.success && json.resolvedChats) {
+      const dbMap = {};
+      Object.keys(json.resolvedChats).forEach(function(phone) {
+        if (json.resolvedChats[phone] && json.resolvedChats[phone].isResolved) {
+          const norm = normalizeWhatsAppPhone(phone) || phone;
+          dbMap[norm] = true;
+        }
+      });
+      window.omniResolvedDbMap = Object.assign({}, getOmniResolvedChats(), dbMap);
+      try {
+        localStorage.setItem('omni_resolved_chats_v1', JSON.stringify(window.omniResolvedDbMap));
+      } catch (e) {}
+      if (typeof renderOmniInboxSidebar === 'function') {
+        renderOmniInboxSidebar();
+      }
+    }
+  } catch (err) {
+    console.warn('Gagal memuat status resolve dari Neon DB:', err);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -8792,6 +8841,7 @@ function getOmniPicChats() {
 }
 
 function renderOmniInboxModule() {
+  fetchOmniResolvedStatuses();
   startWatzapPolling();
   const allChats = getOmniPicChats();
   const bAll = document.getElementById('omniBadgeAll');
@@ -9072,13 +9122,19 @@ function renderOmniActiveChat(pic) {
     const safeSender = escapeHtml(senderDisplayName).replace(/'/g, "\\'");
     const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
 
+    let cleanTextRender = displayText;
+    if (hasImage && (cleanTextRender === '[Foto/Gambar]' || cleanTextRender === '[Pesan Masuk]' || cleanTextRender === '[Image]')) {
+      cleanTextRender = '';
+    }
+    const textHtml = cleanTextRender ? ('<div style="white-space:pre-wrap; word-break:break-word;' + (hasImage ? ' margin-top:6px;' : '') + '">' + escapeHtml(cleanTextRender) + '</div>') : '';
+
     return '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '">' +
       replyBtn +
       '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
         '<div class="omni-bubble-sender">' + senderDisplayName + '</div>' +
         quotedBlock +
         mediaImg +
-        '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || '') + '</div>' +
+        textHtml +
         '<span class="omni-bubble-time">' + timeStr + tickMarkup + '</span>' +
       '</div>' +
     '</div>';
@@ -9345,12 +9401,18 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
   const safeSender = escapeHtml(senderNameText).replace(/'/g, "\\'");
   const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
 
+  let cleanTextRenderStream = displayText;
+  if (hasImage && (cleanTextRenderStream === '[Foto/Gambar]' || cleanTextRenderStream === '[Pesan Masuk]' || cleanTextRenderStream === '[Image]')) {
+    cleanTextRenderStream = '';
+  }
+  const textHtmlStream = cleanTextRenderStream ? ('<div style="white-space:pre-wrap; word-break:break-word;' + (hasImage ? ' margin-top:6px;' : '') + '">' + escapeHtml(cleanTextRenderStream) + '</div>') : '';
+
   row.innerHTML = replyBtn +
     '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
       '<div class="omni-bubble-sender">' + escapeHtml(senderNameText) + '</div>' +
       quotedBlock +
       mediaImg +
-      '<div style="white-space:pre-wrap; word-break:break-word;">' + escapeHtml(msg.text || msg.message || '') + '</div>' +
+      textHtmlStream +
       '<span class="omni-bubble-time">' + timeStr + tickSvg + '</span>' +
     '</div>';
   stream.appendChild(row);
@@ -9486,7 +9548,24 @@ async function pollWatzapIncomingMessages() {
     const res = await fetch('/api/watzap-webhook?since=' + lastWatzapSyncTime);
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.success || !Array.isArray(data.messages) || data.messages.length === 0) return;
+    if (!data.success) return;
+
+    // SINKRONISASI STATUS RESOLVE PERMANEN DARI NEON POSTGRESQL (Tidak pernah hilang saat redeploy)
+    if (data.resolvedChats && typeof data.resolvedChats === 'object') {
+      const dbMap = {};
+      Object.keys(data.resolvedChats).forEach(function(ph) {
+        if (data.resolvedChats[ph] && data.resolvedChats[ph].isResolved) {
+          const norm = normalizeWhatsAppPhone(ph) || ph;
+          dbMap[norm] = true;
+        }
+      });
+      window.omniResolvedDbMap = Object.assign({}, getOmniResolvedChats(), dbMap);
+      try {
+        localStorage.setItem('omni_resolved_chats_v1', JSON.stringify(window.omniResolvedDbMap));
+      } catch (e) {}
+    }
+
+    if (!Array.isArray(data.messages) || data.messages.length === 0) return;
 
     const isInitialLoad = (lastWatzapSyncTime === 0);
     let hasNew = false;
@@ -9506,15 +9585,28 @@ async function pollWatzapIncomingMessages() {
       const matched = matchPicFromMasterData(cleanPhone, msg.senderName || ('PIC ' + cleanPhone), '-');
       const picKey = cleanPhone; // Standarisasi: Key percakapan SELALU nomor telepon
       const text = msg.message || msg.text || '';
+      const incomingMediaUrl = msg.mediaUrl || msg.media_url || msg.image || msg.url || '';
 
       if (!threads[picKey]) threads[picKey] = [];
-      const alreadyExists = threads[picKey].some(function(t) {
-        if (t.id && msg.messageId && t.id === msg.messageId) return true;
-        if (Math.abs(Number(t.timestamp) - ts) < 5000 && (t.text || '').trim() === text.trim() && (t.sender || 'PIC') === (msg.sender || 'PIC')) return true;
-        return Number(t.timestamp) === ts && (t.text || '').trim() === text.trim();
+
+      // Cari apakah pesan sudah pernah tercatat
+      let existingMsg = null;
+      threads[picKey].forEach(function(t) {
+        if (t.id && msg.messageId && t.id === msg.messageId) {
+          existingMsg = t;
+        } else if (Math.abs(Number(t.timestamp) - ts) < 5000 && (t.text || '').trim() === text.trim() && (t.sender || 'PIC') === (msg.sender || 'PIC')) {
+          existingMsg = t;
+        }
       });
 
-      if (!alreadyExists) {
+      if (existingMsg) {
+        // Jika sebelumnya belum ada mediaUrl dan sekarang ada, perbarui data media
+        if (!existingMsg.mediaUrl && incomingMediaUrl) {
+          existingMsg.mediaUrl = incomingMediaUrl;
+          existingMsg.messageType = 'image';
+          hasNew = true;
+        }
+      } else {
         let replyToObj = msg.replyTo || null;
         let cleanMsgText = text;
         if (!replyToObj && cleanMsgText.startsWith('>')) {
@@ -9532,12 +9624,12 @@ async function pollWatzapIncomingMessages() {
           text: cleanMsgText,
           timestamp: ts,
           status: 'sent',
-          mediaUrl: msg.mediaUrl || msg.media_url || msg.image || msg.url || '',
-          messageType: msg.messageType || (msg.mediaUrl || msg.media_url || msg.image ? 'image' : 'text'),
+          mediaUrl: incomingMediaUrl,
+          messageType: msg.messageType || (incomingMediaUrl ? 'image' : 'text'),
           replyTo: replyToObj
         };
         threads[picKey].push(newMsgObj);
-        setOmniChatResolved(picKey, false);
+        // CATATAN: Sekali di-resolve, tetap berstatus resolve permanen di database Neon PostgreSQL!
         hasNew = true;
 
         if (!isInitialLoad) {

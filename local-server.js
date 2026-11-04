@@ -652,6 +652,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (reqPath === '/api/omni-resolve' || reqPath.startsWith('/api/omni-resolve')) {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        req.body = body ? JSON.parse(body) : {};
+      } catch (e) {
+        req.body = {};
+      }
+      res.status = (code) => { res.statusCode = code; return res; };
+      res.json = (data) => {
+        res.writeHead(res.statusCode || 200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+      };
+      await require('./api/omni-resolve')(req, res);
+      if (req.method === 'POST') {
+        broadcastLiveEvent('OMNI_RESOLVE_UPDATED', { timestamp: Date.now() });
+      }
+    });
+    return;
+  }
+
   // API Database Status Check (Untuk Realtime Cross-Device Sync)
   if (reqPath === '/api/database-status') {
     const checkFile = (f) => {
