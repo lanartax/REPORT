@@ -117,7 +117,7 @@ module.exports = async function handler(req, res) {
         gatewaySource = 'WAHA_VPS';
         const wData = await wahaRes.json().catch(() => ({}));
         if (wData.id) {
-          msgId = String(wData.id);
+          msgId = typeof wData.id === 'object' ? String(wData.id._serialized || wData.id.id || '') : String(wData.id);
         }
         console.log(`✅ [WAHA VPS] Pesan berhasil terkirim ke WhatsApp ${cleanPhone}!`);
       } else {
@@ -128,6 +128,7 @@ module.exports = async function handler(req, res) {
     }
 
     // 2. Fallback ke WatZap API jika WAHA belum merespons
+    let wzJson = null;
     if (!sentSuccessfully) {
       const endpoint = mediaUrl ? 'https://api.watzap.id/v1/send_image_url' : 'https://api.watzap.id/v1/send_message';
       const payload = mediaUrl ? {
@@ -151,8 +152,11 @@ module.exports = async function handler(req, res) {
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(10000)
       });
-      const wzJson = await wzRes.json();
+      wzJson = await wzRes.json();
       console.log('WatZap send result:', wzJson);
+      if (wzJson && (wzJson.status === '200' || wzJson.status === 200 || wzJson.ack === 'successfully')) {
+        sentSuccessfully = true;
+      }
     }
 
     // Simpan ke database Neon PostgreSQL secara realtime
@@ -183,7 +187,8 @@ module.exports = async function handler(req, res) {
     });
 
     return res.status(200).json({
-      success: wzJson.status === '200' || wzJson.status === 200 || wzJson.ack === 'successfully',
+      success: sentSuccessfully,
+      gateway: gatewaySource,
       watzap: wzJson,
       phone: cleanPhone,
       messageId: msgId,
