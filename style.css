@@ -5743,17 +5743,18 @@ h1, h2, h3, h4, h5, h6,
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 4px 0;
+  margin: 10px 0;
 }
 
 .omni-date-pill {
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 600;
   background: #ffffff;
-  color: #64748b;
-  padding: 3px 10px;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  color: #475569;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* Chat Bubbles */

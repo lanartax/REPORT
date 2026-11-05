@@ -9054,6 +9054,38 @@ function generateWhatsAppBotMessage(k, picName) {
     'silakan bantu screenshot chatnya + infoin ke kami sudah sampai mana progressnya ya ^^ jangan lupa follow up kembali customernya jika ghosting agar peluang closing meningkat ya 👍';
 }
 
+function formatOmniDateDivider(timestamp) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const defaultToday = `Today, ${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+  if (!timestamp) return defaultToday;
+
+  const msgDate = new Date(Number(timestamp) || timestamp);
+  if (isNaN(msgDate.getTime())) return defaultToday;
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  const dateStr = `${pad(msgDate.getDate())}/${pad(msgDate.getMonth() + 1)}/${msgDate.getFullYear()}`;
+
+  const isToday = msgDate.getFullYear() === today.getFullYear() &&
+                  msgDate.getMonth() === today.getMonth() &&
+                  msgDate.getDate() === today.getDate();
+  if (isToday) {
+    return `Today, ${dateStr}`;
+  }
+
+  const isYesterday = msgDate.getFullYear() === yesterday.getFullYear() &&
+                      msgDate.getMonth() === yesterday.getMonth() &&
+                      msgDate.getDate() === yesterday.getDate();
+  if (isYesterday) {
+    return `Kemarin, ${dateStr}`;
+  }
+
+  return dateStr;
+}
+
 function renderOmniActiveChat(pic) {
   const container = document.getElementById('omniChatViewContainer');
   if (!container) return;
@@ -9063,34 +9095,41 @@ function renderOmniActiveChat(pic) {
   const threads = getOmniThreads();
   const customMessages = threads[pic.key] || threads[cleanWA] || threads[normalizeWhatsAppPhone(cleanWA)] || [];
 
-  const keepsBotMarkup = (pic.keeps || []).map(function(k) {
-    const botText = generateWhatsAppBotMessage(k, pic.picName);
-    let timeFormatted = '12:46 PM';
-    if (k.timestamp) {
-      const parts = k.timestamp.split(' ');
-      if (parts[1]) timeFormatted = parts[1].slice(0, 5);
-    }
-    return '<div class="omni-msg-row omni-msg-bot">' +
-      '<div class="omni-bubble omni-bubble-bot">' +
-        '<div class="omni-bubble-bot-text">' + escapeHtml(botText) + '</div>' +
-        '<span class="omni-bubble-time">' +
-          timeFormatted +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline; vertical-align:middle; margin-left:3px;"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 13 19"/></svg>' +
-        '</span>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+  // Sort messages chronologically
+  const sortedMessages = (customMessages || []).slice().sort(function(a, b) {
+    return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0);
+  });
 
-  const customMessagesMarkup = customMessages.map(function(msg) {
-    if (msg.sender === 'SYSTEM') {
-      return '<div style="display:flex; justify-content:center; margin: 10px 0;">' +
-        '<span style="background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-size: 0.70rem; font-weight: 600; padding: 4px 12px; border-radius: 12px; text-align: center;">' +
-          escapeHtml(msg.text) +
-        '</span>' +
-      '</div>';
+  let lastDateGroup = null;
+  const messagesRendered = [];
+
+  sortedMessages.forEach(function(msg) {
+    const msgTs = msg.timestamp ? Number(msg.timestamp) : Date.now();
+    const d = new Date(msgTs);
+    const dateKey = isNaN(d.getTime()) ? 'today' : `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    if (dateKey !== lastDateGroup) {
+      lastDateGroup = dateKey;
+      const dateLabel = formatOmniDateDivider(msgTs);
+      messagesRendered.push(
+        '<div class="omni-date-divider">' +
+          '<span class="omni-date-pill">' + escapeHtml(dateLabel) + '</span>' +
+        '</div>'
+      );
     }
+
+    if (msg.sender === 'SYSTEM') {
+      messagesRendered.push(
+        '<div style="display:flex; justify-content:center; margin: 10px 0;">' +
+          '<span style="background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-size: 0.70rem; font-weight: 600; padding: 4px 12px; border-radius: 12px; text-align: center;">' +
+            escapeHtml(msg.text) +
+          '</span>' +
+        '</div>'
+      );
+      return;
+    }
+
     const isOutgoing = msg.sender === 'ADMIN';
-    const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeStr = !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const tickMarkup = isOutgoing ? (
       '<span class="omni-msg-status-tick" id="tick_' + (msg.id || '') + '">' +
         (msg.status === 'sending'
@@ -9139,17 +9178,30 @@ function renderOmniActiveChat(pic) {
     }
     const textHtml = cleanTextRender ? ('<div style="white-space:pre-wrap; word-break:break-word;' + (hasImage ? ' margin-top:6px;' : '') + '">' + escapeHtml(cleanTextRender) + '</div>') : '';
 
-    return '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '">' +
-      replyBtn +
-      '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
-        '<div class="omni-bubble-sender">' + senderDisplayName + '</div>' +
-        quotedBlock +
-        mediaImg +
-        textHtml +
-        '<span class="omni-bubble-time">' + timeStr + tickMarkup + '</span>' +
+    messagesRendered.push(
+      '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '">' +
+        replyBtn +
+        '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
+          '<div class="omni-bubble-sender">' + senderDisplayName + '</div>' +
+          quotedBlock +
+          mediaImg +
+          textHtml +
+          '<span class="omni-bubble-time">' + timeStr + tickMarkup + '</span>' +
+        '</div>' +
+      '</div>'
+    );
+  });
+
+  if (messagesRendered.length === 0) {
+    messagesRendered.push(
+      '<div class="omni-date-divider">' +
+        '<span class="omni-date-pill">' + formatOmniDateDivider(Date.now()) + '</span>' +
       '</div>' +
-    '</div>';
-  }).join('');
+      '<div style="text-align:center; padding: 40px 16px; color:#94a3b8; font-size:0.75rem;">' +
+        'Belum ada pesan percakapan dengan kontak ini.' +
+      '</div>'
+    );
+  }
 
   container.innerHTML = '<div class="omni-chatview-header">' +
     '<div class="omni-header-contact">' +
@@ -9169,10 +9221,6 @@ function renderOmniActiveChat(pic) {
       '</div>' +
     '</div>' +
     '<div class="omni-header-actions" style="display: flex; align-items: center; gap: 8px;">' +
-      '<button type="button" class="omni-btn-wa-direct" onclick="openWhatsAppChat(\'' + cleanWA + '\', \'' + escapeHtml(pic.picName) + '\')" title="Buka WhatsApp Web Langsung">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
-        '<span>Buka WhatsApp Web</span>' +
-      '</button>' +
       '<button type="button" class="omni-btn-resolve ' + (pic.isResolved ? 'is-resolved' : '') + '" onclick="handleOmniResolveClick(\'' + pic.key + '\')" title="Selesaikan chat jika semua format keep tgl 3 ke atas sudah diisi">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' +
         '<span>' + (pic.isResolved ? '✓ Resolved' : 'Resolve Chat') + '</span>' +
@@ -9180,11 +9228,7 @@ function renderOmniActiveChat(pic) {
     '</div>' +
   '</div>' +
   '<div class="omni-messages-stream" id="omniMessagesStream">' +
-    '<div class="omni-date-divider">' +
-      '<span class="omni-date-pill">Today</span>' +
-    '</div>' +
-    keepsBotMarkup +
-    customMessagesMarkup +
+    messagesRendered.join('') +
   '</div>' +
   '<button type="button" id="omniNewMessagePill" class="omni-new-msg-pill" style="display:none;" onclick="scrollOmniStreamToBottom()">' +
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>' +
