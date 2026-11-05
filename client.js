@@ -8143,18 +8143,26 @@ function parseQuotedFromText(rawText) {
   return { cleanText: rawText, replyTo: null };
 }
 
-function startOmniQuotedReply(text, senderName) {
-  activeQuotedMsg = { text: text, senderName: senderName };
+function startOmniQuotedReply(msgId, text, senderName) {
+  if (arguments.length === 2) {
+    senderName = text;
+    text = msgId;
+    msgId = '';
+  }
+  activeQuotedMsg = { id: msgId || '', text: text || '', senderName: senderName || 'Pesan' };
   const bar = document.getElementById('omniQuotedReplyBar');
   const titleSpan = document.getElementById('omniQuotedSenderName');
   const snippetDiv = document.getElementById('omniQuotedSnippet');
   if (bar && titleSpan && snippetDiv) {
-    titleSpan.innerText = senderName;
-    snippetDiv.innerText = text;
+    titleSpan.innerText = activeQuotedMsg.senderName;
+    snippetDiv.innerText = activeQuotedMsg.text;
     bar.style.display = 'flex';
   }
   const inp = document.getElementById('omniReplyInput');
-  if (inp) inp.focus();
+  if (inp) {
+    inp.focus();
+    inp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 function cancelOmniQuotedReply() {
@@ -8162,6 +8170,53 @@ function cancelOmniQuotedReply() {
   const bar = document.getElementById('omniQuotedReplyBar');
   if (bar) bar.style.display = 'none';
 }
+
+function scrollToOmniQuotedMessage(quotedId, quotedText) {
+  const stream = document.getElementById('omniMessagesStream');
+  if (!stream) return;
+
+  let targetEl = null;
+
+  // 1. Cari berdasarkan ID pesan
+  if (quotedId) {
+    targetEl = document.getElementById('omniMsg_' + quotedId) || stream.querySelector('[data-msg-id="' + quotedId + '"]');
+  }
+
+  // 2. Fallback: Cari berdasarkan cuplikan teks pesan
+  if (!targetEl && quotedText) {
+    const cleanSearch = String(quotedText).trim().toLowerCase().slice(0, 35);
+    const allRows = stream.querySelectorAll('.omni-msg-row');
+    for (let i = allRows.length - 1; i >= 0; i--) {
+      const row = allRows[i];
+      const bubbleEl = row.querySelector('.omni-bubble');
+      if (bubbleEl) {
+        const clone = bubbleEl.cloneNode(true);
+        const replyBlock = clone.querySelector('.omni-bubble-reply-block');
+        if (replyBlock) replyBlock.remove();
+        const rowText = clone.innerText.toLowerCase();
+        if (cleanSearch && rowText.includes(cleanSearch)) {
+          targetEl = row;
+          break;
+        }
+      }
+    }
+  }
+
+  if (targetEl) {
+    // Scroll mulus langsung ke chat yang dimention tepat di tengah tampilan
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Efek highlight / focus point (pulse animation)
+    targetEl.classList.remove('omni-msg-focused');
+    void targetEl.offsetWidth; // trigger reflow
+    targetEl.classList.add('omni-msg-focused');
+
+    setTimeout(function() {
+      if (targetEl) targetEl.classList.remove('omni-msg-focused');
+    }, 2000);
+  }
+}
+window.scrollToOmniQuotedMessage = scrollToOmniQuotedMessage;
 
 function openOmniImageModal(src) {
   const modal = document.getElementById('omniImageModal');
@@ -9140,16 +9195,23 @@ function renderOmniActiveChat(pic) {
 
     let replyToObj = msg.replyTo || null;
     let displayText = msg.text || '';
-    if (!replyToObj && displayText.startsWith('>')) {
+    if (displayText.startsWith('>')) {
       const parsed = parseQuotedFromText(displayText);
-      if (parsed.replyTo) {
-        replyToObj = parsed.replyTo;
+      if (parsed.cleanText) {
         displayText = parsed.cleanText;
+        if (!replyToObj && parsed.replyTo) {
+          replyToObj = parsed.replyTo;
+        }
       }
     }
 
+    const msgId = String(msg.id || msg.messageId || ('msg_' + (msg.timestamp || Math.random().toString(36).slice(2))));
+    const safeMsgId = escapeHtml(msgId).replace(/'/g, "\\'");
+
+    const targetQuotedId = replyToObj ? escapeHtml(replyToObj.id || '').replace(/'/g, "\\'") : '';
+    const targetQuotedText = replyToObj ? escapeHtml(replyToObj.text || '').replace(/'/g, "\\'").replace(/\n/g, ' ') : '';
     const quotedBlock = replyToObj ? (
-      '<div class="omni-bubble-reply-block">' +
+      '<div class="omni-bubble-reply-block" onclick="scrollToOmniQuotedMessage(\'' + targetQuotedId + '\', \'' + targetQuotedText + '\')" title="Klik untuk melompat ke pesan yang direply">' +
         '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
         '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
       '</div>'
@@ -9168,9 +9230,9 @@ function renderOmniActiveChat(pic) {
     ) : '');
 
     const senderDisplayName = isOutgoing ? 'Admin (Anda)' : escapeHtml(pic.picName || 'PIC');
-    const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeText = escapeHtml(displayText || msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     const safeSender = escapeHtml(senderDisplayName).replace(/'/g, "\\'");
-    const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
+    const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeMsgId + '\', \'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
 
     let cleanTextRender = displayText;
     if (hasImage && (cleanTextRender === '[Foto/Gambar]' || cleanTextRender === '[Pesan Masuk]' || cleanTextRender === '[Image]')) {
@@ -9179,7 +9241,7 @@ function renderOmniActiveChat(pic) {
     const textHtml = cleanTextRender ? ('<div style="white-space:pre-wrap; word-break:break-word;' + (hasImage ? ' margin-top:6px;' : '') + '">' + escapeHtml(cleanTextRender) + '</div>') : '';
 
     messagesRendered.push(
-      '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '">' +
+      '<div class="omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming') + '" id="omniMsg_' + safeMsgId + '" data-msg-id="' + safeMsgId + '">' +
         replyBtn +
         '<div class="omni-bubble ' + (isOutgoing ? 'omni-bubble-outgoing' : 'omni-bubble-incoming') + '">' +
           '<div class="omni-bubble-sender">' + senderDisplayName + '</div>' +
@@ -9410,12 +9472,17 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
 
   const isOutgoing = msg.sender === 'ADMIN';
   const timeStr = new Date(msg.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const msgId = String(msg.id || msg.messageId || ('msg_' + (msg.timestamp || Math.random().toString(36).slice(2))));
+  const safeMsgId = escapeHtml(msgId).replace(/'/g, "\\'");
+
   const row = document.createElement('div');
   row.className = 'omni-msg-row ' + (isOutgoing ? 'omni-msg-outgoing' : 'omni-msg-incoming');
+  row.id = 'omniMsg_' + safeMsgId;
+  row.setAttribute('data-msg-id', safeMsgId);
   row.style.animation = 'fadeIn 0.2s ease-in-out';
 
   const tickSvg = isOutgoing ? (
-    '<span class="omni-msg-status-tick" id="tick_' + (msg.id || '') + '">' +
+    '<span class="omni-msg-status-tick" id="tick_' + safeMsgId + '">' +
       (msg.status === 'sending'
         ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="display:inline; vertical-align:middle; margin-left:3px;"><polyline points="20 6 9 17 4 12"/></svg>'
         : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2" style="display:inline; vertical-align:middle; margin-left:3px;"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 13 19"/></svg>') +
@@ -9424,16 +9491,20 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
 
   let replyToObj = msg.replyTo || null;
   let displayText = msg.text || msg.message || '';
-  if (!replyToObj && displayText.startsWith('>')) {
+  if (displayText.startsWith('>')) {
     const parsed = parseQuotedFromText(displayText);
-    if (parsed.replyTo) {
-      replyToObj = parsed.replyTo;
+    if (parsed.cleanText) {
       displayText = parsed.cleanText;
+      if (!replyToObj && parsed.replyTo) {
+        replyToObj = parsed.replyTo;
+      }
     }
   }
 
+  const targetQuotedId = replyToObj ? escapeHtml(replyToObj.id || '').replace(/'/g, "\\'") : '';
+  const targetQuotedText = replyToObj ? escapeHtml(replyToObj.text || '').replace(/'/g, "\\'").replace(/\n/g, ' ') : '';
   const quotedBlock = replyToObj ? (
-    '<div class="omni-bubble-reply-block">' +
+    '<div class="omni-bubble-reply-block" onclick="scrollToOmniQuotedMessage(\'' + targetQuotedId + '\', \'' + targetQuotedText + '\')" title="Klik untuk melompat ke pesan yang direply">' +
       '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
       '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
     '</div>'
@@ -9452,9 +9523,9 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
   ) : '');
 
   const senderNameText = isOutgoing ? 'Admin (Anda)' : (senderDisplayName || 'PIC');
-  const safeText = escapeHtml(msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const safeText = escapeHtml(displayText || msg.text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
   const safeSender = escapeHtml(senderNameText).replace(/'/g, "\\'");
-  const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
+  const replyBtn = '<button type="button" class="omni-btn-bubble-reply" onclick="startOmniQuotedReply(\'' + safeMsgId + '\', \'' + safeText + '\', \'' + safeSender + '\')" title="Balas pesan ini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></button>';
 
   let cleanTextRenderStream = displayText;
   if (hasImage && (cleanTextRenderStream === '[Foto/Gambar]' || cleanTextRenderStream === '[Pesan Masuk]' || cleanTextRenderStream === '[Image]')) {
@@ -9538,10 +9609,13 @@ async function sendOmniReply() {
   // Cek jika sedang mereply pesan tertentu (Quoted Reply)
   if (activeQuotedMsg) {
     outgoingMsg.replyTo = {
+      id: activeQuotedMsg.id || '',
       text: activeQuotedMsg.text,
       senderName: activeQuotedMsg.senderName
     };
-    textToSend = '> *' + (activeQuotedMsg.senderName || 'Pesan') + '*:\n> ' + activeQuotedMsg.text.replace(/\n/g, '\n> ') + '\n\n' + text;
+    // PENTING: Kirimkan HANYA pesan teks bersih tanpa format `> *...*:`
+    // Di WhatsApp asli, balasan pesan langsung terhubung ke bubble chat customer secara native
+    textToSend = text;
     cancelOmniQuotedReply();
   }
 

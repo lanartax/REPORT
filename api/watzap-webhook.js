@@ -232,11 +232,13 @@ module.exports = async function handler(req, res) {
       let msgText = m.message || '';
 
       // Parsing otomatis kutipan jika ada di dalam teks
-      if (!replyToObj && msgText.startsWith('>')) {
+      if (msgText.startsWith('>')) {
         const parsed = parseQuotedFromText(msgText);
-        if (parsed.replyTo) {
-          replyToObj = parsed.replyTo;
+        if (parsed.cleanText) {
           msgText = parsed.cleanText;
+          if (!replyToObj && parsed.replyTo) {
+            replyToObj = parsed.replyTo;
+          }
         }
       }
 
@@ -584,11 +586,13 @@ module.exports = async function handler(req, res) {
       }
 
       // Jika pesan teks menggunakan format kutipan WhatsApp bawaan (> *Nama*: ...)
-      if (!replyTo && text.startsWith('>')) {
+      if (text.startsWith('>')) {
         const parsed = parseQuotedFromText(text);
-        if (parsed.replyTo) {
-          replyTo = parsed.replyTo;
+        if (parsed.cleanText) {
           text = parsed.cleanText;
+          if (!replyTo && parsed.replyTo) {
+            replyTo = parsed.replyTo;
+          }
         }
       }
 

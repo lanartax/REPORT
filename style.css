@@ -6898,6 +6898,36 @@ h1, h2, h3, h4, h5, h6,
   transform: scale(1.1);
 }
 
+/* Focus point highlight animation when clicking a quoted reply */
+@keyframes omniFocusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+    filter: brightness(0.92);
+    transform: scale(1.02);
+  }
+  30% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0.35);
+    filter: brightness(0.88);
+    transform: scale(1.03);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.15);
+    filter: brightness(0.95);
+    transform: scale(1.01);
+  }
+  100% {
+    box-shadow: none;
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+.omni-msg-row.omni-msg-focused .omni-bubble {
+  animation: omniFocusPulse 1.8s ease-out forwards;
+  position: relative;
+  z-index: 10;
+}
+
 /* Quoted Reply Block inside Bubble */
 .omni-bubble-reply-block {
   background: rgba(0, 0, 0, 0.05);
@@ -6908,11 +6938,22 @@ h1, h2, h3, h4, h5, h6,
   font-size: 0.72rem;
   line-height: 1.35;
   cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.omni-bubble-reply-block:hover {
+  background: rgba(0, 0, 0, 0.11);
+  filter: brightness(0.96);
 }
 
 .omni-bubble-outgoing .omni-bubble-reply-block {
   background: rgba(0, 0, 0, 0.06);
   border-left-color: #059669;
+}
+
+.omni-bubble-outgoing .omni-bubble-reply-block:hover {
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .omni-reply-block-sender {
