@@ -18,7 +18,7 @@ const MIME_TYPES = {
 };
 
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1V0pIa0NZCprJqRwnSnikFaLZ-dd50nY0uE3bjVYsUe0/export?format=csv&gid=1014933310';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
 
 // ==========================================
 // SERVER-SENT EVENTS (SSE) BROADCAST ENGINE
@@ -320,7 +320,8 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-          await handleUpdateStatus(body.nomorWA || '', body.status || '', body.feedback || '', body.reportAR || body.arDoc || '');
+          const fb = body.feedback || body.feedbackTimFU || '';
+          await handleUpdateStatus(body.nomorWA || '', body.status || '', fb, body.reportAR || body.arDoc || '');
         } catch (e) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Format JSON tidak valid' }));
@@ -329,7 +330,8 @@ const server = http.createServer(async (req, res) => {
       return;
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host}`);
-      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '', urlParams.searchParams.get('feedback') || '', urlParams.searchParams.get('reportAR') || urlParams.searchParams.get('arDoc') || '');
+      const fb = urlParams.searchParams.get('feedback') || urlParams.searchParams.get('feedbackTimFU') || '';
+      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '', fb, urlParams.searchParams.get('reportAR') || urlParams.searchParams.get('arDoc') || '');
       return;
     }
   }

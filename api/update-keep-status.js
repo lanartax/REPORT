@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
 
 function updateLocalCsv(nomorWA, newStatus, feedback = null, reportAR = null) {
   try {
@@ -66,13 +66,13 @@ module.exports = async function handler(req, res) {
       const body = req.body || {};
       nomorWA = body.nomorWA || '';
       status = body.status || '';
-      feedback = body.feedback || '';
+      feedback = body.feedback || body.feedbackTimFU || '';
       reportAR = body.reportAR || body.arDoc || '';
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       nomorWA = urlParams.searchParams.get('nomorWA') || (req.query && req.query.nomorWA) || '';
       status = urlParams.searchParams.get('status') || (req.query && req.query.status) || '';
-      feedback = urlParams.searchParams.get('feedback') || (req.query && req.query.feedback) || '';
+      feedback = urlParams.searchParams.get('feedback') || urlParams.searchParams.get('feedbackTimFU') || (req.query && (req.query.feedback || req.query.feedbackTimFU)) || '';
       reportAR = urlParams.searchParams.get('reportAR') || urlParams.searchParams.get('arDoc') || '';
     }
 
@@ -89,6 +89,15 @@ module.exports = async function handler(req, res) {
     }
     const gasRes = await fetch(targetUrl, { redirect: 'follow' });
     const gasJson = await gasRes.json();
+
+    if (reportAR) {
+      try {
+        const arUrl = `${APPS_SCRIPT_URL}?action=UPDATE_REPORT_AR&nomorWA=${encodeURIComponent(cleanWA)}&arDoc=${encodeURIComponent(reportAR)}`;
+        await fetch(arUrl, { redirect: 'follow' });
+      } catch (arErr) {
+        console.warn('Gagal update reportAR di Apps Script:', arErr);
+      }
+    }
 
     return res.status(200).json(gasJson);
   } catch (err) {

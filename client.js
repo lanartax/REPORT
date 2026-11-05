@@ -3332,7 +3332,7 @@ async function updateKeepStatusInGoogleSheets(rawWA, newStatus) {
   const normWA = String(rawWA || '').replace(/\D/g, '');
   if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update status.');
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
 
   let result = null;
   // 1. Coba lewat backend local-server proxy
@@ -3405,7 +3405,7 @@ async function updateReportARInGoogleSheets(rawWA, arDoc) {
   const normWA = String(rawWA || '').replace(/\D/g, '');
   if (!normWA) throw new Error('Nomor WhatsApp tidak valid untuk update Report AR.');
 
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
 
   let result = null;
   // 1. Coba lewat backend local-server proxy
@@ -10210,35 +10210,62 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
   });
 
   try {
-    const promises = [
-      fetch('/api/update-keep-status', {
+    let success = false;
+    // 1. Coba update via API backend
+    try {
+      const res = await fetch('/api/update-keep-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nomorWA: customerWA,
           status: newStatus,
+          feedback: newFeedback,
           feedbackTimFU: newFeedback,
           reportAR: newReportAR,
           cabang: matchedRow ? matchedRow['Cabang'] : '',
           namaTimFollowUp: matchedRow ? (matchedRow['Nama Tim Follow Up'] || matchedRow['Nama Tim FU']) : ''
         })
-      })
-    ];
+      });
+      if (res.ok) {
+        const j = await res.json();
+        if (j && j.success) success = true;
+      }
+    } catch (e) {
+      console.warn('API /api/update-keep-status gagal, fallback direct GAS:', e);
+    }
+
+    // 2. Fallback direct Apps Script jika backend gagal / 404
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbybKV-XtULQW6ct4GCNCCgk2f84AD4CVsSGCOOzweskJFaZtPk0jnEut8tJ80Aq1naoXA/exec';
+    if (!success) {
+      try {
+        let gasUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(customerWA)}&status=${encodeURIComponent(newStatus || '')}`;
+        if (newFeedback) gasUrl += `&feedback=${encodeURIComponent(newFeedback)}`;
+        await fetch(gasUrl, { redirect: 'follow' });
+      } catch (gasErr) {
+        console.error('Direct GAS update status gagal:', gasErr);
+      }
+    }
 
     if (newReportAR) {
-      promises.push(
-        fetch('/api/update-report-ar', {
+      try {
+        await fetch('/api/update-report-ar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             nomorWA: customerWA,
             arDoc: newReportAR
           })
-        })
-      );
+        });
+      } catch (e) {
+        // Fallback direct GAS
+        try {
+          const arUrl = `${APPS_SCRIPT_URL}?action=UPDATE_REPORT_AR&nomorWA=${encodeURIComponent(customerWA)}&arDoc=${encodeURIComponent(newReportAR)}`;
+          await fetch(arUrl, { redirect: 'follow' });
+        } catch (arErr) {
+          console.error('Direct GAS update report AR gagal:', arErr);
+        }
+      }
     }
-
-    await Promise.allSettled(promises);
   } catch (err) {
     console.error('Gagal update keep status ke backend:', err);
   }
