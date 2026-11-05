@@ -57,7 +57,7 @@ let currentActiveTab = 1;
 // Executive Dashboard & Leaderboard State
 let currentLeaderboardSort = 'omzet'; // 'omzet', 'gp', 'score'
 let leaderboardPeriodMode = 'current'; // 'current' or 'ath'
-let dashFilters = { month: '10', cabang: 'all', sales: 'all', mode: 'DPP' };
+let dashFilters = { month: String(new Date().getMonth() + 1), cabang: 'all', sales: 'all', mode: 'DPP' };
 let cachedMonthlyTargets = {};
 let lastProcessedPicStats = null;
 let lastActivePICs = [];
@@ -1780,6 +1780,7 @@ function parseKeepCSV(csvText, isSilent = false) {
       pill.innerHTML = `<span>📁 Sumber: Google Sheets Live (${rawKeepRows.length.toLocaleString('id-ID')} Baris Data)</span>`;
     }
 
+    populateKeepPeriodDropdowns();
     populateKeepSosmedDropdown();
     applyKeepFilters();
 
@@ -1901,6 +1902,90 @@ async function syncLiveKeepData() {
 }
 window.syncLiveKeepData = syncLiveKeepData;
 
+const INDO_MONTH_NAMES_LIST = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+function getDetectedKeepPeriod() {
+  const now = new Date();
+  const mName = INDO_MONTH_NAMES_LIST[now.getMonth()];
+  const yShort = String(now.getFullYear()).slice(-2);
+  return `${mName}-${yShort}`;
+}
+window.getDetectedKeepPeriod = getDetectedKeepPeriod;
+
+function parseKeepPeriodKey(pStr) {
+  if (!pStr || typeof pStr !== 'string') return 0;
+  const parts = pStr.trim().split('-');
+  if (parts.length < 2) return 0;
+  const mStr = parts[0].toLowerCase();
+  const yStr = parts[1];
+  const mIdx = INDO_MONTH_NAMES_LIST.findIndex(m => m.toLowerCase() === mStr);
+  const mNum = mIdx >= 0 ? mIdx + 1 : 0;
+  let yNum = parseInt(yStr, 10);
+  if (isNaN(yNum)) return 0;
+  const fullYear = (yNum >= 50 && yNum <= 99) ? (1900 + yNum) : (2000 + yNum);
+  return fullYear * 100 + mNum;
+}
+
+function populateKeepPeriodDropdowns() {
+  if (!rawKeepRows || rawKeepRows.length === 0) return;
+
+  const detectedPeriod = getDetectedKeepPeriod();
+  const uniquePeriods = new Set();
+  rawKeepRows.forEach(r => {
+    const p = String(r['PERIODE'] || '').trim();
+    if (p && p !== 'undefined' && p !== 'null') {
+      uniquePeriods.add(p);
+    }
+  });
+
+  const sortedPeriods = Array.from(uniquePeriods).sort((a, b) => parseKeepPeriodKey(b) - parseKeepPeriodKey(a));
+  if (sortedPeriods.length === 0) return;
+
+  // 1. Format Keep Dropdown
+  const keepSelect = document.getElementById('keepFilterPeriode');
+  if (keepSelect) {
+    const currentVal = keepSelect.value;
+    let html = '<option value="ALL">Semua Periode</option>';
+    sortedPeriods.forEach(p => {
+      const isCurrent = (p.toLowerCase() === detectedPeriod.toLowerCase());
+      const label = isCurrent ? `${p} (Bulan ini)` : p;
+      html += `<option value="${p}">${label}</option>`;
+    });
+    keepSelect.innerHTML = html;
+    if (currentVal && (currentVal === 'ALL' || sortedPeriods.includes(currentVal))) {
+      keepSelect.value = currentVal;
+    } else if (sortedPeriods.includes(detectedPeriod)) {
+      keepSelect.value = detectedPeriod;
+    } else {
+      keepSelect.value = sortedPeriods[0];
+    }
+  }
+
+  // 2. Audit Tracking AR Dropdown
+  const auditSelect = document.getElementById('auditFilterPeriode');
+  if (auditSelect) {
+    const currentVal = auditSelect.value;
+    let html = '<option value="ALL">Semua Periode</option>';
+    sortedPeriods.forEach(p => {
+      const isCurrent = (p.toLowerCase() === detectedPeriod.toLowerCase());
+      const label = isCurrent ? `${p} (Bulan ini)` : p;
+      html += `<option value="${p}">${label}</option>`;
+    });
+    auditSelect.innerHTML = html;
+    if (currentVal && (currentVal === 'ALL' || sortedPeriods.includes(currentVal))) {
+      auditSelect.value = currentVal;
+    } else if (sortedPeriods.includes(detectedPeriod)) {
+      auditSelect.value = detectedPeriod;
+    } else {
+      auditSelect.value = sortedPeriods[0];
+    }
+  }
+}
+window.populateKeepPeriodDropdowns = populateKeepPeriodDropdowns;
+
 function populateKeepSosmedDropdown() {
   const select = document.getElementById('keepFilterSosmed');
   if (!select) return;
@@ -2020,7 +2105,12 @@ function toggleAuditFiltersSection() {
 }
 
 function resetKeepFilters() {
-  if (document.getElementById('keepFilterPeriode')) document.getElementById('keepFilterPeriode').value = 'Oktober-26';
+  const detected = getDetectedKeepPeriod();
+  const keepPeriodeEl = document.getElementById('keepFilterPeriode');
+  if (keepPeriodeEl) {
+    const hasDetected = Array.from(keepPeriodeEl.options).some(o => o.value.toLowerCase() === detected.toLowerCase());
+    keepPeriodeEl.value = hasDetected ? detected : (keepPeriodeEl.options[1] ? keepPeriodeEl.options[1].value : 'ALL');
+  }
   if (document.getElementById('keepFilterSosmed')) document.getElementById('keepFilterSosmed').value = 'ALL';
   if (document.getElementById('keepFilterStatus')) document.getElementById('keepFilterStatus').value = 'ALL';
   if (document.getElementById('keepFilterTanggal')) document.getElementById('keepFilterTanggal').value = '';
@@ -3036,6 +3126,7 @@ function runARMissingSosmedAudit() {
     pill.innerHTML = `<span>📁 ${rawAuditARList.length} AR Ditemukan</span>`;
   }
 
+  populateKeepPeriodDropdowns();
   populateAuditSosmedDropdown();
   applyAuditColStyles();
   applyAuditFilters();
@@ -3168,7 +3259,11 @@ function resetAuditFilters() {
   const statusEl = document.getElementById('auditFilterStatus');
   const searchEl = document.getElementById('auditSearchInput');
 
-  if (periodeEl) periodeEl.value = 'Oktober-26';
+  if (periodeEl) {
+    const detected = getDetectedKeepPeriod();
+    const hasDetected = Array.from(periodeEl.options).some(o => o.value.toLowerCase() === detected.toLowerCase());
+    periodeEl.value = hasDetected ? detected : (periodeEl.options[1] ? periodeEl.options[1].value : 'ALL');
+  }
   if (sosmedEl) sosmedEl.value = 'ALL';
   if (tglVlookupEl) tglVlookupEl.value = '';
   if (tglReportEl) tglReportEl.value = '';
@@ -3931,10 +4026,10 @@ function generateAuditItemTSV(auditItem, item) {
   // 1. TANGGAL (format DD/MM/YYYY)
   const tgl = formatCrosellingDate(auditItem.postingDate);
 
-  // 2. PERIODE (e.g. Oktober-26)
+  // 2. PERIODE (e.g. November-26)
   const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
     ? String(auditItem.keep['PERIODE']).trim() 
-    : 'Oktober-26';
+    : getDetectedKeepPeriod();
 
   // 3. NO AR
   const noAR = String(auditItem.doc || '').trim();
@@ -4137,7 +4232,7 @@ function findKeepForARItem(item, docNumber = null) {
   // Fallback: If not found in rawKeepRows (e.g. offline customer), build fallback keep object
   if (!matched) {
     matched = {
-      'PERIODE': 'Oktober-26',
+      'PERIODE': getDetectedKeepPeriod(),
       'Nomor WA': rawWA,
       'Nama': (item && (item['Name'] || item['Customer/Vendor Name'])) || '-',
       'Barang Keep': (item && (item['Dscription'] || item['Item/Service Description'])) || '-',
@@ -6325,11 +6420,12 @@ function setDashCalculationMode(mode) {
 }
 
 function resetDashboardFilters() {
-  dashFilters = { month: '10', cabang: 'all', sales: 'all', mode: currentCalculationMode };
+  const currentNowMonth = String(new Date().getMonth() + 1);
+  dashFilters = { month: currentNowMonth, cabang: 'all', sales: 'all', mode: currentCalculationMode };
   const mSel = document.getElementById('dashFilterMonth');
   const cSel = document.getElementById('dashFilterCabang');
   const sSel = document.getElementById('dashFilterSales');
-  if (mSel) mSel.value = '10';
+  if (mSel) mSel.value = currentNowMonth;
   if (cSel) cSel.value = 'all';
   if (sSel) sSel.value = 'all';
   applyDashboardFilters();
@@ -6468,7 +6564,7 @@ async function loadARClaimsData() {
       c.evidenceImages = c.evidenceImage ? [c.evidenceImage] : [];
     }
     c.evidenceImage = c.evidenceImages[0] || null;
-    c.periode = c.periode || 'Oktober-26';
+    c.periode = c.periode || getDetectedKeepPeriod();
     c.keepText = c.keepText || '';
   });
 
@@ -6503,7 +6599,7 @@ function addSingleARToClaims(auditItem, customItems = null) {
 
   const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
     ? String(auditItem.keep['PERIODE']).trim() 
-    : 'Oktober-26';
+    : getDetectedKeepPeriod();
   const keepFormatted = (typeof formatKeepTextForClipboard === 'function') 
     ? formatKeepTextForClipboard(auditItem.keep) 
     : '';
@@ -6586,7 +6682,7 @@ function claimAllFilteredMissingAR() {
     const itemsToClaim = (auditItem.items || []).filter(it => !isItemExemptFromSosmed(it) && !isItemInputSosmed(it));
     const periode = (auditItem.keep && auditItem.keep['PERIODE']) 
       ? String(auditItem.keep['PERIODE']).trim() 
-      : 'Oktober-26';
+      : getDetectedKeepPeriod();
     const keepFormatted = (typeof formatKeepTextForClipboard === 'function') 
       ? formatKeepTextForClipboard(auditItem.keep) 
       : '';
@@ -7038,7 +7134,7 @@ async function buildClaimsWorksheet(wb, sheetName, rows) {
     const rowObj = {
       no: idx + 1,
       tanggal: formatCrosellingDate(r.postingDate),
-      periode: r.periode || 'Oktober-26',
+      periode: r.periode || getDetectedKeepPeriod(),
       noAR: r.docNumber,
       noHP: r.customerPhone || '-',
       kodeSosmed: r.targetSosmedCode,
@@ -7237,7 +7333,7 @@ async function downloadARClaimsSingleExcel(autoShare = false) {
       const rArr = [
         idx + 1,
         formatCrosellingDate(r.postingDate),
-        r.periode || 'Oktober-26',
+        r.periode || getDetectedKeepPeriod(),
         r.docNumber,
         r.customerPhone || '-',
         r.targetSosmedCode,
@@ -7370,7 +7466,7 @@ async function shareARClaimsBatchDay4() {
       const rArr = [
         idx + 1,
         formatCrosellingDate(r.postingDate),
-        r.periode || 'Oktober-26',
+        r.periode || getDetectedKeepPeriod(),
         r.docNumber,
         r.customerPhone || '-',
         r.targetSosmedCode,
@@ -7589,7 +7685,7 @@ function exportClaimsPenaltyReport() {
     excelData.push([
       idx + 1,
       formatCrosellingDate(r.postingDate),
-      r.periode || 'Oktober-26',
+      r.periode || getDetectedKeepPeriod(),
       r.docNumber,
       r.cabang,
       `${r.customerName || '-'} (${r.customerPhone || '-'})`,
