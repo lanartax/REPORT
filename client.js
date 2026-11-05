@@ -8171,44 +8171,151 @@ function cancelOmniQuotedReply() {
   if (bar) bar.style.display = 'none';
 }
 
-function scrollToOmniQuotedMessage(quotedId, quotedText) {
+function findTargetQuotedRow(replyTo) {
+  if (!replyTo) return null;
   const stream = document.getElementById('omniMessagesStream');
-  if (!stream) return;
+  if (!stream) return null;
 
-  let targetEl = null;
+  const allRows = Array.from(stream.querySelectorAll('.omni-msg-row'));
+  if (allRows.length === 0) return null;
 
-  // 1. Cari berdasarkan ID pesan
-  if (quotedId) {
-    targetEl = document.getElementById('omniMsg_' + quotedId) || stream.querySelector('[data-msg-id="' + quotedId + '"]');
+  // 1. Jika ada ID spesifik pesan
+  if (replyTo.id) {
+    const byId = document.getElementById('omniMsg_' + replyTo.id) || stream.querySelector('[data-msg-id="' + replyTo.id + '"]');
+    if (byId) return byId;
   }
 
-  // 2. Fallback: Cari berdasarkan cuplikan teks pesan
-  if (!targetEl && quotedText) {
-    const cleanSearch = String(quotedText).trim().toLowerCase().slice(0, 35);
-    const allRows = stream.querySelectorAll('.omni-msg-row');
-    for (let i = allRows.length - 1; i >= 0; i--) {
-      const row = allRows[i];
-      const bubbleEl = row.querySelector('.omni-bubble');
-      if (bubbleEl) {
-        const clone = bubbleEl.cloneNode(true);
-        const replyBlock = clone.querySelector('.omni-bubble-reply-block');
-        if (replyBlock) replyBlock.remove();
-        const rowText = clone.innerText.toLowerCase();
-        if (cleanSearch && rowText.includes(cleanSearch)) {
-          targetEl = row;
-          break;
-        }
+  const rawQuotedText = String(replyTo.text || '').trim();
+  if (!rawQuotedText) return null;
+
+  function getBubbleCleanText(row) {
+    const bubble = row.querySelector('.omni-bubble');
+    if (!bubble) return '';
+    const clone = bubble.cloneNode(true);
+    const rb = clone.querySelector('.omni-bubble-reply-block');
+    if (rb) rb.remove();
+    const timeEl = clone.querySelector('.omni-bubble-time');
+    if (timeEl) timeEl.remove();
+    const senderEl = clone.querySelector('.omni-bubble-sender');
+    if (senderEl) senderEl.remove();
+    return clone.innerText.trim();
+  }
+
+  // 2. Ekstraksi spesifik jika merupakan Format Keep follow-up
+  const waMatch = rawQuotedText.match(/nomor\s+whatsapp\s*:\s*([0-9+]+)/i);
+  const custMatch = rawQuotedText.match(/nama\s+customer\s*:\s*([^\n\r]+)/i);
+  const tglMatch = rawQuotedText.match(/tanggal\s+keep\s*:\s*([^\n\r]+)/i);
+  const barangMatch = rawQuotedText.match(/barang\s*:\s*([^\n\r]+)/i);
+
+  const targetWA = waMatch ? waMatch[1].replace(/\D/g, '') : '';
+  const targetCust = custMatch ? custMatch[1].trim().toLowerCase() : '';
+  const targetTgl = tglMatch ? tglMatch[1].trim().toLowerCase() : '';
+  const targetBarang = barangMatch ? barangMatch[1].trim().toLowerCase() : '';
+
+  if (targetWA || targetCust || targetTgl) {
+    let bestRow = null;
+    let highestScore = 0;
+
+    for (const row of allRows) {
+      const bubbleText = getBubbleCleanText(row).toLowerCase();
+      const bubbleDigits = bubbleText.replace(/\D/g, '');
+      let score = 0;
+
+      if (targetWA && (bubbleText.includes(targetWA) || (targetWA.length >= 9 && bubbleDigits.includes(targetWA.slice(-9))))) {
+        score += 10;
       }
+      if (targetCust && targetCust.length > 2 && bubbleText.includes(targetCust)) {
+        score += 8;
+      }
+      if (targetTgl && bubbleText.includes(targetTgl)) {
+        score += 5;
+      }
+      if (targetBarang && targetBarang.length > 3 && bubbleText.includes(targetBarang)) {
+        score += 4;
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestRow = row;
+      }
+    }
+
+    if (bestRow && highestScore >= 5) {
+      return bestRow;
     }
   }
 
-  if (targetEl) {
-    // Scroll mulus langsung ke chat yang dimention tepat di tengah tampilan
-    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // 3. Pencarian berbasis baris-baris unik dari teks kutipan
+  const lines = rawQuotedText.split('\n')
+    .map(function(l) { return l.trim().toLowerCase(); })
+    .filter(function(l) { return l.length >= 8 && !l.startsWith('halo kak') && !l.startsWith('mimin mau') && !l.startsWith('silakan bantu'); });
 
-    // Efek highlight / focus point (pulse animation)
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const row of allRows) {
+    const bubbleText = getBubbleCleanText(row).toLowerCase();
+    if (!bubbleText) continue;
+
+    let score = 0;
+    for (const line of lines) {
+      if (bubbleText.includes(line)) {
+        score += line.length;
+      }
+    }
+
+    if (bubbleText === rawQuotedText.toLowerCase() || bubbleText.includes(rawQuotedText.toLowerCase())) {
+      score += 100;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = row;
+    }
+  }
+
+  if (bestMatch && bestScore > 0) {
+    return bestMatch;
+  }
+
+  // 4. Fallback: pencarian substring umum
+  const normalizedQuoted = rawQuotedText.toLowerCase().replace(/\s+/g, ' ');
+  const fallbackShort = normalizedQuoted.slice(0, 30);
+  for (let i = allRows.length - 1; i >= 0; i--) {
+    const bubbleText = getBubbleCleanText(allRows[i]).toLowerCase();
+    if (bubbleText.includes(fallbackShort)) {
+      return allRows[i];
+    }
+  }
+
+  return null;
+}
+
+function handleOmniQuotedClick(idx) {
+  const msgs = window.currentOmniChatMessages || [];
+  const msg = msgs[idx];
+  if (!msg || !msg.replyTo) return;
+
+  const targetEl = findTargetQuotedRow(msg.replyTo);
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     targetEl.classList.remove('omni-msg-focused');
     void targetEl.offsetWidth; // trigger reflow
+    targetEl.classList.add('omni-msg-focused');
+
+    setTimeout(function() {
+      if (targetEl) targetEl.classList.remove('omni-msg-focused');
+    }, 2000);
+  }
+}
+window.handleOmniQuotedClick = handleOmniQuotedClick;
+
+function scrollToOmniQuotedMessage(quotedId, quotedText) {
+  const targetEl = findTargetQuotedRow({ id: quotedId, text: quotedText });
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetEl.classList.remove('omni-msg-focused');
+    void targetEl.offsetWidth;
     targetEl.classList.add('omni-msg-focused');
 
     setTimeout(function() {
@@ -9154,11 +9261,12 @@ function renderOmniActiveChat(pic) {
   const sortedMessages = (customMessages || []).slice().sort(function(a, b) {
     return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0);
   });
+  window.currentOmniChatMessages = sortedMessages;
 
   let lastDateGroup = null;
   const messagesRendered = [];
 
-  sortedMessages.forEach(function(msg) {
+  sortedMessages.forEach(function(msg, idx) {
     const msgTs = msg.timestamp ? Number(msg.timestamp) : Date.now();
     const d = new Date(msgTs);
     const dateKey = isNaN(d.getTime()) ? 'today' : `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -9208,10 +9316,8 @@ function renderOmniActiveChat(pic) {
     const msgId = String(msg.id || msg.messageId || ('msg_' + (msg.timestamp || Math.random().toString(36).slice(2))));
     const safeMsgId = escapeHtml(msgId).replace(/'/g, "\\'");
 
-    const targetQuotedId = replyToObj ? escapeHtml(replyToObj.id || '').replace(/'/g, "\\'") : '';
-    const targetQuotedText = replyToObj ? escapeHtml(replyToObj.text || '').replace(/'/g, "\\'").replace(/\n/g, ' ') : '';
     const quotedBlock = replyToObj ? (
-      '<div class="omni-bubble-reply-block" onclick="scrollToOmniQuotedMessage(\'' + targetQuotedId + '\', \'' + targetQuotedText + '\')" title="Klik untuk melompat ke pesan yang direply">' +
+      '<div class="omni-bubble-reply-block" onclick="handleOmniQuotedClick(' + idx + ')" title="Klik untuk melompat ke pesan yang direply">' +
         '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
         '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
       '</div>'
@@ -9501,10 +9607,12 @@ function appendOmniBubbleToStream(msg, senderDisplayName) {
     }
   }
 
-  const targetQuotedId = replyToObj ? escapeHtml(replyToObj.id || '').replace(/'/g, "\\'") : '';
-  const targetQuotedText = replyToObj ? escapeHtml(replyToObj.text || '').replace(/'/g, "\\'").replace(/\n/g, ' ') : '';
+  if (!window.currentOmniChatMessages) window.currentOmniChatMessages = [];
+  const streamIdx = window.currentOmniChatMessages.length;
+  window.currentOmniChatMessages.push(msg);
+
   const quotedBlock = replyToObj ? (
-    '<div class="omni-bubble-reply-block" onclick="scrollToOmniQuotedMessage(\'' + targetQuotedId + '\', \'' + targetQuotedText + '\')" title="Klik untuk melompat ke pesan yang direply">' +
+    '<div class="omni-bubble-reply-block" onclick="handleOmniQuotedClick(' + streamIdx + ')" title="Klik untuk melompat ke pesan yang direply">' +
       '<div class="omni-reply-block-sender">' + escapeHtml(replyToObj.senderName || 'Balasan') + '</div>' +
       '<div class="omni-reply-block-text">' + escapeHtml(replyToObj.text || '') + '</div>' +
     '</div>'
