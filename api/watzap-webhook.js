@@ -340,13 +340,16 @@ module.exports = async function handler(req, res) {
           ? String(p.to || p._data?.id?.remote || p._data?.to || '')
           : String(p.from || p._data?.id?.remote || '');
 
-        // Abaikan grup WhatsApp
-        const isGroup = targetJid.includes('@g.us') ||
+        // Abaikan grup WhatsApp & WhatsApp Status/Broadcast
+        const isGroupOrBroadcast = targetJid.includes('@g.us') ||
+          targetJid.includes('broadcast') ||
           String(p.from || '').includes('@g.us') ||
-          String(p.to || '').includes('@g.us');
+          String(p.from || '').includes('broadcast') ||
+          String(p.to || '').includes('@g.us') ||
+          String(p.to || '').includes('broadcast');
 
-        if (isGroup) {
-          return res.status(200).json({ status: 200, message: 'Group ignored' });
+        if (isGroupOrBroadcast) {
+          return res.status(200).json({ status: 200, message: 'Group or broadcast ignored' });
         }
 
         // Resolusi nomor telepon asli dari WhatsApp LID (@lid -> @c.us)
@@ -356,6 +359,10 @@ module.exports = async function handler(req, res) {
         }
         if (cleanPhone.startsWith('08')) cleanPhone = '62' + cleanPhone.slice(1);
         else if (cleanPhone.startsWith('8')) cleanPhone = '62' + cleanPhone;
+
+        if (!cleanPhone || cleanPhone.length < 9) {
+          return res.status(200).json({ status: 200, message: 'Invalid phone or system contact ignored' });
+        }
 
         const messageId = String(p.id || ('waha_' + Date.now()));
 
