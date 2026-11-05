@@ -8755,6 +8755,7 @@ function getIndexedOmniKeeps() {
     const status = (r['Status'] || 'BELUM DIINPUT').trim() || 'BELUM DIINPUT';
     const feedback = (r['Feedback Tim FU'] || '').trim();
     const remarks = (r['Remarks'] || r['Kode Sosmed'] || sender || '-').trim();
+    const reportAR = (r['REPORT AR'] || r['Report AR'] || r['AR'] || '').trim();
     const isPending = (!feedback || feedback === '-' || feedback === '""') || status === 'BELUM DIINPUT' || !status;
 
     const keepItem = {
@@ -8765,6 +8766,7 @@ function getIndexedOmniKeeps() {
       cabang: cabang,
       sender: sender,
       remarks: remarks,
+      reportAR: reportAR,
       status: status,
       feedback: feedback,
       timestamp: ts,
@@ -9731,6 +9733,10 @@ function openWhatsAppChat(cleanWA, picName) {
 function renderOmniKeepPanel(pic) {
   const container = document.getElementById('omniDetailsPanelContainer');
   if (!container) return;
+  if (!pic) {
+    container.innerHTML = '';
+    return;
+  }
   const pendingKeeps = (pic.keeps || []).filter(function(k) { return k.isPending; });
   const resolvedKeeps = (pic.keeps || []).filter(function(k) { return !k.isPending; });
   const displayKeeps = selectedOmniKeepSubTab === 'PENDING' ? pendingKeeps : resolvedKeeps;
@@ -9746,13 +9752,8 @@ function renderOmniKeepPanel(pic) {
     'TAKE OUT'
   ];
 
-  const cardsMarkup = displayKeeps.length === 0 ? (
-    '<div style="padding: 36px 14px; text-align: center; color: #64748b; font-size: 0.78rem; line-height: 1.5;">' +
-      (selectedOmniKeepSubTab === 'PENDING'
-        ? '✨ Semua format keep 2 hari terakhir untuk PIC ini sudah diisi feedback & statusnya!'
-        : 'Belum ada format keep yang selesai.') +
-    '</div>'
-  ) : displayKeeps.map(function(k) {
+  // User requirement: Yang kotak warna hijau tolong tulisannya dihapus aja (jika 0 maka kosong tanpa teks / notifikasi)
+  const cardsMarkup = displayKeeps.length === 0 ? '' : displayKeeps.map(function(k) {
     const curStatus = k.status || 'BELUM DIINPUT';
     const optMarkup = statusOptions.map(function(opt) {
       return '<option value="' + opt + '" ' + (opt === curStatus ? 'selected' : '') + '>' + opt + '</option>';
@@ -9785,6 +9786,10 @@ function renderOmniKeepPanel(pic) {
       '</div>' +
       '<div class="omni-keep-form-modern">' +
         '<div>' +
+          '<label class="omni-keep-label-modern">REPORT AR (Kolom N):</label>' +
+          '<input type="text" class="omni-keep-input-modern" id="omniReportARInp_' + k.customerWA + '" value="' + escapeHtml(k.reportAR || '') + '" placeholder="Nomor Dokumen AR..." />' +
+        '</div>' +
+        '<div>' +
           '<label class="omni-keep-label-modern">Status (Kolom V):</label>' +
           '<select class="omni-keep-select-modern" id="omniStatusSelect_' + k.customerWA + '">' +
             optMarkup +
@@ -9796,7 +9801,7 @@ function renderOmniKeepPanel(pic) {
         '</div>' +
         '<button type="button" class="omni-btn-save-modern" id="btnSaveKeep_' + k.customerWA + '" onclick="saveSingleKeepFeedback(\'' + k.customerWA + '\', \'' + pic.key + '\')">' +
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' +
-          '<span>Simpan Feedback</span>' +
+          '<span>Simpan Feedback & AR</span>' +
         '</button>' +
       '</div>' +
     '</div>';
@@ -9804,11 +9809,14 @@ function renderOmniKeepPanel(pic) {
 
   container.innerHTML = '<div class="omni-details-top">' +
     '<div class="omni-details-title-row">' +
-      '<span class="omni-details-heading">Format Keep PIC (2 Hari Terakhir)</span>' +
-      '<span class="omni-keep-counter-badge ' + (pendingKeeps.length === 0 ? 'zero' : '') + '">' +
-        pendingKeeps.length + ' Pending' +
-      '</span>' +
+      '<span class="omni-details-heading">Format Keep PIC</span>' +
+      '<span class="omni-keep-period-chip">2 Hari Terakhir</span>' +
     '</div>' +
+    '<span class="omni-keep-counter-badge ' + (pendingKeeps.length === 0 ? 'zero' : '') + '">' +
+      pendingKeeps.length + ' Pending' +
+    '</span>' +
+  '</div>' +
+  '<div class="omni-keep-subtabs-wrap">' +
     '<div class="omni-keep-subtabs">' +
       '<button type="button" class="omni-subtab-btn ' + (selectedOmniKeepSubTab === 'PENDING' ? 'active' : '') + '" onclick="setOmniKeepSubTab(\'PENDING\')">' +
         'Belum Diisi (' + pendingKeeps.length + ')' +
@@ -9826,11 +9834,13 @@ function renderOmniKeepPanel(pic) {
 async function saveSingleKeepFeedback(customerWA, picKey) {
   const statusEl = document.getElementById('omniStatusSelect_' + customerWA);
   const feedbackEl = document.getElementById('omniFeedbackInp_' + customerWA);
+  const arEl = document.getElementById('omniReportARInp_' + customerWA);
   const saveBtn = document.getElementById('btnSaveKeep_' + customerWA);
   if (!statusEl || !feedbackEl) return;
 
   const newStatus = statusEl.value;
   const newFeedback = feedbackEl.value.trim();
+  const newReportAR = arEl ? arEl.value.trim() : '';
 
   let matchedRow = null;
   if (Array.isArray(rawKeepRows)) {
@@ -9839,6 +9849,7 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
       if (rowWA === customerWA) {
         rawKeepRows[i]['Status'] = newStatus;
         rawKeepRows[i]['Feedback Tim FU'] = newFeedback;
+        rawKeepRows[i]['REPORT AR'] = newReportAR;
         matchedRow = rawKeepRows[i];
         break;
       }
@@ -9847,9 +9858,13 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
 
   const threads = getOmniThreads();
   if (!threads[picKey]) threads[picKey] = [];
+  let updateText = '[UPDATE FORMAT KEEP] Status: ' + newStatus + ' | Feedback: ' + (newFeedback || '-');
+  if (newReportAR) updateText += ' | AR: ' + newReportAR;
+  updateText += ' (' + (matchedRow ? matchedRow['Nama'] : customerWA) + ')';
+
   threads[picKey].push({
     sender: 'ADMIN',
-    text: '[UPDATE FORMAT KEEP] Status: ' + newStatus + ' | Feedback: ' + (newFeedback || '-') + ' (' + (matchedRow ? matchedRow['Nama'] : customerWA) + ')',
+    text: updateText,
     timestamp: Date.now()
   });
   saveOmniThreads(threads);
@@ -9859,22 +9874,6 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
     saveBtn.style.background = '#059669';
   }
 
-  try {
-    await fetch('/api/update-keep-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nomorWA: customerWA,
-        status: newStatus,
-        feedbackTimFU: newFeedback,
-        cabang: matchedRow ? matchedRow['Cabang'] : '',
-        namaTimFollowUp: matchedRow ? (matchedRow['Nama Tim Follow Up'] || matchedRow['Nama Tim FU']) : ''
-      })
-    });
-  } catch (err) {
-    console.error('Gagal update keep status ke backend:', err);
-  }
-
   // Update in-memory 2-day keep cache (0ms)
   const keepsMap = getIndexedOmniKeeps();
   Object.keys(keepsMap).forEach(function(k) {
@@ -9882,13 +9881,48 @@ async function saveSingleKeepFeedback(customerWA, picKey) {
       if (item.customerWA === customerWA) {
         item.status = newStatus;
         item.feedback = newFeedback;
+        item.reportAR = newReportAR;
         item.isPending = (newStatus === 'BELUM DIINPUT');
       }
     });
   });
 
+  try {
+    const promises = [
+      fetch('/api/update-keep-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nomorWA: customerWA,
+          status: newStatus,
+          feedbackTimFU: newFeedback,
+          reportAR: newReportAR,
+          cabang: matchedRow ? matchedRow['Cabang'] : '',
+          namaTimFollowUp: matchedRow ? (matchedRow['Nama Tim Follow Up'] || matchedRow['Nama Tim FU']) : ''
+        })
+      })
+    ];
+
+    if (newReportAR) {
+      promises.push(
+        fetch('/api/update-report-ar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nomorWA: customerWA,
+            arDoc: newReportAR
+          })
+        })
+      );
+    }
+
+    await Promise.allSettled(promises);
+  } catch (err) {
+    console.error('Gagal update keep status ke backend:', err);
+  }
+
   if (typeof showSaveToast === 'function') {
-    showSaveToast('Status format keep berhasil disimpan!');
+    showSaveToast('Format keep & REPORT AR berhasil disimpan!');
   }
 
   renderOmniInboxModule();

@@ -283,7 +283,7 @@ const server = http.createServer(async (req, res) => {
 
   // 3. API Update Keep Status & Feedback to Google Sheets via Google Apps Script Web App
   if (reqPath === '/api/update-keep-status') {
-    const handleUpdateStatus = async (nomorWA, status, feedback = '') => {
+    const handleUpdateStatus = async (nomorWA, status, feedback = '', reportAR = '') => {
       if (!nomorWA) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'nomorWA harus diisi' }));
@@ -292,8 +292,11 @@ const server = http.createServer(async (req, res) => {
 
       // Perbarui file lokal keep-data.csv seketika & siarkan via SSE (0ms)
       updateLocalKeepCsvStatus(nomorWA, status, feedback);
+      if (reportAR) {
+        updateLocalKeepCsvReportAR(nomorWA, reportAR);
+      }
 
-      console.log(`📤 Mengirim update status/feedback ke Google Sheets: WA=${nomorWA}, Status=${status || '-'}, Feedback=${feedback || '-'}`);
+      console.log(`📤 Mengirim update status/feedback ke Google Sheets: WA=${nomorWA}, Status=${status || '-'}, Feedback=${feedback || '-'}, AR=${reportAR || '-'}`);
       try {
         let targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(nomorWA)}&status=${encodeURIComponent(status || '')}`;
         if (feedback) {
@@ -317,7 +320,7 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-          await handleUpdateStatus(body.nomorWA || '', body.status || '', body.feedback || '');
+          await handleUpdateStatus(body.nomorWA || '', body.status || '', body.feedback || '', body.reportAR || body.arDoc || '');
         } catch (e) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Format JSON tidak valid' }));
@@ -326,7 +329,7 @@ const server = http.createServer(async (req, res) => {
       return;
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host}`);
-      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '', urlParams.searchParams.get('feedback') || '');
+      await handleUpdateStatus(urlParams.searchParams.get('nomorWA') || '', urlParams.searchParams.get('status') || '', urlParams.searchParams.get('feedback') || '', urlParams.searchParams.get('reportAR') || urlParams.searchParams.get('arDoc') || '');
       return;
     }
   }

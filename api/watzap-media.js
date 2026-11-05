@@ -39,3 +39,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).send('Internal media proxy error');
   }
 };
+

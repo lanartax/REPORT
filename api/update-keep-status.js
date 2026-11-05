@@ -3,7 +3,7 @@ const path = require('path');
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdEByURvrvCNAJ-TlaxlU5GoNvmClgxynK_vYrORzXiTXFoYArwRMCJzdW2LWvT5wfUw/exec';
 
-function updateLocalCsv(nomorWA, newStatus, feedback = null) {
+function updateLocalCsv(nomorWA, newStatus, feedback = null, reportAR = null) {
   try {
     const csvPath = path.join(process.cwd(), 'keep-data.csv');
     if (!fs.existsSync(csvPath)) return;
@@ -25,6 +25,11 @@ function updateLocalCsv(nomorWA, newStatus, feedback = null) {
         const rowWA = String(cols[7] || '').replace(/\D/g, '');
         if (rowWA === targetWA || (rowWA.length >= 9 && rowWA.slice(-9) === targetLast9)) {
           while (cols.length < 23) cols.push('');
+          if (reportAR !== null && reportAR !== undefined && String(reportAR).trim() !== '') {
+            cols[13] = String(reportAR).trim();
+            const today = new Date();
+            cols[14] = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+          }
           if (newStatus !== null && newStatus !== undefined) cols[21] = String(newStatus).trim();
           if (feedback !== null && feedback !== undefined) cols[22] = String(feedback).trim();
           lines[i] = cols.join(',');
@@ -55,17 +60,20 @@ module.exports = async function handler(req, res) {
     let nomorWA = '';
     let status = '';
     let feedback = '';
+    let reportAR = '';
 
     if (req.method === 'POST') {
       const body = req.body || {};
       nomorWA = body.nomorWA || '';
       status = body.status || '';
       feedback = body.feedback || '';
+      reportAR = body.reportAR || body.arDoc || '';
     } else {
       const urlParams = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       nomorWA = urlParams.searchParams.get('nomorWA') || (req.query && req.query.nomorWA) || '';
       status = urlParams.searchParams.get('status') || (req.query && req.query.status) || '';
       feedback = urlParams.searchParams.get('feedback') || (req.query && req.query.feedback) || '';
+      reportAR = urlParams.searchParams.get('reportAR') || urlParams.searchParams.get('arDoc') || '';
     }
 
     if (!nomorWA) {
@@ -73,7 +81,7 @@ module.exports = async function handler(req, res) {
     }
 
     const cleanWA = String(nomorWA).replace(/\D/g, '');
-    updateLocalCsv(cleanWA, status, feedback);
+    updateLocalCsv(cleanWA, status, feedback, reportAR);
 
     let targetUrl = `${APPS_SCRIPT_URL}?action=UPDATE_STATUS&nomorWA=${encodeURIComponent(cleanWA)}&status=${encodeURIComponent(status || '')}`;
     if (feedback) {

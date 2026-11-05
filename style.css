@@ -5984,72 +5984,111 @@ h1, h2, h3, h4, h5, h6,
 
 /* 4. DEDICATED PANEL: FORMAT KEEP & UPDATE FEEDBACK */
 .omni-col-details {
-  width: 320px;
-  min-width: 300px;
+  width: 330px;
+  min-width: 310px;
   background: #ffffff;
   border-left: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 14px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
 }
 
-.omni-keep-panel-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+.omni-details-top {
+  height: 54px;
+  min-height: 54px;
+  max-height: 54px;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-bottom: 1px solid #e2e8f0;
-}
-
-.omni-keep-panel-title-wrap {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: #ffffff;
+  flex-shrink: 0;
 }
 
-.omni-keep-panel-title {
-  font-size: 0.84rem;
+.omni-details-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.omni-details-heading {
+  font-size: 0.88rem;
   font-weight: 800;
   color: #0f172a;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
-.omni-keep-pending-badge {
-  font-size: 0.65rem;
+.omni-keep-period-chip {
+  font-size: 0.62rem;
   font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.omni-keep-counter-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #dc2626;
   background: #fee2e2;
-  color: #ef4444;
-  padding: 2px 7px;
+  border: 1px solid #fecaca;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.omni-keep-counter-badge.zero {
+  color: #059669;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.omni-keep-subtabs-wrap {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.omni-keep-subtabs {
+  display: flex;
+  gap: 4px;
+  background: #e2e8f0;
+  padding: 3px;
   border-radius: 8px;
 }
 
-.omni-keep-tabs-nav {
-  display: flex;
-  gap: 4px;
-  background: #f1f5f9;
-  padding: 3px;
-  border-radius: 6px;
-}
-
-.omni-keep-tab-btn {
+.omni-subtab-btn {
   flex: 1;
   background: transparent;
   border: none;
   color: #64748b;
-  padding: 5px 6px;
-  border-radius: 4px;
-  font-size: 0.70rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: center;
+  font-family: inherit;
 }
 
-.omni-keep-tab-btn.active {
+.omni-subtab-btn:hover {
+  color: #0f172a;
+}
+
+.omni-subtab-btn.active {
   background: #ffffff;
   color: #0f172a;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 /* Keep Card in Panel */
@@ -6591,6 +6630,9 @@ h1, h2, h3, h4, h5, h6,
    MODERN FORMAT KEEP PANEL (PURPLE BOX OVERHAUL)
    ========================================================================== */
 .omni-details-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -6689,6 +6731,26 @@ h1, h2, h3, h4, h5, h6,
   letter-spacing: 0.04em;
   display: block;
   margin-bottom: 3px;
+}
+
+.omni-keep-input-modern {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+  font-family: inherit;
+  font-weight: 600;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.omni-keep-input-modern:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .omni-keep-select-modern {
