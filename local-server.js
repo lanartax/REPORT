@@ -630,6 +630,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (reqPath === '/api/watzap-media' || reqPath.startsWith('/api/watzap-media')) {
+    res.status = (code) => { res.statusCode = code; return res; };
+    res.send = (data) => {
+      res.writeHead(res.statusCode || 200);
+      res.end(data);
+    };
+    await require('./api/watzap-media')(req, res);
+    return;
+  }
+
   if (reqPath === '/api/watzap-send' || reqPath.startsWith('/api/watzap-send')) {
     let body = '';
     req.on('data', chunk => body += chunk);

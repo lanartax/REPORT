@@ -8551,10 +8551,19 @@ function saveOmniThreads(threads) {
         if (k.toLowerCase().includes('yahya')) targetKey = '6289603864476';
         else return;
       }
-      cleaned[targetKey] = threads[k];
+      cleaned[targetKey] = (threads[k] || []).map(function(m) {
+        if (m.mediaUrl && m.mediaUrl.length > 500 && m.mediaUrl.startsWith('data:')) {
+          const copy = Object.assign({}, m);
+          copy.mediaUrl = '';
+          return copy;
+        }
+        return m;
+      });
     });
     localStorage.setItem('gadgetmart_omni_threads', JSON.stringify(cleaned));
-  } catch (e) {}
+  } catch (e) {
+    console.warn('saveOmniThreads warning:', e);
+  }
 }
 
 function setOmniFolder(folder) {
@@ -9050,7 +9059,7 @@ function renderOmniActiveChat(pic) {
   const initial = (pic.picName || 'P').charAt(0).toUpperCase();
   const cleanWA = pic.picWA;
   const threads = getOmniThreads();
-  const customMessages = threads[pic.key] || [];
+  const customMessages = threads[pic.key] || threads[cleanWA] || threads[normalizeWhatsAppPhone(cleanWA)] || [];
 
   const keepsBotMarkup = (pic.keeps || []).map(function(k) {
     const botText = generateWhatsAppBotMessage(k, pic.picName);
@@ -9658,7 +9667,9 @@ async function pollWatzapIncomingMessages() {
       if (isInitialLoad) {
         renderOmniInboxModule();
         const allChats = getOmniPicChats();
-        if (!selectedOmniPicKey && allChats.length > 0) {
+        if (selectedOmniPicKey) {
+          selectOmniPic(selectedOmniPicKey);
+        } else if (allChats.length > 0) {
           selectOmniPic(allChats[0].key);
         }
       } else {

@@ -382,18 +382,22 @@ module.exports = async function handler(req, res) {
           ts = Number(p.timestamp) > 10000000000 ? Number(p.timestamp) : Number(p.timestamp) * 1000;
         }
 
-        // Ekstraksi & resolusi media gambar/foto agar menjadi Data URI permanen
+        // Ekstraksi & resolusi media gambar/foto agar menjadi URL proxy ringan (tanpa kuota base64 berlebih)
         let mediaUrl = '';
         if (p.hasMedia && p.media) {
-          if (typeof p.media === 'string') mediaUrl = p.media;
-          else if (p.media.url) mediaUrl = p.media.url;
-          else if (p.media.data) {
-            const mime = p.media.mimetype || 'image/jpeg';
-            mediaUrl = `data:${mime};base64,${p.media.data}`;
+          if (p.media.url) {
+            const m = String(p.media.url).match(/\/api\/files\/(.+)$/);
+            if (m) mediaUrl = `/api/watzap-media?file=${m[1]}`;
+            else mediaUrl = p.media.url;
+          } else if (p.media.filename) {
+            mediaUrl = `/api/watzap-media?file=default/${p.media.filename}`;
+          } else if (typeof p.media === 'string') {
+            const m = p.media.match(/\/api\/files\/(.+)$/);
+            if (m) mediaUrl = `/api/watzap-media?file=${m[1]}`;
+            else mediaUrl = p.media;
+          } else if (messageId) {
+            mediaUrl = `/api/watzap-media?file=default/${messageId}.jpeg`;
           }
-        }
-        if (mediaUrl && !mediaUrl.startsWith('data:')) {
-          mediaUrl = await fetchAndEncodeMedia(mediaUrl, p.media?.mimetype || 'image/jpeg');
         }
 
         const isImage = Boolean(p.hasMedia || mediaUrl);

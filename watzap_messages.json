@@ -40,5 +40,25 @@
     "timestamp": 1793771722762,
     "mediaUrl": "",
     "replyTo": null
+  },
+  {
+    "messageId": "[object Object]",
+    "phone": "6289603864476",
+    "message": "Halo Yahya! Sistem omnichannel WAHA VPS sudah aktif & tersinkronisasi.",
+    "sender": "ADMIN",
+    "type": "text",
+    "timestamp": 1793782568234,
+    "mediaUrl": "",
+    "replyTo": null
+  },
+  {
+    "messageId": "true_152419883311330@lid_3EB0FEFAB49C62B70B86EF",
+    "phone": "6289603864476",
+    "message": "Testing sinkronisasi chat omnichannel WAHA",
+    "sender": "ADMIN",
+    "type": "text",
+    "timestamp": 1793782605694,
+    "mediaUrl": "",
+    "replyTo": null
   }
 ]

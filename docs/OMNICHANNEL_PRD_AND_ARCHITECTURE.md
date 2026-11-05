@@ -307,3 +307,4 @@ WAHA_BASE_URL="http://178.83.188.100:3088"
 WAHA_API_KEY="gadgetmart123"
 ```
 Setelah itu, modul omnichannel akan langsung aktif dan berfungsi 100%.
+
